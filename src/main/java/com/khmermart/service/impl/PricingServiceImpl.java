@@ -185,13 +185,15 @@ public class PricingServiceImpl implements PricingService {
 
     // 4. Shipping calculation
     long shippingCents = 0L;
-    if (shippingMethod != null) {
+    long subtotalAfterDiscounts = Math.max(0L, subtotalCents - totalDiscountCents);
+
+    if (shippingMethod != null && subtotalCents > 0) {
       long baseFee = shippingMethod.getFeeCents();
       boolean freeShippingCoupon =
           coupon != null && coupon.isActive() && coupon.getType() == CouponType.FREE_SHIPPING;
       boolean orderOverThreshold =
           shippingMethod.getFreeOverCents() != null
-              && subtotalCents >= shippingMethod.getFreeOverCents();
+              && subtotalAfterDiscounts >= shippingMethod.getFreeOverCents();
 
       if (freeShippingCoupon || orderOverThreshold) {
         shippingCents = 0L;
@@ -200,7 +202,7 @@ public class PricingServiceImpl implements PricingService {
       }
     }
 
-    long totalCents = Math.max(0L, subtotalCents - totalDiscountCents + shippingCents);
+    long totalCents = Math.max(0L, subtotalAfterDiscounts + shippingCents);
 
     return new PricingResult(
         subtotalCents,

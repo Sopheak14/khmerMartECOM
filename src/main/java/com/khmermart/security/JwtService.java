@@ -38,6 +38,37 @@ public class JwtService {
         .compact();
   }
 
+  public String generateStreamToken(Long paymentId, Long userId) {
+    Date now = new Date();
+    Date expiry = new Date(now.getTime() + 15 * 60 * 1000L); // 15 min
+
+    return Jwts.builder()
+        .subject(String.valueOf(userId))
+        .claim("paymentId", paymentId)
+        .claim("typ", "stream")
+        .issuedAt(now)
+        .expiration(expiry)
+        .signWith(accessKey)
+        .compact();
+  }
+
+  public boolean validateStreamToken(String token, Long paymentId) {
+    try {
+      Claims claims = validateAndGetClaims(token);
+      if (!"stream".equals(claims.get("typ", String.class))) {
+        return false;
+      }
+      Long tokenPaymentId = claims.get("paymentId", Long.class);
+      if (tokenPaymentId == null) {
+        Number num = claims.get("paymentId", Number.class);
+        tokenPaymentId = num != null ? num.longValue() : null;
+      }
+      return paymentId != null && paymentId.equals(tokenPaymentId);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   public Claims validateAndGetClaims(String token) {
     return Jwts.parser().verifyWith(accessKey).build().parseSignedClaims(token).getPayload();
   }

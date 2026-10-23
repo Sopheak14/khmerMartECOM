@@ -717,11 +717,16 @@ public class CheckoutServiceImpl implements CheckoutService {
               .couponId(coupon.getId())
               .userId(userId)
               .orderId(order.getId())
-              .status(CouponRedemptionStatus.PENDING)
+              .status(
+                  initialStatus == OrderStatus.CONFIRMED
+                      ? CouponRedemptionStatus.REDEEMED
+                      : CouponRedemptionStatus.PENDING)
               .build();
       couponRedemptionRepository.save(redemption);
-      coupon.setUsedCount(coupon.getUsedCount() + 1);
-      couponRepository.save(coupon);
+      if (initialStatus == OrderStatus.CONFIRMED) {
+        coupon.setUsedCount(coupon.getUsedCount() + 1);
+        couponRepository.save(coupon);
+      }
     }
 
     // Clear cart

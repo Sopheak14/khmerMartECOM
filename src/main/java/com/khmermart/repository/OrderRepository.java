@@ -17,5 +17,7 @@ public interface OrderRepository
 
   Page<Order> findByUserId(Long userId, Pageable pageable);
 
+  Page<Order> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable);
+
   List<Order> findByStatus(OrderStatus status);
 }

@@ -1,6 +1,7 @@
 package com.khmermart.repository;
 
 import com.khmermart.model.entity.Payment;
+import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import java.time.Instant;
 import java.util.List;
@@ -12,9 +13,17 @@ import org.springframework.stereotype.Repository;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
   Optional<Payment> findByOrderId(Long orderId);
 
+  List<Payment> findByOrderIdOrderByIdDesc(Long orderId);
+
+  Optional<Payment> findFirstByOrderIdOrderByIdDesc(Long orderId);
+
+  Optional<Payment> findByOrderIdAndStatus(Long orderId, PaymentStatus status);
+
   Optional<Payment> findByKhqrMd5(String khqrMd5);
 
   Optional<Payment> findByBakongHash(String bakongHash);
 
   List<Payment> findByStatusAndQrExpiresAtBefore(PaymentStatus status, Instant before);
+
+  List<Payment> findByMethodAndStatus(PaymentMethod method, PaymentStatus status);
 }

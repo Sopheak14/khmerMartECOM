@@ -89,24 +89,18 @@ class PricingServiceImplTest {
 
   @Test
   @DisplayName(
-      "4. Shipping rules: standard fee waived when subtotal >= freeOverCents or with FREESHIP coupon")
+      "4. Shipping rules: standard fee 150 waived when subtotal-after-discounts >= freeOverCents (5000) or with FREESHIP coupon")
   void testFreeShipping() {
     ShippingMethod standard =
-        ShippingMethod.builder().code("STANDARD").feeCents(200L).freeOverCents(5000L).build();
+        ShippingMethod.builder().code("STANDARD").feeCents(150L).freeOverCents(5000L).build();
 
-    // Below threshold, no coupon -> shipping fee 200
-    List<PricingItem> smallOrder = List.of(new PricingItem(1L, null, 3000L, 1, null));
+    // Below threshold ($28 / 2800c), no coupon -> shipping fee 150, total 2950
+    List<PricingItem> smallOrder = List.of(new PricingItem(1L, null, 2800L, 1, null));
     PricingResult res1 = pricingService.calculate(smallOrder, List.of(), null, standard);
-    assertThat(res1.shippingCents()).isEqualTo(200L);
-    assertThat(res1.totalCents()).isEqualTo(3200L);
+    assertThat(res1.shippingCents()).isEqualTo(150L);
+    assertThat(res1.totalCents()).isEqualTo(2950L);
 
-    // Above threshold ($50 / 5000c) -> shipping fee 0
-    List<PricingItem> largeOrder = List.of(new PricingItem(1L, null, 6000L, 1, null));
-    PricingResult res2 = pricingService.calculate(largeOrder, List.of(), null, standard);
-    assertThat(res2.shippingCents()).isEqualTo(0L);
-    assertThat(res2.totalCents()).isEqualTo(6000L);
-
-    // Below threshold with FREESHIP coupon -> shipping fee 0
+    // Below threshold with FREESHIP coupon -> shipping fee 0, total 2800
     Coupon freeShipCoupon =
         Coupon.builder()
             .code("FREESHIP")
@@ -114,9 +108,23 @@ class PricingServiceImplTest {
             .value(0L)
             .active(true)
             .build();
-    PricingResult res3 = pricingService.calculate(smallOrder, List.of(), freeShipCoupon, standard);
+    PricingResult res2 = pricingService.calculate(smallOrder, List.of(), freeShipCoupon, standard);
+    assertThat(res2.shippingCents()).isEqualTo(0L);
+    assertThat(res2.totalCents()).isEqualTo(2800L);
+
+    // Above threshold ($60 / 6000c) -> shipping fee 0
+    List<PricingItem> largeOrder = List.of(new PricingItem(1L, null, 6000L, 1, null));
+    PricingResult res3 = pricingService.calculate(largeOrder, List.of(), null, standard);
     assertThat(res3.shippingCents()).isEqualTo(0L);
-    assertThat(res3.totalCents()).isEqualTo(3000L);
+    assertThat(res3.totalCents()).isEqualTo(6000L);
+
+    // Subtotal 6000c minus discount 2000c = 4000c (< 5000c threshold) -> shipping fee 150 applies!
+    Coupon coupon2000 =
+        Coupon.builder().code("OFF2000").type(CouponType.FIXED).value(2000L).active(true).build();
+    PricingResult res4 = pricingService.calculate(largeOrder, List.of(), coupon2000, standard);
+    assertThat(res4.discountCents()).isEqualTo(2000L);
+    assertThat(res4.shippingCents()).isEqualTo(150L);
+    assertThat(res4.totalCents()).isEqualTo(4150L); // 6000 - 2000 + 150
   }
 
   @Test

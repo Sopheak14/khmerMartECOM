@@ -9,5 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface CouponRedemptionRepository extends JpaRepository<CouponRedemption, Long> {
   int countByCouponIdAndUserId(Long couponId, Long userId);
 
+  Optional<CouponRedemption> findByOrderId(Long orderId);
+
   Optional<CouponRedemption> findByCouponIdAndOrderId(Long couponId, Long orderId);
 }
