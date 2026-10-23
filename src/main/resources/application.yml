@@ -30,6 +30,9 @@ spring:
         default_batch_fetch_size: 50
         jdbc:
           time_zone: UTC
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
 
 springdoc:
   swagger-ui:

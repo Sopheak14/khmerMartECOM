@@ -13,7 +13,15 @@ import org.springframework.stereotype.Repository;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
   Optional<User> findByEmailIgnoreCase(String email);
 
+  default Optional<User> findByEmail(String email) {
+    return findByEmailIgnoreCase(email);
+  }
+
   boolean existsByEmailIgnoreCase(String email);
+
+  default boolean existsByEmail(String email) {
+    return existsByEmailIgnoreCase(email);
+  }
 
   Page<User> findByRole(Role role, Pageable pageable);
 }
