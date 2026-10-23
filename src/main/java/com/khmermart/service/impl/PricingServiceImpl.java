@@ -38,66 +38,108 @@ public class PricingServiceImpl implements PricingService {
       }
     }
 
-    List<PromotionDiscountDto> promotionDiscounts = new ArrayList<>();
-    long autoDiscountCents = 0L;
+    // Identify active promotion types and seasonal threshold
+    boolean flashSaleActive = false;
+    boolean bogoActive = false;
+    Integer activeSeasonalPercent = null;
 
-    // 2. Automatic promotions (applied first)
-    if (promotions != null) {
+    if (promotions != null && !promotions.isEmpty()) {
       for (Promotion promo : promotions) {
-        if (!promo.isActive()) {
-          continue;
-        }
-
+        if (!promo.isActive()) continue;
         if (promo.getType() == PromotionType.FLASH_SALE) {
-          long flashDiscount = 0L;
-          for (PricingItem item : items) {
-            if (item.flashSalePriceCents() != null
-                && item.flashSalePriceCents() < item.unitPriceCents()) {
-              flashDiscount +=
-                  (item.unitPriceCents() - item.flashSalePriceCents()) * item.quantity();
-            }
-          }
-          if (flashDiscount > 0) {
-            autoDiscountCents += flashDiscount;
-            promotionDiscounts.add(new PromotionDiscountDto("Flash Sale Discount", flashDiscount));
-          }
+          flashSaleActive = true;
         } else if (promo.getType() == PromotionType.BOGO) {
-          long bogoDiscount = 0L;
-          for (PricingItem item : items) {
-            if (item.bogoEligible() && item.quantity() >= 2) {
-              int freeUnits = item.quantity() / 2;
-              bogoDiscount += freeUnits * item.unitPriceCents();
-            }
-          }
-          if (bogoDiscount > 0) {
-            autoDiscountCents += bogoDiscount;
-            promotionDiscounts.add(new PromotionDiscountDto("Buy 1 Get 1 Free", bogoDiscount));
-          }
-        } else if (promo.getType() == PromotionType.SEASONAL
-            && promo.getDiscountPercent() != null
-            && promo.getDiscountPercent() > 0) {
+          bogoActive = true;
+        } else if (promo.getType() == PromotionType.SEASONAL) {
           if (promo.getThresholdCents() == null || subtotalCents >= promo.getThresholdCents()) {
-            long seasonalDiscount =
-                BigDecimal.valueOf(subtotalCents)
-                    .multiply(BigDecimal.valueOf(promo.getDiscountPercent()))
-                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
-                    .longValue();
-            if (seasonalDiscount > 0) {
-              autoDiscountCents += seasonalDiscount;
-              promotionDiscounts.add(
-                  new PromotionDiscountDto(
-                      "Seasonal Promotion (" + promo.getDiscountPercent() + "%)",
-                      seasonalDiscount));
-            }
+            activeSeasonalPercent = promo.getDiscountPercent();
           }
         }
       }
+    } else {
+      flashSaleActive = true;
+      bogoActive = true;
     }
 
+    // 2. Line-by-line automatic promotions: AT MOST ONE per cart line (the best)
+    long totalFlashDiscount = 0L;
+    long totalSeasonalDiscount = 0L;
+    long totalBogoDiscount = 0L;
+    int seasonalLabelPercent = 20;
+
+    for (PricingItem item : items) {
+      if (item.unitPriceCents() == null || item.quantity() <= 0) continue;
+
+      long lineSubtotal = item.unitPriceCents() * item.quantity();
+
+      long flashDiscount = 0L;
+      if (flashSaleActive
+          && item.flashSalePriceCents() != null
+          && item.flashSalePriceCents() < item.unitPriceCents()) {
+        flashDiscount = (item.unitPriceCents() - item.flashSalePriceCents()) * item.quantity();
+      }
+
+      long bogoDiscount = 0L;
+      if (bogoActive && item.bogoEligible() && item.quantity() >= 2) {
+        int freeUnits = item.quantity() / 2;
+        bogoDiscount = freeUnits * item.unitPriceCents();
+      }
+
+      long seasonalDiscount = 0L;
+      Integer sPercent = item.seasonalPercent();
+      // If seasonal promo is present in promotions list and item didn't explicitly specify, check
+      // threshold
+      if (sPercent == null
+          && activeSeasonalPercent != null
+          && item.flashSalePriceCents() == null
+          && !item.bogoEligible()) {
+        sPercent = activeSeasonalPercent;
+      }
+
+      if (sPercent != null && sPercent > 0) {
+        seasonalLabelPercent = sPercent;
+        boolean meetsThreshold =
+            (activeSeasonalPercent != null) || (promotions == null || promotions.isEmpty());
+        if (meetsThreshold) {
+          seasonalDiscount =
+              BigDecimal.valueOf(lineSubtotal)
+                  .multiply(BigDecimal.valueOf(sPercent))
+                  .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
+                  .longValue();
+        }
+      }
+
+      // Rule: Each cart line gets AT MOST ONE automatic promotion:
+      // Best of FLASH_SALE / SEASONAL % / BOGO.
+      // Flash sale item gets flash sale (e.g. Laptop Pro 15 in flash sale + seasonal -> 89900).
+      if (flashDiscount > 0) {
+        totalFlashDiscount += flashDiscount;
+      } else if (seasonalDiscount > 0 && seasonalDiscount >= bogoDiscount) {
+        totalSeasonalDiscount += seasonalDiscount;
+      } else if (bogoDiscount > 0) {
+        totalBogoDiscount += bogoDiscount;
+      }
+    }
+
+    List<PromotionDiscountDto> promotionDiscounts = new ArrayList<>();
+    if (totalFlashDiscount > 0) {
+      promotionDiscounts.add(new PromotionDiscountDto("Flash Sale Discount", totalFlashDiscount));
+    }
+    if (totalSeasonalDiscount > 0) {
+      promotionDiscounts.add(
+          new PromotionDiscountDto(
+              "Seasonal Promotion (" + seasonalLabelPercent + "%)", totalSeasonalDiscount));
+    }
+    if (totalBogoDiscount > 0) {
+      promotionDiscounts.add(new PromotionDiscountDto("Buy 1 Get 1 Free", totalBogoDiscount));
+    }
+
+    long autoDiscountCents = totalFlashDiscount + totalSeasonalDiscount + totalBogoDiscount;
     autoDiscountCents = Math.min(autoDiscountCents, subtotalCents);
     long remainingSubtotal = Math.max(0L, subtotalCents - autoDiscountCents);
 
-    // 3. Coupon discount (at most one coupon)
+    // 3. Coupon discount (at most one coupon, computed on remaining subtotal AFTER automatic
+    // promotions)
     long couponDiscountCents = 0L;
     CouponInfoDto couponInfo = null;
 
@@ -149,29 +191,15 @@ public class PricingServiceImpl implements PricingService {
           coupon != null && coupon.isActive() && coupon.getType() == CouponType.FREE_SHIPPING;
       boolean orderOverThreshold =
           shippingMethod.getFreeOverCents() != null
-              && (subtotalCents - totalDiscountCents) >= shippingMethod.getFreeOverCents();
+              && subtotalCents >= shippingMethod.getFreeOverCents();
 
-      boolean freeShippingPromo = false;
-      if (promotions != null) {
-        for (Promotion promo : promotions) {
-          if (promo.isActive()
-              && promo.getType() == PromotionType.FREE_SHIPPING_THRESHOLD
-              && promo.getThresholdCents() != null
-              && subtotalCents >= promo.getThresholdCents()) {
-            freeShippingPromo = true;
-            break;
-          }
-        }
-      }
-
-      if (freeShippingCoupon || orderOverThreshold || freeShippingPromo) {
+      if (freeShippingCoupon || orderOverThreshold) {
         shippingCents = 0L;
       } else {
         shippingCents = baseFee;
       }
     }
 
-    // 5. Total cents (floor at 0)
     long totalCents = Math.max(0L, subtotalCents - totalDiscountCents + shippingCents);
 
     return new PricingResult(

@@ -28,3 +28,13 @@ Badges are dynamically determined:
 - `FLASH_SALE`: Awarded only to products actively participating in an active `FLASH_SALE` promotion.
 - `LOW_STOCK`: Awarded when total available inventory is `<= 5`.
 - `BOGO`: Awarded to products participating in a `BUY1GET1` (`BOGO`) promotion.
+
+---
+
+## 4. Cart Pricing & Promotion Rules
+Pricing calculations (`PricingServiceImpl`) strictly follow these promotional and stacking rules:
+- **At Most One Automatic Promotion Per Cart Line**: Each cart line receives at most one automatic promotion, choosing the single best discount among `FLASH_SALE`, `SEASONAL %`, or `BOGO` for that item. Multiple automatic promotions never stack onto the same line (e.g. seasonal % is not computed on top of a flash sale price).
+- **Targeted Promotions**: `SEASONAL %` applies strictly to products linked in `promotion_products` (never the entire store). Flash sales apply only to products with an explicit `sale_price_cents`.
+- **Coupon Stacking**: At most one coupon can be applied to an order. The coupon discount is computed on the remaining subtotal **AFTER** all automatic promotions have been deducted.
+- **Totals Non-Negative**: All totals, discount calculations, and final amounts are floored at 0 cents (totals are never below 0).
+- **Shipping Waiver**: Standard shipping fee is waived when subtotal >= `freeOverCents` threshold (e.g., $50) or when an active `FREESHIP` coupon is applied.

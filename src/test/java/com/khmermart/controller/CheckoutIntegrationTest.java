@@ -43,7 +43,7 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
     JsonNode methods = objectMapper.readTree(methodsRes.getBody()).get("data");
     assertThat(methods.size()).isGreaterThanOrEqualTo(3);
     assertThat(methods.get(0).get("code").asText()).isEqualTo("STANDARD");
-    assertThat(methods.get(0).get("feeCents").asLong()).isEqualTo(200L);
+    assertThat(methods.get(0).get("feeCents").asLong()).isEqualTo(150L);
 
     ResponseEntity<String> provRes =
         restTemplate.getForEntity("/api/shipping/provinces", String.class);
@@ -53,7 +53,8 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("2. Checkout preview: Siem Reap address with SAME_DAY returns 422 VALIDATION_ERROR")
+  @DisplayName(
+      "2. Checkout preview: Siem Reap address with SAME_DAY returns 400 VALIDATION_ERROR with details")
   void testSameDayShippingValidation() throws Exception {
     // Customer 2 (Dara Khiev) has address 3 located in Siem Reap
     String token = loginCustomer("customer2@khmermart.local", "Customer@123");
@@ -73,12 +74,12 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
         restTemplate.exchange(
             "/api/checkout/preview", HttpMethod.POST, new HttpEntity<>(req, headers), String.class);
 
-    assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     JsonNode json = objectMapper.readTree(res.getBody());
     assertThat(json.get("success").asBoolean()).isFalse();
     assertThat(json.get("error").get("code").asText()).isEqualTo("VALIDATION_ERROR");
-    assertThat(json.get("error").get("message").asText())
-        .contains("Same-day delivery is only available in Phnom Penh");
+    assertThat(json.get("error").get("details").get("shippingMethodCode").asText())
+        .isEqualTo("Same-day delivery is only available in Phnom Penh");
   }
 
   @Test
@@ -163,6 +164,11 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
     String nextAction = firstData.get("next").asText();
     assertThat(nextAction).isEqualTo("ORDER_SUCCESS");
     assertThat(firstData.get("order").get("status").asText()).isEqualTo("CONFIRMED");
+    JsonNode timeline0 = firstData.get("order").get("timeline").get(0);
+    assertThat(timeline0.has("at")).isTrue();
+    assertThat(timeline0.has("timestamp")).isFalse();
+    assertThat(timeline0.has("status")).isTrue();
+    assertThat(timeline0.has("note")).isTrue();
 
     // Second call with EXACT SAME Idempotency-Key -> returns identical cached order
     ResponseEntity<String> secondCall =

@@ -73,7 +73,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -184,7 +183,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         throw new CustomException(
             ErrorCode.VALIDATION_ERROR,
             "Same-day delivery is only available in Phnom Penh",
-            HttpStatus.UNPROCESSABLE_ENTITY);
+            Map.of("shippingMethodCode", "Same-day delivery is only available in Phnom Penh"));
       }
     }
 
@@ -213,6 +212,9 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
+
+    Optional<Promotion> seasonalPromo =
+        activePromotions.stream().filter(p -> p.getType() == PromotionType.SEASONAL).findFirst();
 
     for (CartItem item : cartItems) {
       Product product = productRepository.findById(item.getProductId()).orElse(null);
@@ -281,6 +283,17 @@ public class CheckoutServiceImpl implements CheckoutService {
                 .isPresent();
       }
 
+      Integer seasonalPercent = null;
+      if (seasonalPromo.isPresent()) {
+        boolean seasonalEligible =
+            promotionProductRepository
+                .findByPromotionIdAndProductId(seasonalPromo.get().getId(), product.getId())
+                .isPresent();
+        if (seasonalEligible) {
+          seasonalPercent = seasonalPromo.get().getDiscountPercent();
+        }
+      }
+
       pricingItems.add(
           new PricingItem(
               product.getId(),
@@ -288,7 +301,8 @@ public class CheckoutServiceImpl implements CheckoutService {
               currentUnitPrice,
               item.getQuantity(),
               flashSalePrice,
-              bogoEligible));
+              bogoEligible,
+              seasonalPercent));
     }
 
     Coupon coupon = null;
@@ -386,7 +400,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         throw new CustomException(
             ErrorCode.VALIDATION_ERROR,
             "Same-day delivery is only available in Phnom Penh",
-            HttpStatus.UNPROCESSABLE_ENTITY);
+            Map.of("shippingMethodCode", "Same-day delivery is only available in Phnom Penh"));
       }
     }
 
@@ -415,6 +429,9 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
+
+    Optional<Promotion> seasonalPromo =
+        activePromotions.stream().filter(p -> p.getType() == PromotionType.SEASONAL).findFirst();
 
     for (CartItem item : cartItems) {
       Product product =
@@ -474,6 +491,17 @@ public class CheckoutServiceImpl implements CheckoutService {
                 .isPresent();
       }
 
+      Integer seasonalPercent = null;
+      if (seasonalPromo.isPresent()) {
+        boolean seasonalEligible =
+            promotionProductRepository
+                .findByPromotionIdAndProductId(seasonalPromo.get().getId(), product.getId())
+                .isPresent();
+        if (seasonalEligible) {
+          seasonalPercent = seasonalPromo.get().getDiscountPercent();
+        }
+      }
+
       pricingItems.add(
           new PricingItem(
               product.getId(),
@@ -481,7 +509,8 @@ public class CheckoutServiceImpl implements CheckoutService {
               currentUnitPrice,
               item.getQuantity(),
               flashSalePrice,
-              bogoEligible));
+              bogoEligible,
+              seasonalPercent));
     }
 
     Coupon coupon = null;
@@ -704,7 +733,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     List<OrderTimelineDto> timeline =
         List.of(
             new OrderTimelineDto(
-                initialStatus.name(), order.getPlacedAt(), "Order placed via checkout"));
+                initialStatus.name(), "Order placed via checkout", order.getPlacedAt()));
 
     boolean canCancel =
         order.getStatus() == OrderStatus.PENDING_PAYMENT

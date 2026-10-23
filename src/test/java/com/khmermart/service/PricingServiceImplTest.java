@@ -162,4 +162,81 @@ class PricingServiceImplTest {
     assertThat(result.discountCents()).isEqualTo(300L);
     assertThat(result.totalCents()).isEqualTo(0L);
   }
+
+  @Test
+  @DisplayName("7. Laptop Pro 15 in flash sale + seasonal -> only the flash sale applies (89900)")
+  void testFlashSaleWithActiveSeasonalPromo() {
+    // Laptop Pro 15: price 99900c, flash sale price 89900c (not linked to seasonal)
+    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+
+    Promotion flashSale =
+        Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
+
+    Promotion seasonal =
+        Promotion.builder()
+            .name("Seasonal 20%")
+            .type(PromotionType.SEASONAL)
+            .discountPercent(20)
+            .thresholdCents(5000L)
+            .active(true)
+            .build();
+
+    PricingResult result =
+        pricingService.calculate(items, List.of(flashSale, seasonal), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(99900L);
+    assertThat(result.discountCents()).isEqualTo(10000L); // 99900 - 89900
+    assertThat(result.totalCents()).isEqualTo(89900L);
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
+  }
+
+  @Test
+  @DisplayName("8. Seasonal-only product -> 20% off its price")
+  void testSeasonalOnlyProduct() {
+    // Product 1002 (Dell Latitude 5520, $750 = 75000c) with seasonal 20%
+    List<PricingItem> items = List.of(new PricingItem(1002L, 5L, 75000L, 1, null, false, 20));
+
+    Promotion seasonal =
+        Promotion.builder()
+            .name("Seasonal 20%")
+            .type(PromotionType.SEASONAL)
+            .discountPercent(20)
+            .thresholdCents(5000L)
+            .active(true)
+            .build();
+
+    PricingResult result = pricingService.calculate(items, List.of(seasonal), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(75000L);
+    assertThat(result.discountCents()).isEqualTo(15000L); // 20% of 75000
+    assertThat(result.totalCents()).isEqualTo(60000L);
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).contains("Seasonal");
+  }
+
+  @Test
+  @DisplayName("9. Flash item + SAVE5 -> 89900 - 500 = 89400")
+  void testFlashSaleItemWithSave5Coupon() {
+    // Laptop Pro 15 (99900c, flash price 89900c) + coupon SAVE5 (500c)
+    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+
+    Promotion flashSale =
+        Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
+
+    Coupon save5 =
+        Coupon.builder()
+            .code("SAVE5")
+            .type(CouponType.FIXED)
+            .value(500L)
+            .minOrderCents(3500L)
+            .active(true)
+            .build();
+
+    PricingResult result = pricingService.calculate(items, List.of(flashSale), save5, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(99900L);
+    assertThat(result.discountCents()).isEqualTo(10500L); // 10000 (flash) + 500 (coupon)
+    assertThat(result.totalCents()).isEqualTo(89400L); // 89900 - 500
+  }
 }

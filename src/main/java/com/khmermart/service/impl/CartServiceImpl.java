@@ -132,6 +132,9 @@ public class CartServiceImpl implements CartService {
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
 
+    Optional<Promotion> seasonalPromo =
+        activePromotions.stream().filter(p -> p.getType() == PromotionType.SEASONAL).findFirst();
+
     for (CartItem item : items) {
       Product product = productRepository.findById(item.getProductId()).orElse(null);
       if (product == null) {
@@ -213,6 +216,17 @@ public class CartServiceImpl implements CartService {
                 .isPresent();
       }
 
+      Integer seasonalPercent = null;
+      if (seasonalPromo.isPresent()) {
+        boolean seasonalEligible =
+            promotionProductRepository
+                .findByPromotionIdAndProductId(seasonalPromo.get().getId(), product.getId())
+                .isPresent();
+        if (seasonalEligible) {
+          seasonalPercent = seasonalPromo.get().getDiscountPercent();
+        }
+      }
+
       pricingItems.add(
           new PricingItem(
               product.getId(),
@@ -220,7 +234,8 @@ public class CartServiceImpl implements CartService {
               currentUnitPrice,
               item.getQuantity(),
               flashSalePrice,
-              bogoEligible));
+              bogoEligible,
+              seasonalPercent));
     }
 
     Coupon coupon = null;

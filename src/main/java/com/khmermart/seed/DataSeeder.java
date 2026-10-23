@@ -313,11 +313,11 @@ public class DataSeeder implements CommandLineRunner {
 
   private void seedShippingMethods() {
     insertShippingMethod(
-        1L, "STANDARD", "Standard Delivery", "សេវាដឹកជញ្ជូនធម្មតា", 200L, 5000L, 2, 4, false);
+        1L, "STANDARD", "Standard Delivery", "សេវាដឹកជញ្ជូនធម្មតា", 150L, 5000L, 2, 4, false);
     insertShippingMethod(
-        2L, "EXPRESS", "Express Delivery", "សេវាដឹកជញ្ជូនរហ័ស", 500L, null, 1, 2, false);
+        2L, "EXPRESS", "Express Delivery", "សេវាដឹកជញ្ជូនរហ័ស", 300L, null, 1, 2, false);
     insertShippingMethod(
-        3L, "SAME_DAY", "Same-Day Delivery", "សេវាដឹកជញ្ជូនក្នុងថ្ងៃតែមួយ", 800L, null, 0, 1, true);
+        3L, "SAME_DAY", "Same-Day Delivery", "សេវាដឹកជញ្ជូនក្នុងថ្ងៃតែមួយ", 250L, null, 0, 1, true);
   }
 
   private void insertShippingMethod(
@@ -669,6 +669,8 @@ public class DataSeeder implements CommandLineRunner {
         """,
         Timestamp.from(now.minus(5, ChronoUnit.DAYS)),
         Timestamp.from(now.plus(25, ChronoUnit.DAYS)));
+    insertPromotionProduct(2L, 1002L, 60000L);
+    insertPromotionProduct(2L, 1003L, 68000L);
 
     // 3. BOGO: Buy 1 Get 1 Free on product 1022 (Women's Floral Chiffon Blouse)
     jdbcTemplate.update(

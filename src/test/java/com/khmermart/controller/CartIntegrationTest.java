@@ -101,36 +101,36 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     restTemplate.exchange(
         "/api/cart/items", HttpMethod.POST, new HttpEntity<>(cheapItem, headers), String.class);
 
-    // A. Invalid coupon -> 400 COUPON_INVALID
+    // A. Invalid coupon -> 422 COUPON_INVALID
     ResponseEntity<String> invRes =
         restTemplate.exchange(
             "/api/cart/coupon",
             HttpMethod.POST,
             new HttpEntity<>(new ApplyCouponRequest("INVALID_CODE"), headers),
             String.class);
-    assertThat(invRes.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(invRes.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     assertThat(objectMapper.readTree(invRes.getBody()).get("error").get("code").asText())
         .isEqualTo("COUPON_INVALID");
 
-    // B. SAVE5 with subtotal 1400c < 3500c -> 400 COUPON_MIN_ORDER
+    // B. SAVE5 with subtotal 1400c < 3500c -> 422 COUPON_MIN_ORDER
     ResponseEntity<String> minOrderRes =
         restTemplate.exchange(
             "/api/cart/coupon",
             HttpMethod.POST,
             new HttpEntity<>(new ApplyCouponRequest("SAVE5"), headers),
             String.class);
-    assertThat(minOrderRes.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(minOrderRes.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     assertThat(objectMapper.readTree(minOrderRes.getBody()).get("error").get("code").asText())
         .isEqualTo("COUPON_MIN_ORDER");
 
-    // C. EXPIRED coupon -> 400 COUPON_EXPIRED
+    // C. EXPIRED coupon -> 422 COUPON_EXPIRED
     ResponseEntity<String> expRes =
         restTemplate.exchange(
             "/api/cart/coupon",
             HttpMethod.POST,
             new HttpEntity<>(new ApplyCouponRequest("EXPIRED"), headers),
             String.class);
-    assertThat(expRes.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(expRes.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     assertThat(objectMapper.readTree(expRes.getBody()).get("error").get("code").asText())
         .isEqualTo("COUPON_EXPIRED");
 
