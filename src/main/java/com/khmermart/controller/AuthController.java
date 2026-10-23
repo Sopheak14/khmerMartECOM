@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -88,7 +89,7 @@ public class AuthController {
 
   @PostMapping("/logout")
   @Operation(summary = "Revoke session and clear refresh token cookie")
-  public ResponseEntity<SuccessResponse<Void>> logout(
+  public ResponseEntity<SuccessResponse<Map<String, Object>>> logout(
       @CookieValue(name = AppConstant.REFRESH_TOKEN_COOKIE_NAME, required = false)
           String refreshToken,
       HttpServletRequest httpRequest) {
@@ -104,21 +105,24 @@ public class AuthController {
 
   @PostMapping("/forgot-password")
   @Operation(summary = "Request password reset email")
-  public SuccessResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+  public SuccessResponse<Map<String, Object>> forgotPassword(
+      @Valid @RequestBody ForgotPasswordRequest request) {
     authService.forgotPassword(request);
     return ApiResponseUtil.success();
   }
 
   @PostMapping("/reset-password")
   @Operation(summary = "Reset password using reset token")
-  public SuccessResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+  public SuccessResponse<Map<String, Object>> resetPassword(
+      @Valid @RequestBody ResetPasswordRequest request) {
     authService.resetPassword(request);
     return ApiResponseUtil.success();
   }
 
   @PostMapping("/verify-email")
   @Operation(summary = "Verify account email address")
-  public SuccessResponse<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+  public SuccessResponse<Map<String, Object>> verifyEmail(
+      @Valid @RequestBody VerifyEmailRequest request) {
     authService.verifyEmail(request);
     return ApiResponseUtil.success();
   }

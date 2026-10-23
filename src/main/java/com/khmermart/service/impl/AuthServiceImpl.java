@@ -165,16 +165,22 @@ public class AuthServiceImpl implements AuthService {
             .orElseThrow(
                 () ->
                     new CustomException(
-                        ErrorCode.UNAUTHORIZED, MessageConstant.INVALID_REFRESH_TOKEN));
+                        ErrorCode.UNAUTHORIZED, MessageConstant.REFRESH_TOKEN_NO_LONGER_VALID));
 
-    // Reuse detection: If the token has already been revoked, revoke the whole family
+    // Check if token has been revoked
     if (oldToken.getRevokedAt() != null) {
-      log.warn(
-          "Refresh token reuse detected for familyId={}, userId={}",
-          oldToken.getFamilyId(),
-          oldToken.getUserId());
-      appUserTokenService.revokeFamilyImmediately(oldToken.getFamilyId());
-      throw new CustomException(ErrorCode.UNAUTHORIZED, MessageConstant.TOKEN_REUSE_DETECTED);
+      // Real reuse of a rotated token (has been replaced by a successor)
+      if (oldToken.getReplacedById() != null) {
+        log.warn(
+            "Refresh token reuse detected for familyId={}, userId={}",
+            oldToken.getFamilyId(),
+            oldToken.getUserId());
+        appUserTokenService.revokeFamilyImmediately(oldToken.getFamilyId());
+        throw new CustomException(ErrorCode.UNAUTHORIZED, MessageConstant.TOKEN_REUSE_DETECTED);
+      }
+      // Revoked/logged-out token or child in an already revoked family
+      throw new CustomException(
+          ErrorCode.UNAUTHORIZED, MessageConstant.REFRESH_TOKEN_NO_LONGER_VALID);
     }
 
     if (oldToken.getExpiresAt().isBefore(Instant.now())) {
@@ -283,8 +289,8 @@ public class AuthServiceImpl implements AuthService {
     resetToken.setUsedAt(Instant.now());
     passwordResetTokenRepository.save(resetToken);
 
-    // Invalidate existing refresh tokens upon password reset
-    appUserTokenRepository.deleteByUserId(user.getId());
+    // Invalidate existing refresh tokens upon password reset by setting revokedAt
+    appUserTokenRepository.revokeAllByUserId(user.getId(), Instant.now());
   }
 
   @Override

@@ -14,12 +14,15 @@ public final class MessageConstant {
   public static final String PROVINCE_NOT_FOUND = "Province not found";
   public static final String REFRESH_TOKEN_REQUIRED = "Refresh token required";
   public static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
+  public static final String REFRESH_TOKEN_NO_LONGER_VALID = "Refresh token is no longer valid";
   public static final String TOKEN_REUSE_DETECTED = "Invalid refresh token: token reuse detected";
   public static final String TOKEN_EXPIRED = "Refresh token has expired";
   public static final String RATE_LIMITED = "Too many login attempts. Please try again later";
   public static final String INVALID_RESET_TOKEN = "Invalid or expired reset token";
   public static final String INVALID_VERIFY_TOKEN = "Invalid or expired verification token";
   public static final String CURRENT_PASSWORD_INCORRECT = "Current password is incorrect";
+  public static final String PASSWORD_INVALID =
+      "Password must be at least 8 characters and contain both letters and numbers";
   public static final String VALIDATION_FAILED = "Validation failed";
   public static final String MALFORMED_JSON = "Malformed JSON request body";
   public static final String CONFLICT = "Concurrent modification conflict. Please retry";

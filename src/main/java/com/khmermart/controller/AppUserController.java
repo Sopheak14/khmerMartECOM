@@ -43,7 +43,7 @@ public class AppUserController {
 
   @PatchMapping("/me/password")
   @Operation(summary = "Change account password")
-  public SuccessResponse<Void> changePassword(
+  public SuccessResponse<java.util.Map<String, Object>> changePassword(
       @CurrentUser UserPrincipal principal, @Valid @RequestBody PasswordRequest request) {
     appUserService.changePassword(principal.id(), request);
     return ApiResponseUtil.success();

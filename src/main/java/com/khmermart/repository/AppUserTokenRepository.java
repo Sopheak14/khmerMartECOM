@@ -20,5 +20,10 @@ public interface AppUserTokenRepository extends JpaRepository<AppUserToken, Long
   @Query("UPDATE AppUserToken t SET t.revokedAt = :now WHERE t.familyId = :familyId")
   void revokeFamily(@Param("familyId") String familyId, @Param("now") Instant now);
 
+  @Modifying
+  @Query(
+      "UPDATE AppUserToken t SET t.revokedAt = :now WHERE t.userId = :userId AND t.revokedAt IS NULL")
+  void revokeAllByUserId(@Param("userId") Long userId, @Param("now") Instant now);
+
   void deleteByUserId(Long userId);
 }

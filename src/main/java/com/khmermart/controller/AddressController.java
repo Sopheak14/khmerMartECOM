@@ -62,7 +62,7 @@ public class AddressController {
 
   @DeleteMapping("/{id}")
   @Operation(summary = "Delete delivery address")
-  public SuccessResponse<Void> deleteAddress(
+  public SuccessResponse<java.util.Map<String, Object>> deleteAddress(
       @CurrentUser UserPrincipal principal, @PathVariable Long id) {
     addressService.deleteAddress(principal.id(), id);
     return ApiResponseUtil.success();

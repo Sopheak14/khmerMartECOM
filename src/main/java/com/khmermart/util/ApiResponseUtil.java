@@ -4,6 +4,7 @@ import com.khmermart.common.exception.ErrorCode;
 import com.khmermart.common.response.ErrorResponse;
 import com.khmermart.common.response.PaginationResponse;
 import com.khmermart.common.response.SuccessResponse;
+import java.util.Map;
 
 public final class ApiResponseUtil {
 
@@ -21,8 +22,8 @@ public final class ApiResponseUtil {
     return new SuccessResponse<>(data, meta, facets);
   }
 
-  public static SuccessResponse<Void> success() {
-    return new SuccessResponse<>(null);
+  public static SuccessResponse<Map<String, Object>> success() {
+    return new SuccessResponse<>(Map.of());
   }
 
   public static ErrorResponse error(ErrorCode errorCode) {

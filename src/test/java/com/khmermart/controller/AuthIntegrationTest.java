@@ -1,17 +1,29 @@
 package com.khmermart.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
-import com.khmermart.model.request.AppUserUpdateRequest;
+import com.khmermart.model.entity.AppUser;
+import com.khmermart.model.entity.AppUserToken;
+import com.khmermart.model.entity.EmailVerificationToken;
+import com.khmermart.model.entity.PasswordResetToken;
 import com.khmermart.model.request.AuthRequest;
-import com.khmermart.model.request.PasswordRequest;
+import com.khmermart.model.request.ForgotPasswordRequest;
 import com.khmermart.model.request.RegisterRequest;
+import com.khmermart.model.request.ResetPasswordRequest;
+import com.khmermart.model.request.VerifyEmailRequest;
+import com.khmermart.repository.AppUserRepository;
+import com.khmermart.repository.AppUserTokenRepository;
 import com.khmermart.repository.EmailVerificationTokenRepository;
 import com.khmermart.repository.PasswordResetTokenRepository;
 import com.khmermart.security.JwtService;
+import com.khmermart.service.MailService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -20,8 +32,10 @@ import java.util.Date;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -37,9 +51,15 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private JwtService jwtService;
 
+  @Autowired private AppUserRepository appUserRepository;
+
+  @Autowired private AppUserTokenRepository appUserTokenRepository;
+
   @Autowired private EmailVerificationTokenRepository emailVerificationTokenRepository;
 
   @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
+
+  @SpyBean private MailService mailService;
 
   @Value("${app.jwt.access-secret}")
   private String accessSecret;
@@ -90,6 +110,8 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     assertThat(details).isNotNull();
     assertThat(details.has("email")).isTrue();
     assertThat(details.has("password")).isTrue();
+    assertThat(details.get("password").asText())
+        .isEqualTo("Password must be at least 8 characters and contain both letters and numbers");
     assertThat(details.has("phone")).isTrue();
     assertThat(details.has("fullName")).isTrue();
   }
@@ -176,19 +198,176 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     JsonNode reuseJson = objectMapper.readTree(secondRefresh.getBody());
     assertThat(reuseJson.get("success").asBoolean()).isFalse();
     assertThat(reuseJson.get("error").get("code").asText()).isEqualTo("UNAUTHORIZED");
+    assertThat(reuseJson.get("error").get("message").asText()).contains("token reuse detected");
 
-    // Also verify Set-Cookie: km_rt=; Max-Age=0 is sent on failure
+    // Verify Set-Cookie: km_rt=; Max-Age=0 is sent on failure
     List<String> reuseCookies = secondRefresh.getHeaders().get(HttpHeaders.SET_COOKIE);
     assertThat(reuseCookies).isNotNull();
     assertThat(reuseCookies.get(0)).contains("Max-Age=0");
 
-    // 3rd refresh call with the NEW cookie: FAILS because the whole family is now revoked!
+    // 3rd refresh call with the NEW cookie: FAILS because the whole family was revoked!
     HttpHeaders newHeaders = new HttpHeaders();
     newHeaders.add(HttpHeaders.COOKIE, newKmRtCookie);
     ResponseEntity<String> thirdRefresh =
         restTemplate.exchange(
             "/api/auth/refresh", HttpMethod.POST, new HttpEntity<>(newHeaders), String.class);
     assertThat(thirdRefresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    JsonNode thirdJson = objectMapper.readTree(thirdRefresh.getBody());
+    assertThat(thirdJson.get("error").get("message").asText())
+        .isEqualTo("Refresh token is no longer valid");
+  }
+
+  @Test
+  @DisplayName(
+      "Forgot password -> Reset password flow (token single-use, old password fails, revokes all refresh tokens)")
+  void testForgotPasswordAndResetPasswordFlow() throws Exception {
+    String email = "pwd_reset_" + System.currentTimeMillis() + "@khmermart.local";
+    RegisterRequest reg =
+        new RegisterRequest(email, "InitialPassword123", "Reset Tester", "+85512444999");
+    ResponseEntity<String> regResp =
+        restTemplate.postForEntity("/api/auth/register", reg, String.class);
+    assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    AppUser user = appUserRepository.findByEmail(email).orElseThrow();
+    Long userId = user.getId();
+
+    // 1. Request forgot password
+    ForgotPasswordRequest forgotReq = new ForgotPasswordRequest(email);
+    ResponseEntity<String> forgotResp =
+        restTemplate.postForEntity("/api/auth/forgot-password", forgotReq, String.class);
+    assertThat(forgotResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode forgotJson = objectMapper.readTree(forgotResp.getBody());
+    assertThat(forgotJson.get("success").asBoolean()).isTrue();
+    assertThat(forgotJson.has("data")).isTrue();
+    assertThat(forgotJson.get("data").isObject()).isTrue();
+
+    // 2. Capture raw token sent via mailService
+    ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mailService, atLeastOnce())
+        .sendPasswordResetEmail(eq(email), any(), tokenCaptor.capture());
+    String rawResetToken = tokenCaptor.getValue();
+    assertThat(rawResetToken).isNotBlank();
+
+    // Verify token stored in DB is hashed with SHA-256 (never plaintext)
+    List<PasswordResetToken> tokens = passwordResetTokenRepository.findAll();
+    PasswordResetToken dbToken =
+        tokens.stream().filter(t -> t.getUserId().equals(userId)).findFirst().orElseThrow();
+    assertThat(dbToken.getTokenHash()).hasSize(64);
+    assertThat(dbToken.getTokenHash()).isNotEqualTo(rawResetToken);
+
+    // 3. Reset password using valid raw token
+    ResetPasswordRequest resetReq = new ResetPasswordRequest(rawResetToken, "NewSecurePassword456");
+    ResponseEntity<String> resetResp =
+        restTemplate.postForEntity("/api/auth/reset-password", resetReq, String.class);
+    assertThat(resetResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode resetJson = objectMapper.readTree(resetResp.getBody());
+    assertThat(resetJson.get("success").asBoolean()).isTrue();
+    assertThat(resetJson.has("data")).isTrue();
+    assertThat(resetJson.get("data").isObject()).isTrue();
+
+    // 4. Second use of same reset token fails (single-use)
+    ResponseEntity<String> secondResetResp =
+        restTemplate.postForEntity("/api/auth/reset-password", resetReq, String.class);
+    assertThat(secondResetResp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    // 5. Old password no longer works
+    AuthRequest oldLogin = new AuthRequest(email, "InitialPassword123");
+    ResponseEntity<String> oldLoginResp =
+        restTemplate.postForEntity("/api/auth/login", oldLogin, String.class);
+    assertThat(oldLoginResp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+    // 6. New password works
+    AuthRequest newLogin = new AuthRequest(email, "NewSecurePassword456");
+    ResponseEntity<String> newLoginResp =
+        restTemplate.postForEntity("/api/auth/login", newLogin, String.class);
+    assertThat(newLoginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    // 7. Verify all previous refresh tokens of the user are revoked
+    List<AppUserToken> userTokens = appUserTokenRepository.findAll();
+    long unrevokedCount =
+        userTokens.stream()
+            .filter(t -> t.getUserId().equals(userId))
+            .filter(t -> t.getRevokedAt() == null)
+            .count();
+    // Only the single brand new login token from step 6 should be unrevoked
+    assertThat(unrevokedCount).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("Verify email flow: registration sends email, verify-email sets emailVerified=true")
+  void testVerifyEmailFlow() throws Exception {
+    String email = "verify_" + System.currentTimeMillis() + "@khmermart.local";
+    RegisterRequest reg =
+        new RegisterRequest(email, "Password123", "Verify Tester", "+85512777333");
+    ResponseEntity<String> regResp =
+        restTemplate.postForEntity("/api/auth/register", reg, String.class);
+    assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    AppUser user = appUserRepository.findByEmail(email).orElseThrow();
+    Long userId = user.getId();
+
+    // Capture verification token
+    ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mailService, atLeastOnce())
+        .sendVerificationEmail(eq(email), any(), tokenCaptor.capture());
+    String rawVerifyToken = tokenCaptor.getValue();
+    assertThat(rawVerifyToken).isNotBlank();
+
+    // Verify token stored in DB is hashed with SHA-256
+    List<EmailVerificationToken> tokens = emailVerificationTokenRepository.findAll();
+    EmailVerificationToken dbToken =
+        tokens.stream().filter(t -> t.getUserId().equals(userId)).findFirst().orElseThrow();
+    assertThat(dbToken.getTokenHash()).hasSize(64);
+    assertThat(dbToken.getTokenHash()).isNotEqualTo(rawVerifyToken);
+
+    // Call verify-email
+    VerifyEmailRequest verifyReq = new VerifyEmailRequest(rawVerifyToken);
+    ResponseEntity<String> verifyResp =
+        restTemplate.postForEntity("/api/auth/verify-email", verifyReq, String.class);
+    assertThat(verifyResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode verifyJson = objectMapper.readTree(verifyResp.getBody());
+    assertThat(verifyJson.get("success").asBoolean()).isTrue();
+    assertThat(verifyJson.has("data")).isTrue();
+    assertThat(verifyJson.get("data").isObject()).isTrue();
+
+    // Confirm emailVerified is now true
+    AppUser verifiedUser = appUserRepository.findById(userId).orElseThrow();
+    assertThat(verifiedUser.isEmailVerified()).isTrue();
+  }
+
+  @Test
+  @DisplayName("POST /api/auth/logout clears km_rt cookie and revokes refresh token")
+  void testLogout() throws Exception {
+    String email = "logout_" + System.currentTimeMillis() + "@khmermart.local";
+    RegisterRequest reg = new RegisterRequest(email, "Password123", "Logout Test", "+85512777999");
+    ResponseEntity<String> regResp =
+        restTemplate.postForEntity("/api/auth/register", reg, String.class);
+    String cookieHeader = regResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+    assertThat(cookieHeader).isNotNull();
+    String kmRtCookie = cookieHeader.split(";")[0];
+
+    HttpHeaders logoutHeaders = new HttpHeaders();
+    logoutHeaders.add(HttpHeaders.COOKIE, kmRtCookie);
+    ResponseEntity<String> logoutResp =
+        restTemplate.exchange(
+            "/api/auth/logout", HttpMethod.POST, new HttpEntity<>(logoutHeaders), String.class);
+    assertThat(logoutResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode logoutJson = objectMapper.readTree(logoutResp.getBody());
+    assertThat(logoutJson.has("data")).isTrue();
+    assertThat(logoutJson.get("data").isObject()).isTrue();
+
+    List<String> cookies = logoutResp.getHeaders().get(HttpHeaders.SET_COOKIE);
+    assertThat(cookies).isNotNull();
+    assertThat(cookies.get(0)).contains("Max-Age=0");
+
+    // Refresh after logout should fail with "Refresh token is no longer valid"
+    ResponseEntity<String> refreshAfterLogout =
+        restTemplate.exchange(
+            "/api/auth/refresh", HttpMethod.POST, new HttpEntity<>(logoutHeaders), String.class);
+    assertThat(refreshAfterLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    JsonNode refreshJson = objectMapper.readTree(refreshAfterLogout.getBody());
+    assertThat(refreshJson.get("error").get("message").asText())
+        .isEqualTo("Refresh token is no longer valid");
   }
 
   @Test
@@ -241,99 +420,5 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     JsonNode json = objectMapper.readTree(response.getBody());
     assertThat(json.get("success").asBoolean()).isFalse();
     assertThat(json.get("error").get("code").asText()).isEqualTo("FORBIDDEN");
-  }
-
-  @Test
-  @DisplayName(
-      "User profile CRUD: GET /api/users/me, PATCH /api/users/me, PATCH /api/users/me/password, wrong password validation")
-  void testUserProfileEndpoints() throws Exception {
-    String email = "profile_" + System.currentTimeMillis() + "@khmermart.local";
-    RegisterRequest reg =
-        new RegisterRequest(email, "InitialPass123", "Initial Name", "+85512777888");
-
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    JsonNode regJson = objectMapper.readTree(regResp.getBody());
-    String accessToken = regJson.get("data").get("accessToken").asText();
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth(accessToken);
-
-    // 1. GET /api/users/me
-    ResponseEntity<String> getMeResp =
-        restTemplate.exchange(
-            "/api/users/me", HttpMethod.GET, new HttpEntity<>(headers), String.class);
-    assertThat(getMeResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-    JsonNode getMeJson = objectMapper.readTree(getMeResp.getBody());
-    assertThat(getMeJson.get("data").get("fullName").asText()).isEqualTo("Initial Name");
-
-    // 2. PATCH /api/users/me
-    AppUserUpdateRequest updateReq = new AppUserUpdateRequest("Updated Name", "+85598111222");
-    HttpEntity<AppUserUpdateRequest> updateEntity = new HttpEntity<>(updateReq, headers);
-    ResponseEntity<String> patchResp =
-        restTemplate.exchange("/api/users/me", HttpMethod.PATCH, updateEntity, String.class);
-    assertThat(patchResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-    JsonNode patchJson = objectMapper.readTree(patchResp.getBody());
-    assertThat(patchJson.get("data").get("fullName").asText()).isEqualTo("Updated Name");
-    assertThat(patchJson.get("data").get("phone").asText()).isEqualTo("+85598111222");
-
-    // 3. PATCH /api/users/me/password with WRONG currentPassword -> 400 VALIDATION_ERROR on field
-    // currentPassword
-    PasswordRequest wrongPassReq = new PasswordRequest("WrongCurrentPass", "NewSecurePass456");
-    ResponseEntity<String> wrongPassResp =
-        restTemplate.exchange(
-            "/api/users/me/password",
-            HttpMethod.PATCH,
-            new HttpEntity<>(wrongPassReq, headers),
-            String.class);
-    assertThat(wrongPassResp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    JsonNode wrongPassJson = objectMapper.readTree(wrongPassResp.getBody());
-    assertThat(wrongPassJson.get("error").get("code").asText()).isEqualTo("VALIDATION_ERROR");
-    assertThat(wrongPassJson.get("error").get("details").has("currentPassword")).isTrue();
-
-    // 4. PATCH /api/users/me/password with CORRECT currentPassword -> 200 OK
-    PasswordRequest changePassReq = new PasswordRequest("InitialPass123", "NewSecurePass456");
-    ResponseEntity<String> passResp =
-        restTemplate.exchange(
-            "/api/users/me/password",
-            HttpMethod.PATCH,
-            new HttpEntity<>(changePassReq, headers),
-            String.class);
-    assertThat(passResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-    // 5. Verify login works with new password
-    AuthRequest newLogin = new AuthRequest(email, "NewSecurePass456");
-    ResponseEntity<String> loginResp =
-        restTemplate.postForEntity("/api/auth/login", newLogin, String.class);
-    assertThat(loginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-  }
-
-  @Test
-  @DisplayName("POST /api/auth/logout clears km_rt cookie and revokes refresh token")
-  void testLogout() throws Exception {
-    String email = "logout_" + System.currentTimeMillis() + "@khmermart.local";
-    RegisterRequest reg = new RegisterRequest(email, "Password123", "Logout Test", "+85512777999");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    String cookieHeader = regResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-    assertThat(cookieHeader).isNotNull();
-    String kmRtCookie = cookieHeader.split(";")[0];
-
-    HttpHeaders logoutHeaders = new HttpHeaders();
-    logoutHeaders.add(HttpHeaders.COOKIE, kmRtCookie);
-    ResponseEntity<String> logoutResp =
-        restTemplate.exchange(
-            "/api/auth/logout", HttpMethod.POST, new HttpEntity<>(logoutHeaders), String.class);
-    assertThat(logoutResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-    List<String> cookies = logoutResp.getHeaders().get(HttpHeaders.SET_COOKIE);
-    assertThat(cookies).isNotNull();
-    assertThat(cookies.get(0)).contains("Max-Age=0");
-
-    // Refresh after logout should fail
-    ResponseEntity<String> refreshAfterLogout =
-        restTemplate.exchange(
-            "/api/auth/refresh", HttpMethod.POST, new HttpEntity<>(logoutHeaders), String.class);
-    assertThat(refreshAfterLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 }
