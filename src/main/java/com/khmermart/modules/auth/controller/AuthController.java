@@ -67,10 +67,17 @@ public class AuthController {
         refreshToken != null
             ? refreshToken
             : cookieUtil.getRefreshTokenFromCookie(httpRequest).orElse(null);
-    AuthResult result = authService.refresh(token);
-    return ResponseEntity.ok()
-        .header(HttpHeaders.SET_COOKIE, result.cookie().toString())
-        .body(ApiResponse.ok(result.authResponse()));
+    try {
+      AuthResult result = authService.refresh(token);
+      return ResponseEntity.ok()
+          .header(HttpHeaders.SET_COOKIE, result.cookie().toString())
+          .body(ApiResponse.ok(result.authResponse()));
+    } catch (com.khmermart.common.api.ApiException ex) {
+      ResponseCookie deleteCookie = cookieUtil.deleteRefreshTokenCookie();
+      return ResponseEntity.status(ex.getErrorCode().getHttpStatus())
+          .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+          .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage(), ex.getDetails()));
+    }
   }
 
   @PostMapping("/logout")

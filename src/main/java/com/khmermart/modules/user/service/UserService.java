@@ -58,7 +58,10 @@ public class UserService {
             .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "User not found"));
 
     if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-      throw new ApiException(ErrorCode.VALIDATION_ERROR, "Current password is incorrect");
+      throw new ApiException(
+          ErrorCode.VALIDATION_ERROR,
+          "Validation failed",
+          java.util.Map.of("currentPassword", "Current password is incorrect"));
     }
 
     user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
