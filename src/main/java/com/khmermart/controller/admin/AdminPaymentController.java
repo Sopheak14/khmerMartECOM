@@ -5,6 +5,7 @@ import com.khmermart.model.response.OrderDto;
 import com.khmermart.security.CurrentUser;
 import com.khmermart.security.UserPrincipal;
 import com.khmermart.service.BankTransferService;
+import com.khmermart.service.OrderService;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPaymentController {
 
   private final BankTransferService bankTransferService;
+  private final OrderService orderService;
 
-  public AdminPaymentController(BankTransferService bankTransferService) {
+  public AdminPaymentController(
+      BankTransferService bankTransferService, OrderService orderService) {
     this.bankTransferService = bankTransferService;
+    this.orderService = orderService;
   }
 
   @PostMapping("/{id}/approve-bank-transfer")
@@ -31,6 +35,15 @@ public class AdminPaymentController {
   public SuccessResponse<OrderDto> approveBankTransfer(
       @CurrentUser UserPrincipal principal, @PathVariable Long id) {
     OrderDto orderDto = bankTransferService.approveBankTransfer(id, principal.id());
+    return ApiResponseUtil.success(orderDto);
+  }
+
+  @PostMapping("/{id}/refund")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(summary = "Process manual refund for payment")
+  public SuccessResponse<OrderDto> processRefund(
+      @CurrentUser UserPrincipal principal, @PathVariable Long id) {
+    OrderDto orderDto = orderService.processRefund(principal.id(), id, null);
     return ApiResponseUtil.success(orderDto);
   }
 }

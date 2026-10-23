@@ -154,4 +154,46 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
     assertThat(items3.get(0).get("id").asLong()).isEqualTo(addr2Id);
     assertThat(items3.get(0).get("isDefault").asBoolean()).isTrue();
   }
+
+  @Test
+  @DisplayName(
+      "Address validation: bad phone or missing required fields returns 400 VALIDATION_ERROR")
+  void testAddressValidation() throws Exception {
+    String email = "addr_val_" + System.currentTimeMillis() + "@khmermart.local";
+    RegisterRequest reg = new RegisterRequest(email, "Pass123456", "Val Tester", "+85512444555");
+    ResponseEntity<String> regResp =
+        restTemplate.postForEntity("/api/auth/register", reg, String.class);
+    JsonNode regJson = objectMapper.readTree(regResp.getBody());
+    String token = regJson.get("data").get("accessToken").asText();
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setBearerAuth(token);
+
+    // Invalid phone (not +855) and blank recipientName
+    AddressRequest invalidReq =
+        new AddressRequest(
+            "Home",
+            "",
+            "012345678",
+            "#123 St 2004",
+            null,
+            "Sen Sok",
+            "Phnom Penh",
+            "120801",
+            false);
+
+    ResponseEntity<String> resp =
+        restTemplate.exchange(
+            "/api/users/me/addresses",
+            HttpMethod.POST,
+            new HttpEntity<>(invalidReq, headers),
+            String.class);
+
+    assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    JsonNode json = objectMapper.readTree(resp.getBody());
+    assertThat(json.get("success").asBoolean()).isFalse();
+    assertThat(json.get("error").get("code").asText()).isEqualTo("VALIDATION_ERROR");
+    assertThat(json.get("error").get("details").has("recipientName")).isTrue();
+    assertThat(json.get("error").get("details").has("phone")).isTrue();
+  }
 }

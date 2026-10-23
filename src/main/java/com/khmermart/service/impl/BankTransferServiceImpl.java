@@ -120,7 +120,7 @@ public class BankTransferServiceImpl implements BankTransferService {
                           .createdAt(Instant.now())
                           .build());
 
-      payment.setStatus(PaymentStatus.PENDING_VERIFICATION);
+      payment.setStatus(PaymentStatus.PENDING);
       Payment savedPayment = paymentRepository.save(payment);
       Long finalPaymentId = savedPayment.getId();
 
@@ -133,7 +133,7 @@ public class BankTransferServiceImpl implements BankTransferService {
       slip.setStatus("PENDING");
       slipRepository.save(slip);
 
-      order.setPaymentStatus(PaymentStatus.PENDING_VERIFICATION);
+      order.setPaymentStatus(PaymentStatus.PENDING);
       orderRepository.save(order);
 
       return orderService.toDto(order);

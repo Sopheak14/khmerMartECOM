@@ -30,7 +30,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
+# server is
   mailpit:
     image: axllent/mailpit:latest
     container_name: khmermart-mailpit

@@ -21,5 +21,7 @@ public interface OrderService {
 
   OrderDto updateStatus(String orderNumber, OrderStatus newStatus, String note, Long actorId);
 
+  OrderDto processRefund(Long adminId, Long paymentId, String reference);
+
   OrderDto toDto(Order order);
 }

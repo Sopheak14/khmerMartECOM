@@ -206,17 +206,20 @@ public class OrderServiceImpl implements OrderService {
                   .orElse(null);
 
       if (inv != null) {
+        InventoryMovementType movementType;
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
           inv.setQuantityOnHand(inv.getQuantityOnHand() + item.getQuantity());
+          movementType = InventoryMovementType.RETURN;
         } else {
           inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
+          movementType = InventoryMovementType.RELEASE;
         }
         inventoryRepository.save(inv);
 
         InventoryMovement movement =
             InventoryMovement.builder()
                 .inventoryId(inv.getId())
-                .type(InventoryMovementType.RELEASE)
+                .type(movementType)
                 .quantity(item.getQuantity())
                 .reason("Order cancelled: " + order.getOrderNumber())
                 .actorId(userId)
@@ -255,11 +258,65 @@ public class OrderServiceImpl implements OrderService {
             Refund.builder()
                 .paymentId(payment.getId())
                 .amountCents(payment.getAmountCents())
-                .reason("Order cancelled refund: " + reason)
+                .reason(reason != null ? reason : "Order cancelled")
                 .status("PENDING")
+                .actorId(userId)
                 .createdAt(now)
                 .build();
         refundRepository.save(refund);
+      }
+    }
+
+    return toDto(order);
+  }
+
+  @Override
+  @Transactional
+  public OrderDto processRefund(Long adminId, Long paymentId, String reference) {
+    Payment payment =
+        paymentRepository
+            .findById(paymentId)
+            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Payment not found"));
+
+    Order order =
+        orderRepository
+            .findById(payment.getOrderId())
+            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
+
+    payment.setStatus(PaymentStatus.REFUNDED);
+    paymentRepository.save(payment);
+
+    order.setPaymentStatus(PaymentStatus.REFUNDED);
+    orderRepository.save(order);
+
+    List<Refund> refunds = refundRepository.findByPaymentId(payment.getId());
+    if (refunds.isEmpty()) {
+      Refund refund =
+          Refund.builder()
+              .paymentId(payment.getId())
+              .amountCents(payment.getAmountCents())
+              .reason("Manual refund")
+              .status("COMPLETED")
+              .reference(
+                  reference != null
+                      ? reference
+                      : "REFUND-" + UUID.randomUUID().toString().substring(0, 8))
+              .actorId(adminId)
+              .createdAt(Instant.now())
+              .build();
+      refundRepository.save(refund);
+    } else {
+      for (Refund r : refunds) {
+        if ("PENDING".equalsIgnoreCase(r.getStatus())) {
+          r.setStatus("COMPLETED");
+          r.setActorId(adminId);
+          if (reference != null) {
+            r.setReference(reference);
+          } else if (r.getReference() == null) {
+            r.setReference("REFUND-" + UUID.randomUUID().toString().substring(0, 8));
+          }
+          refundRepository.save(r);
+        }
       }
     }
 

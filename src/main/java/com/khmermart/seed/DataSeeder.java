@@ -6,6 +6,9 @@ import com.khmermart.model.enumerate.Roles;
 import com.khmermart.repository.AppUserRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1887,10 +1890,12 @@ public class DataSeeder implements CommandLineRunner {
 
     for (int i = 1; i <= statuses.length; i++) {
       OrderStatus status = statuses[i - 1];
-      String orderNum = "KM-ORD-202610-" + String.format("%03d", i);
-      Long userId = (long) (3 + (i % 3)); // Cycles among customers 3, 4, 5
       Instant placedAt =
           now.minus(30 - (i % 28), ChronoUnit.DAYS).minus(i * 37, ChronoUnit.MINUTES);
+      String dateStr =
+          LocalDate.ofInstant(placedAt, ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE);
+      String orderNum = String.format("KM-%s-%06d", dateStr, i);
+      Long userId = (long) (3 + (i % 3)); // Cycles among customers 3, 4, 5
 
       PaymentStatus paymentStatus = resolvePaymentStatus(status);
       String paymentMethod = (i % 4 == 0) ? "COD" : "KHQR";

@@ -113,8 +113,7 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
       return payment;
     }
 
-    if (payment.getStatus() != PaymentStatus.PENDING
-        && payment.getStatus() != PaymentStatus.PENDING_VERIFICATION) {
+    if (payment.getStatus() != PaymentStatus.PENDING) {
       log.warn(
           "Payment {} cannot be confirmed because status is {}", paymentId, payment.getStatus());
       return payment;

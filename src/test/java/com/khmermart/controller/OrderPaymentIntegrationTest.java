@@ -10,12 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
+import com.khmermart.model.entity.CouponRedemption;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
 import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Product;
+import com.khmermart.model.entity.Refund;
+import com.khmermart.model.enumerate.CouponRedemptionStatus;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentMethod;
@@ -29,6 +32,7 @@ import com.khmermart.repository.OrderItemRepository;
 import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductRepository;
+import com.khmermart.repository.RefundRepository;
 import com.khmermart.security.JwtService;
 import com.khmermart.service.impl.PaymentExpiryJob;
 import java.nio.charset.StandardCharsets;
@@ -56,6 +60,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
   @Autowired private ProductRepository productRepository;
   @Autowired private CouponRepository couponRepository;
   @Autowired private CouponRedemptionRepository couponRedemptionRepository;
+  @Autowired private RefundRepository refundRepository;
   @Autowired private PaymentExpiryJob paymentExpiryJob;
   @Autowired private JwtService jwtService;
   @Autowired private ObjectMapper objectMapper;
@@ -227,12 +232,22 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .paymentStatus(PaymentStatus.PENDING)
                 .paymentMethod(PaymentMethod.KHQR)
                 .subtotalCents(2000L)
-                .discountCents(0L)
+                .couponCode("SAVE5")
+                .discountCents(500L)
                 .shippingCents(0L)
-                .totalCents(2000L)
+                .totalCents(1500L)
                 .shippingAddress("{}")
                 .shippingMethodCode("STANDARD")
                 .placedAt(Instant.now().minus(Duration.ofMinutes(15)))
+                .build());
+
+    CouponRedemption redemption =
+        couponRedemptionRepository.save(
+            CouponRedemption.builder()
+                .couponId(1L)
+                .orderId(order.getId())
+                .userId(3L)
+                .status(CouponRedemptionStatus.PENDING)
                 .build());
 
     orderItemRepository.save(
@@ -275,6 +290,10 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
     List<InventoryMovement> movements = movementRepository.findByRefOrderId(order.getId());
     assertThat(movements)
         .anyMatch(m -> m.getType() == InventoryMovementType.RELEASE && m.getQuantity() == 3);
+
+    CouponRedemption releasedRedemption =
+        couponRedemptionRepository.findById(redemption.getId()).orElseThrow();
+    assertThat(releasedRedemption.getStatus()).isEqualTo(CouponRedemptionStatus.RELEASED);
   }
 
   @Test
@@ -406,6 +425,114 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName(
+      "Cancelling a PAID order: returns stock via movement RETURN (quantity_on_hand + 1), creates PENDING Refund, and admin refund marks payment REFUNDED")
+  void testCancelPaidOrderFlow() throws Exception {
+    Product product =
+        productRepository.save(
+            Product.builder()
+                .sku("TEST-PAID-CANCEL-PROD")
+                .name("Paid Cancel Product")
+                .slug("paid-cancel-product-" + System.currentTimeMillis())
+                .priceCents(5000L)
+                .active(true)
+                .build());
+
+    Inventory inv =
+        inventoryRepository.save(
+            Inventory.builder()
+                .productId(product.getId())
+                .quantityOnHand(10)
+                .quantityReserved(0)
+                .lowStockThreshold(2)
+                .build());
+
+    Order order =
+        orderRepository.save(
+            Order.builder()
+                .orderNumber("KM-TEST-PAID-CANCEL-01")
+                .userId(3L)
+                .status(OrderStatus.CONFIRMED)
+                .paymentStatus(PaymentStatus.PAID)
+                .paymentMethod(PaymentMethod.KHQR)
+                .subtotalCents(5000L)
+                .discountCents(0L)
+                .shippingCents(0L)
+                .totalCents(5000L)
+                .shippingAddress("{}")
+                .shippingMethodCode("STANDARD")
+                .placedAt(Instant.now())
+                .build());
+
+    orderItemRepository.save(
+        OrderItem.builder()
+            .orderId(order.getId())
+            .productId(product.getId())
+            .productNameSnapshot("Paid Cancel Product")
+            .skuSnapshot("TEST-PAID-CANCEL-PROD")
+            .unitPriceCents(5000L)
+            .quantity(1)
+            .lineTotalCents(5000L)
+            .build());
+
+    Payment payment =
+        paymentRepository.save(
+            Payment.builder()
+                .orderId(order.getId())
+                .method(PaymentMethod.KHQR)
+                .status(PaymentStatus.PAID)
+                .amountCents(5000L)
+                .currency("USD")
+                .bakongHash("MOCK-TEST-PAID-HASH")
+                .paidAt(Instant.now())
+                .createdAt(Instant.now())
+                .build());
+
+    // Cancel the PAID order
+    mockMvc
+        .perform(
+            post("/api/orders/{orderNumber}/cancel", order.getOrderNumber())
+                .header("Authorization", customer1Token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Customer changed mind\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+    // Verify inventory: quantity_on_hand incremented by 1 (10 -> 11), quantity_reserved remains 0
+    Inventory updatedInv = inventoryRepository.findById(inv.getId()).orElseThrow();
+    assertThat(updatedInv.getQuantityOnHand()).isEqualTo(11);
+    assertThat(updatedInv.getQuantityReserved()).isEqualTo(0);
+
+    // Verify inventory movement of type RETURN
+    List<InventoryMovement> movements = movementRepository.findByRefOrderId(order.getId());
+    assertThat(movements)
+        .anyMatch(m -> m.getType() == InventoryMovementType.RETURN && m.getQuantity() == 1);
+
+    // Verify Refund record created with status PENDING
+    List<Refund> refunds = refundRepository.findByPaymentId(payment.getId());
+    assertThat(refunds).hasSize(1);
+    Refund refund = refunds.get(0);
+    assertThat(refund.getStatus()).isEqualTo("PENDING");
+    assertThat(refund.getAmountCents()).isEqualTo(5000L);
+    assertThat(refund.getReason()).contains("Customer changed mind");
+
+    // Admin processes refund
+    mockMvc
+        .perform(
+            post("/api/admin/payments/{id}/refund", payment.getId())
+                .header("Authorization", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.paymentStatus").value("REFUNDED"))
+        .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+    Payment refundedPayment = paymentRepository.findById(payment.getId()).orElseThrow();
+    assertThat(refundedPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+
+    Refund completedRefund = refundRepository.findById(refund.getId()).orElseThrow();
+    assertThat(completedRefund.getStatus()).isEqualTo("COMPLETED");
+  }
+
+  @Test
   @DisplayName("Ownership check: customer 2 cannot access customer 1's order")
   void testOrderOwnershipCheck() throws Exception {
     Order order =
@@ -432,8 +559,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName(
-      "Bank transfer: upload slip -> PENDING_VERIFICATION, admin approve -> PAID + CONFIRMED")
+  @DisplayName("Bank transfer: upload slip -> PENDING, admin approve -> PAID + CONFIRMED")
   void testBankTransferSlipAndApproval() throws Exception {
     Order order =
         orderRepository.save(
@@ -464,11 +590,11 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .file(slipFile)
                 .header("Authorization", customer1Token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.paymentStatus").value("PENDING_VERIFICATION"));
+        .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
 
     Payment payment =
         paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElseThrow();
-    assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING_VERIFICATION);
+    assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
 
     // Admin approve
     mockMvc
@@ -534,7 +660,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 header()
                     .string(
                         "Content-Disposition",
-                        "form-data; name=\"attachment\"; filename=\"invoice-KM-TEST-INV-01.pdf\""))
+                        "attachment; filename=\"invoice-KM-TEST-INV-01.pdf\""))
             .andReturn()
             .getResponse()
             .getContentAsByteArray();

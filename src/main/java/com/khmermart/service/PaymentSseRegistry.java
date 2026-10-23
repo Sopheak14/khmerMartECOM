@@ -47,9 +47,8 @@ public class PaymentSseRegistry {
         });
     emitter.onError(e -> cleanup.run());
 
-    // Send initial events
+    // Send initial status event
     try {
-      emitter.send(SseEmitter.event().name("connected").data(Map.of("status", "connected")));
       if (initialStatus != null) {
         emitter.send(SseEmitter.event().name("status").data(initialStatus));
         if (isTerminal(initialStatus.status())) {
@@ -83,7 +82,6 @@ public class PaymentSseRegistry {
     List<SseEmitter> deadEmitters = new ArrayList<>();
     for (SseEmitter emitter : list) {
       try {
-        emitter.send(SseEmitter.event().name("payment_update").data(dto));
         emitter.send(SseEmitter.event().name("status").data(dto));
         if (isTerminal(event.status())) {
           emitter.complete();

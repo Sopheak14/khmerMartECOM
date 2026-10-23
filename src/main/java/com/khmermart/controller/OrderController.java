@@ -17,6 +17,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -93,7 +94,8 @@ public class OrderController {
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", "invoice-" + orderNumber + ".pdf");
+    headers.setContentDisposition(
+        ContentDisposition.attachment().filename("invoice-" + orderNumber + ".pdf").build());
     headers.setContentLength(pdfBytes.length);
 
     return ResponseEntity.ok().headers(headers).body(pdfBytes);
