@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Order Has Shipped - KhmerMart</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; color: #2d3748;">
+    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="background-color: #1a365d; color: #ffffff; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">KhmerMart • ផ្សារខ្មែរ</h1>
+            <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Your Trusted Online Marketplace • ទីផ្សារអនឡាញទុកចិត្តរបស់អ្នក</p>
+        </div>
+        <div style="padding: 30px;">
+            <h2 style="color: #2b6cb0; margin-top: 0;">Order Shipped / ការបញ្ជាទិញត្រូវបានផ្ញើចេញ</h2>
+            <p>Dear <strong th:text="${fullName}">Customer</strong>,</p>
+            <p>Great news! Your order has been dispatched from our fulfillment center and is on its way to you.</p>
+            <div style="background-color: #ebf8ff; border-left: 4px solid #3182ce; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Order Number / លេខការបញ្ជាទិញ:</strong> <span th:text="${orderNumber}">KM-20261023-000001</span></p>
+                <p style="margin: 0 0 8px 0;"><strong>Carrier / ក្រុមហ៊ុនដឹកជញ្ជូន:</strong> <span th:text="${carrier}">J&T Express</span></p>
+                <p style="margin: 0;"><strong>Tracking Number / លេខតាមដាន:</strong> <span style="font-size: 16px; font-weight: bold; color: #2b6cb0;" th:text="${trackingNumber}">KMTRK1234567890</span></p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+                <a th:href="${frontendUrl + '/track/' + trackingNumber}" style="background-color: #3182ce; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Track Shipment Live / តាមដានការដឹកជញ្ជូន</a>
+            </div>
+        </div>
+        <div style="background-color: #edf2f7; padding: 16px; text-align: center; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0;">
+            <p style="margin: 0;">KhmerMart Cambodia • Preah Monivong Blvd, Phnom Penh</p>
+            <p style="margin: 4px 0 0 0;">Need help? Contact <a th:href="${frontendUrl + '/support'}" style="color: #3182ce;">support@khmermart.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

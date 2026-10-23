@@ -3,6 +3,7 @@ package com.khmermart.service.impl;
 import com.khmermart.common.constant.MessageConstant;
 import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
+import com.khmermart.event.PasswordChangedEvent;
 import com.khmermart.mapper.AppUserMapper;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.request.AppUserUpdateRequest;
@@ -12,6 +13,7 @@ import com.khmermart.repository.AppUserRepository;
 import com.khmermart.service.AppUserService;
 import java.time.Instant;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,14 +25,17 @@ public class AppUserServiceImpl implements AppUserService {
   private final AppUserRepository appUserRepository;
   private final PasswordEncoder passwordEncoder;
   private final AppUserMapper appUserMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   public AppUserServiceImpl(
       AppUserRepository appUserRepository,
       PasswordEncoder passwordEncoder,
-      AppUserMapper appUserMapper) {
+      AppUserMapper appUserMapper,
+      ApplicationEventPublisher eventPublisher) {
     this.appUserRepository = appUserRepository;
     this.passwordEncoder = passwordEncoder;
     this.appUserMapper = appUserMapper;
+    this.eventPublisher = eventPublisher;
   }
 
   @Override
@@ -78,5 +83,8 @@ public class AppUserServiceImpl implements AppUserService {
     user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
     user.setUpdatedAt(Instant.now());
     appUserRepository.save(user);
+
+    eventPublisher.publishEvent(
+        new PasswordChangedEvent(user.getId(), user.getEmail(), user.getFullName()));
   }
 }

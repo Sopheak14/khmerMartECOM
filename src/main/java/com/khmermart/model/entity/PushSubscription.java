@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Base64;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,4 +42,20 @@ public class PushSubscription {
   @Column(name = "created_at", nullable = false, updatable = false)
   @Builder.Default
   private Instant createdAt = Instant.now();
+
+  public byte[] getUserKey() {
+    try {
+      return Base64.getUrlDecoder().decode(p256dh);
+    } catch (IllegalArgumentException e) {
+      return Base64.getDecoder().decode(p256dh);
+    }
+  }
+
+  public byte[] getAuthAsBytes() {
+    try {
+      return Base64.getUrlDecoder().decode(auth);
+    } catch (IllegalArgumentException e) {
+      return Base64.getDecoder().decode(auth);
+    }
+  }
 }

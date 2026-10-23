@@ -1,10 +1,11 @@
 package com.khmermart.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.khmermart.common.event.PaymentPaidEvent;
-import com.khmermart.common.event.PaymentStatusChangedEvent;
 import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
+import com.khmermart.event.PaymentPaidEvent;
+import com.khmermart.event.PaymentStatusChangedEvent;
+import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
@@ -16,6 +17,7 @@ import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.response.BakongTxData;
+import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.CouponRedemptionRepository;
 import com.khmermart.repository.CouponRepository;
 import com.khmermart.repository.InventoryMovementRepository;
@@ -25,6 +27,7 @@ import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.OrderStatusHistoryRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductRepository;
+import com.khmermart.service.InvoiceService;
 import com.khmermart.service.OrderStateMachine;
 import com.khmermart.service.PaymentConfirmationService;
 import java.time.Instant;
@@ -49,6 +52,8 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
   private final ProductRepository productRepository;
   private final CouponRepository couponRepository;
   private final CouponRedemptionRepository couponRedemptionRepository;
+  private final AppUserRepository appUserRepository;
+  private final InvoiceService invoiceService;
   private final OrderStateMachine orderStateMachine;
   private final ApplicationEventPublisher eventPublisher;
   private final ObjectMapper objectMapper;
@@ -63,6 +68,8 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
       ProductRepository productRepository,
       CouponRepository couponRepository,
       CouponRedemptionRepository couponRedemptionRepository,
+      AppUserRepository appUserRepository,
+      InvoiceService invoiceService,
       OrderStateMachine orderStateMachine,
       ApplicationEventPublisher eventPublisher,
       ObjectMapper objectMapper) {
@@ -75,6 +82,8 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
     this.productRepository = productRepository;
     this.couponRepository = couponRepository;
     this.couponRedemptionRepository = couponRedemptionRepository;
+    this.appUserRepository = appUserRepository;
+    this.invoiceService = invoiceService;
     this.orderStateMachine = orderStateMachine;
     this.eventPublisher = eventPublisher;
     this.objectMapper = objectMapper;
@@ -217,8 +226,29 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
     }
 
     // 5. Publish events
+    AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
+    byte[] invoicePdf = null;
+    try {
+      invoicePdf = invoiceService.generateInvoicePdf(order.getOrderNumber());
+    } catch (Exception e) {
+      log.warn(
+          "Failed to generate invoice PDF for order {}: {}",
+          order.getOrderNumber(),
+          e.getMessage());
+    }
+
     eventPublisher.publishEvent(
-        new PaymentPaidEvent(payment.getId(), order.getId(), payment.getAmountCents(), hash));
+        new PaymentPaidEvent(
+            payment.getId(),
+            order.getId(),
+            order.getOrderNumber(),
+            order.getUserId(),
+            user != null ? user.getEmail() : null,
+            user != null ? user.getFullName() : null,
+            user != null ? user.getPhone() : null,
+            payment.getAmountCents(),
+            hash,
+            invoicePdf));
     eventPublisher.publishEvent(
         new PaymentStatusChangedEvent(
             payment.getId(),

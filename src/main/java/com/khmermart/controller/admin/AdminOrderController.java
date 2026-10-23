@@ -1,12 +1,15 @@
 package com.khmermart.controller.admin;
 
 import com.khmermart.common.response.SuccessResponse;
+import com.khmermart.model.request.AddTrackingEventRequest;
 import com.khmermart.model.request.ShipOrderRequest;
 import com.khmermart.model.request.UpdateOrderStatusRequest;
 import com.khmermart.model.response.OrderDto;
+import com.khmermart.model.response.TrackingEventDto;
 import com.khmermart.security.CurrentUser;
 import com.khmermart.security.UserPrincipal;
 import com.khmermart.service.OrderService;
+import com.khmermart.service.TrackingService;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminOrderController {
 
   private final OrderService orderService;
+  private final TrackingService trackingService;
 
-  public AdminOrderController(OrderService orderService) {
+  public AdminOrderController(OrderService orderService, TrackingService trackingService) {
     this.orderService = orderService;
+    this.trackingService = trackingService;
   }
 
   @PostMapping("/{orderNumber}/ship")
@@ -37,6 +42,15 @@ public class AdminOrderController {
       @PathVariable String orderNumber, @RequestBody(required = false) ShipOrderRequest request) {
     String carrier = request != null ? request.carrier() : "KhmerMart Express";
     OrderDto dto = orderService.shipOrder(orderNumber, carrier);
+    return ApiResponseUtil.success(dto);
+  }
+
+  @PostMapping("/{orderNumber}/tracking-events")
+  @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+  @Operation(summary = "Add tracking event to order shipment")
+  public SuccessResponse<TrackingEventDto> addTrackingEvent(
+      @PathVariable String orderNumber, @Valid @RequestBody AddTrackingEventRequest request) {
+    TrackingEventDto dto = trackingService.addTrackingEvent(orderNumber, request);
     return ApiResponseUtil.success(dto);
   }
 

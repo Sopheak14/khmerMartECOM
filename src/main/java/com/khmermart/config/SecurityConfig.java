@@ -105,7 +105,10 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/track/**")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/push/vapid-public-key")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/push/vapid-key", "/api/push/vapid-public-key")
+                    .permitAll()
+                    .requestMatchers("/api/dev/**")
                     .permitAll()
 
                     // Cart endpoints (allow guest cart)

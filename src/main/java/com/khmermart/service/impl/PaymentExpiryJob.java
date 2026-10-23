@@ -1,7 +1,7 @@
 package com.khmermart.service.impl;
 
-import com.khmermart.common.event.PaymentStatusChangedEvent;
 import com.khmermart.config.AppProperty;
+import com.khmermart.event.PaymentStatusChangedEvent;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;

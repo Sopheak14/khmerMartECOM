@@ -1,6 +1,6 @@
 package com.khmermart.service;
 
-import com.khmermart.common.event.PaymentStatusChangedEvent;
+import com.khmermart.event.PaymentStatusChangedEvent;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.response.PaymentStatusDto;
 import java.io.IOException;

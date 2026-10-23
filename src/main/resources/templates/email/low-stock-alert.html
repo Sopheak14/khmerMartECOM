@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Low Stock Alert - KhmerMart</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; color: #2d3748;">
+    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="background-color: #742a2a; color: #ffffff; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">KhmerMart • ផ្សារខ្មែរ</h1>
+            <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Inventory Management Alert • ការជូនដំណឹងអំពីស្តុកទំនិញ</p>
+        </div>
+        <div style="padding: 30px;">
+            <h2 style="color: #9b2c2c; margin-top: 0;">⚠️ Low Stock Warning / ការព្រមានអំពីស្តុកទាប</h2>
+            <p>Attention Inventory Manager / Staff,</p>
+            <p>An item has reached or dropped below its configured restock threshold:</p>
+            <div style="background-color: #fff5f5; border: 1px solid #feb2b2; border-radius: 6px; padding: 18px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Product / ឈ្មោះទំនិញ:</strong> <span th:text="${productName}">Laptop Pro 15</span></p>
+                <p style="margin: 0 0 8px 0;"><strong>SKU:</strong> <code th:text="${sku}">LP15-GRY-16-512</code></p>
+                <p style="margin: 0 0 8px 0;"><strong>Remaining Available / ចំនួនស្តុកនៅសល់:</strong> <span style="font-size: 18px; color: #e53e3e; font-weight: bold;" th:text="${available}">3</span> units</p>
+                <p style="margin: 0;"><strong>Threshold / កម្រិតកំណត់:</strong> <span th:text="${threshold}">5</span> units</p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+                <a th:href="${frontendUrl + '/admin/inventory'}" style="background-color: #e53e3e; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Manage Inventory / គ្រប់គ្រងស្តុក</a>
+            </div>
+        </div>
+        <div style="background-color: #edf2f7; padding: 16px; text-align: center; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0;">
+            <p style="margin: 0;">KhmerMart Internal System Notification</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-package com.khmermart.common.event;
+package com.khmermart.event;
 
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;

@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.common.constant.AppConstant;
 import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
+import com.khmermart.event.InventoryLowEvent;
+import com.khmermart.event.OrderPlacedEvent;
 import com.khmermart.mapper.AddressMapper;
 import com.khmermart.model.entity.Address;
+import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.Cart;
 import com.khmermart.model.entity.CartItem;
 import com.khmermart.model.entity.Coupon;
@@ -39,6 +42,7 @@ import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
 import com.khmermart.model.response.ShippingMethodDto;
 import com.khmermart.repository.AddressRepository;
+import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.CartItemRepository;
 import com.khmermart.repository.CartRepository;
 import com.khmermart.repository.CouponRedemptionRepository;
@@ -72,6 +76,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,11 +103,13 @@ public class CheckoutServiceImpl implements CheckoutService {
   private final PaymentRepository paymentRepository;
   private final SettingRepository settingRepository;
   private final IdempotencyRecordRepository idempotencyRecordRepository;
+  private final AppUserRepository appUserRepository;
   private final ShippingService shippingService;
   private final PricingService pricingService;
   private final AddressMapper addressMapper;
   private final StringRedisTemplate redisTemplate;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   public CheckoutServiceImpl(
       AddressRepository addressRepository,
@@ -124,11 +131,13 @@ public class CheckoutServiceImpl implements CheckoutService {
       PaymentRepository paymentRepository,
       SettingRepository settingRepository,
       IdempotencyRecordRepository idempotencyRecordRepository,
+      AppUserRepository appUserRepository,
       ShippingService shippingService,
       PricingService pricingService,
       AddressMapper addressMapper,
       StringRedisTemplate redisTemplate,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      ApplicationEventPublisher eventPublisher) {
     this.addressRepository = addressRepository;
     this.cartRepository = cartRepository;
     this.cartItemRepository = cartItemRepository;
@@ -148,11 +157,13 @@ public class CheckoutServiceImpl implements CheckoutService {
     this.paymentRepository = paymentRepository;
     this.settingRepository = settingRepository;
     this.idempotencyRecordRepository = idempotencyRecordRepository;
+    this.appUserRepository = appUserRepository;
     this.shippingService = shippingService;
     this.pricingService = pricingService;
     this.addressMapper = addressMapper;
     this.redisTemplate = redisTemplate;
     this.objectMapper = objectMapper;
+    this.eventPublisher = eventPublisher;
   }
 
   @Override
@@ -537,13 +548,25 @@ public class CheckoutServiceImpl implements CheckoutService {
         throw new CustomException(ErrorCode.OUT_OF_STOCK, "Inventory item not found");
       }
 
+      int availableBefore = Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved());
       int rows = inventoryRepository.tryReserve(inv.getId(), item.getQuantity());
       if (rows == 0) {
-        int available = Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved());
         throw new CustomException(
             ErrorCode.OUT_OF_STOCK,
-            "Only " + available + " left in stock",
-            Map.of("productId", item.getProductId(), "available", available));
+            "Only " + availableBefore + " left in stock",
+            Map.of("productId", item.getProductId(), "available", availableBefore));
+      }
+
+      int availableAfter = availableBefore - item.getQuantity();
+      int threshold = inv.getLowStockThreshold();
+      if (availableBefore > threshold && availableAfter <= threshold) {
+        Product prod = productRepository.findById(item.getProductId()).orElse(null);
+        String prodName = prod != null ? prod.getName() : "Product #" + item.getProductId();
+        String sku = prod != null ? prod.getSku() : "";
+        inv.setLowStockAlerted(true);
+        inventoryRepository.save(inv);
+        eventPublisher.publishEvent(
+            new InventoryLowEvent(item.getProductId(), prodName, sku, availableAfter, threshold));
       }
 
       InventoryMovement movement =
@@ -788,6 +811,20 @@ public class CheckoutServiceImpl implements CheckoutService {
               .build());
     } catch (Exception ignored) {
     }
+
+    AppUser user = appUserRepository.findById(userId).orElse(null);
+    eventPublisher.publishEvent(
+        new OrderPlacedEvent(
+            order.getId(),
+            order.getOrderNumber(),
+            order.getUserId(),
+            user != null ? user.getEmail() : null,
+            user != null ? user.getFullName() : null,
+            user != null ? user.getPhone() : null,
+            order.getTotalCents(),
+            order.getSubtotalCents(),
+            order.getShippingCents(),
+            order.getCouponCode()));
 
     return responseDto;
   }

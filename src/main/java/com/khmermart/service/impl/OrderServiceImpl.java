@@ -5,6 +5,9 @@ import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
 import com.khmermart.common.response.PaginationResponse;
 import com.khmermart.common.response.SuccessResponse;
+import com.khmermart.event.OrderCancelledEvent;
+import com.khmermart.event.OrderShippedEvent;
+import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.Cart;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
@@ -15,12 +18,15 @@ import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.ProductImage;
 import com.khmermart.model.entity.Refund;
+import com.khmermart.model.entity.Shipment;
 import com.khmermart.model.entity.ShippingMethod;
+import com.khmermart.model.entity.TrackingEvent;
 import com.khmermart.model.enumerate.CouponRedemptionStatus;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.enumerate.ShipmentStatus;
 import com.khmermart.model.request.CartItemRequest;
 import com.khmermart.model.response.AddressDto;
 import com.khmermart.model.response.CartDto;
@@ -28,6 +34,7 @@ import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
 import com.khmermart.model.response.ShippingMethodDto;
+import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.CouponRedemptionRepository;
 import com.khmermart.repository.CouponRepository;
 import com.khmermart.repository.InventoryMovementRepository;
@@ -40,17 +47,22 @@ import com.khmermart.repository.ProductImageRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.repository.ProductVariantRepository;
 import com.khmermart.repository.RefundRepository;
+import com.khmermart.repository.ReviewRepository;
+import com.khmermart.repository.ShipmentRepository;
 import com.khmermart.repository.ShippingMethodRepository;
+import com.khmermart.repository.TrackingEventRepository;
 import com.khmermart.service.CartService;
 import com.khmermart.service.OrderService;
 import com.khmermart.service.OrderStateMachine;
 import com.khmermart.service.ShippingService;
 import com.khmermart.util.ApiResponseUtil;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -72,10 +84,15 @@ public class OrderServiceImpl implements OrderService {
   private final CouponRedemptionRepository couponRedemptionRepository;
   private final RefundRepository refundRepository;
   private final ShippingMethodRepository shippingMethodRepository;
+  private final ShipmentRepository shipmentRepository;
+  private final TrackingEventRepository trackingEventRepository;
+  private final ReviewRepository reviewRepository;
+  private final AppUserRepository appUserRepository;
   private final ShippingService shippingService;
   private final CartService cartService;
   private final OrderStateMachine orderStateMachine;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   public OrderServiceImpl(
       OrderRepository orderRepository,
@@ -91,10 +108,15 @@ public class OrderServiceImpl implements OrderService {
       CouponRedemptionRepository couponRedemptionRepository,
       RefundRepository refundRepository,
       ShippingMethodRepository shippingMethodRepository,
+      ShipmentRepository shipmentRepository,
+      TrackingEventRepository trackingEventRepository,
+      ReviewRepository reviewRepository,
+      AppUserRepository appUserRepository,
       ShippingService shippingService,
       CartService cartService,
       OrderStateMachine orderStateMachine,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      ApplicationEventPublisher eventPublisher) {
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -108,10 +130,15 @@ public class OrderServiceImpl implements OrderService {
     this.couponRedemptionRepository = couponRedemptionRepository;
     this.refundRepository = refundRepository;
     this.shippingMethodRepository = shippingMethodRepository;
+    this.shipmentRepository = shipmentRepository;
+    this.trackingEventRepository = trackingEventRepository;
+    this.reviewRepository = reviewRepository;
+    this.appUserRepository = appUserRepository;
     this.shippingService = shippingService;
     this.cartService = cartService;
     this.orderStateMachine = orderStateMachine;
     this.objectMapper = objectMapper;
+    this.eventPublisher = eventPublisher;
   }
 
   @Override
@@ -267,6 +294,17 @@ public class OrderServiceImpl implements OrderService {
       }
     }
 
+    AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
+    eventPublisher.publishEvent(
+        new OrderCancelledEvent(
+            order.getId(),
+            order.getOrderNumber(),
+            order.getUserId(),
+            user != null ? user.getEmail() : null,
+            user != null ? user.getFullName() : null,
+            user != null ? user.getPhone() : null,
+            reason != null ? reason : "Order cancelled"));
+
     return toDto(order);
   }
 
@@ -373,8 +411,35 @@ public class OrderServiceImpl implements OrderService {
     order.setStatus(OrderStatus.SHIPPED);
     order.setShippedAt(now);
     order.setCarrier(carrier != null && !carrier.isBlank() ? carrier : "KhmerMart Express");
-    order.setTrackingNumber("TRK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+    String trackingNumber =
+        "KMTRK"
+            + String.format(
+                "%010d", Math.abs(UUID.randomUUID().getMostSignificantBits() % 10000000000L));
+    order.setTrackingNumber(trackingNumber);
     order = orderRepository.save(order);
+
+    Shipment shipment = shipmentRepository.findByOrderId(order.getId()).orElse(null);
+    if (shipment == null) {
+      shipment =
+          Shipment.builder()
+              .orderId(order.getId())
+              .carrier(order.getCarrier())
+              .trackingNumber(trackingNumber)
+              .status(ShipmentStatus.DISPATCHED)
+              .estimatedDelivery(now.plus(Duration.ofDays(3)))
+              .build();
+      shipment = shipmentRepository.save(shipment);
+
+      TrackingEvent firstEvent =
+          TrackingEvent.builder()
+              .shipmentId(shipment.getId())
+              .status(ShipmentStatus.DISPATCHED)
+              .location("Phnom Penh Fulfillment Center")
+              .note("Package dispatched with " + order.getCarrier())
+              .createdAt(now)
+              .build();
+      trackingEventRepository.save(firstEvent);
+    }
 
     OrderStatusHistory history =
         OrderStatusHistory.builder()
@@ -426,6 +491,18 @@ public class OrderServiceImpl implements OrderService {
                 });
       }
     }
+
+    AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
+    eventPublisher.publishEvent(
+        new OrderShippedEvent(
+            order.getId(),
+            order.getOrderNumber(),
+            order.getUserId(),
+            user != null ? user.getEmail() : null,
+            user != null ? user.getFullName() : null,
+            user != null ? user.getPhone() : null,
+            order.getCarrier(),
+            order.getTrackingNumber()));
 
     return toDto(order);
   }
@@ -509,7 +586,10 @@ public class OrderServiceImpl implements OrderService {
         }
       }
 
-      boolean canReview = order.getStatus() == OrderStatus.DELIVERED;
+      boolean canReview =
+          (order.getStatus() == OrderStatus.DELIVERED)
+              && !reviewRepository.existsByUserIdAndProductId(
+                  order.getUserId(), item.getProductId());
 
       itemDtos.add(
           new OrderItemDto(
@@ -555,7 +635,9 @@ public class OrderServiceImpl implements OrderService {
             || order.getStatus() == OrderStatus.CONFIRMED
             || order.getStatus() == OrderStatus.PROCESSING;
 
-    boolean canReview = order.getStatus() == OrderStatus.DELIVERED;
+    boolean canReview =
+        order.getStatus() == OrderStatus.DELIVERED
+            && itemDtos.stream().anyMatch(OrderItemDto::canReview);
 
     return new OrderDto(
         order.getId(),
