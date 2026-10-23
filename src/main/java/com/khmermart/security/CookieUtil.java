@@ -1,5 +1,6 @@
 package com.khmermart.security;
 
+import com.khmermart.common.constant.AppConstant;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
@@ -12,10 +13,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class CookieUtil {
 
-  public static final String REFRESH_TOKEN_COOKIE_NAME = "km_rt";
-  public static final String GUEST_CART_COOKIE_NAME = "km_guest";
-  public static final String AUTH_COOKIE_PATH = "/api/auth";
-
   private final boolean isProd;
 
   public CookieUtil(Environment env) {
@@ -23,21 +20,21 @@ public class CookieUtil {
   }
 
   public ResponseCookie createRefreshTokenCookie(String token, long maxAgeSeconds) {
-    return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, token)
+    return ResponseCookie.from(AppConstant.REFRESH_TOKEN_COOKIE_NAME, token)
         .httpOnly(true)
         .secure(isProd)
         .sameSite("Lax")
-        .path(AUTH_COOKIE_PATH)
+        .path(AppConstant.AUTH_COOKIE_PATH)
         .maxAge(maxAgeSeconds)
         .build();
   }
 
   public ResponseCookie deleteRefreshTokenCookie() {
-    return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
+    return ResponseCookie.from(AppConstant.REFRESH_TOKEN_COOKIE_NAME, "")
         .httpOnly(true)
         .secure(isProd)
         .sameSite("Lax")
-        .path(AUTH_COOKIE_PATH)
+        .path(AppConstant.AUTH_COOKIE_PATH)
         .maxAge(0)
         .build();
   }
@@ -47,7 +44,7 @@ public class CookieUtil {
       return Optional.empty();
     }
     return Arrays.stream(request.getCookies())
-        .filter(c -> REFRESH_TOKEN_COOKIE_NAME.equals(c.getName()))
+        .filter(c -> AppConstant.REFRESH_TOKEN_COOKIE_NAME.equals(c.getName()))
         .map(Cookie::getValue)
         .filter(val -> val != null && !val.isBlank())
         .findFirst();

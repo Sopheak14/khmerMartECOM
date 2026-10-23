@@ -1,8 +1,9 @@
 package com.khmermart.config;
 
+import com.khmermart.security.CustomAccessDeniedHandler;
+import com.khmermart.security.JwtAuthEntrypoint;
 import com.khmermart.security.JwtAuthFilter;
-import com.khmermart.security.RestAccessDeniedHandler;
-import com.khmermart.security.RestAuthEntryPoint;
+import com.khmermart.security.RateLimitFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,8 +13,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -26,24 +25,22 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthFilter jwtAuthFilter;
-  private final RestAuthEntryPoint authEntryPoint;
-  private final RestAccessDeniedHandler accessDeniedHandler;
-  private final AppProperties appProperties;
+  private final JwtAuthEntrypoint authEntryPoint;
+  private final CustomAccessDeniedHandler accessDeniedHandler;
+  private final RateLimitFilter rateLimitFilter;
+  private final AppProperty appProperties;
 
   public SecurityConfig(
       JwtAuthFilter jwtAuthFilter,
-      RestAuthEntryPoint authEntryPoint,
-      RestAccessDeniedHandler accessDeniedHandler,
-      AppProperties appProperties) {
+      JwtAuthEntrypoint authEntryPoint,
+      CustomAccessDeniedHandler accessDeniedHandler,
+      RateLimitFilter rateLimitFilter,
+      AppProperty appProperties) {
     this.jwtAuthFilter = jwtAuthFilter;
     this.authEntryPoint = authEntryPoint;
     this.accessDeniedHandler = accessDeniedHandler;
+    this.rateLimitFilter = rateLimitFilter;
     this.appProperties = appProperties;
-  }
-
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder(12);
   }
 
   @Bean
@@ -70,11 +67,16 @@ public class SecurityConfig {
                     .requestMatchers("/api/health")
                     .permitAll()
                     .requestMatchers(
-                        "/api/docs", "/api/docs/**",
-                        "/api/v3/api-docs", "/api/v3/api-docs/**",
-                        "/v3/api-docs", "/v3/api-docs/**",
-                        "/api/swagger-ui/**", "/api/swagger-ui.html",
-                        "/swagger-ui/**", "/swagger-ui.html")
+                        "/api/docs",
+                        "/api/docs/**",
+                        "/api/v3/api-docs",
+                        "/api/v3/api-docs/**",
+                        "/v3/api-docs",
+                        "/v3/api-docs/**",
+                        "/api/swagger-ui/**",
+                        "/api/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html")
                     .permitAll()
 
                     // Public Auth endpoints
@@ -82,9 +84,7 @@ public class SecurityConfig {
                         "/api/auth/register",
                         "/api/auth/login",
                         "/api/auth/refresh",
-                        "/api/auth/logout")
-                    .permitAll()
-                    .requestMatchers(
+                        "/api/auth/logout",
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/auth/verify-email")
@@ -123,18 +123,15 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .requestMatchers("/api/admin/reports/**")
                     .hasRole("ADMIN")
-                    .requestMatchers("/api/admin/settings/**")
-                    .hasRole("ADMIN")
-                    .requestMatchers("/api/admin/audit-logs/**")
-                    .hasRole("ADMIN")
 
-                    // Staff & Admin (🛠)
+                    // Staff or Admin (🛠)
                     .requestMatchers("/api/admin/**")
                     .hasAnyRole("STAFF", "ADMIN")
 
-                    // Authenticated (🔑)
+                    // All other API endpoints require authentication
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
@@ -142,16 +139,17 @@ public class SecurityConfig {
 
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOrigins(List.of(appProperties.frontendUrl()));
-    config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
-    config.setExposedHeaders(List.of("Content-Disposition", "X-Request-Id"));
-    config.setAllowCredentials(true);
-    config.setMaxAge(3600L);
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(List.of(appProperties.frontendUrl()));
+    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    configuration.setAllowedHeaders(
+        List.of("Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"));
+    configuration.setExposedHeaders(List.of("Content-Disposition", "X-Request-Id"));
+    configuration.setAllowCredentials(true);
+    configuration.setMaxAge(3600L);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", config);
+    source.registerCorsConfiguration("/**", configuration);
     return source;
   }
 }

@@ -11,9 +11,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-  private final AppProperties appProperties;
+  private final AppProperty appProperties;
 
-  public WebConfig(AppProperties appProperties) {
+  public WebConfig(AppProperty appProperties) {
     this.appProperties = appProperties;
   }
 

@@ -1,8 +1,8 @@
 package com.khmermart.seed;
 
-import com.khmermart.modules.user.entity.User;
-import com.khmermart.modules.user.model.Role;
-import com.khmermart.modules.user.repository.UserRepository;
+import com.khmermart.model.entity.AppUser;
+import com.khmermart.model.enumerate.Roles;
+import com.khmermart.repository.AppUserRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,33 +17,33 @@ public class DataSeeder implements CommandLineRunner {
 
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
-  private final UserRepository userRepository;
+  private final AppUserRepository appUserRepository;
   private final PasswordEncoder passwordEncoder;
 
-  public DataSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-    this.userRepository = userRepository;
+  public DataSeeder(AppUserRepository appUserRepository, PasswordEncoder passwordEncoder) {
+    this.appUserRepository = appUserRepository;
     this.passwordEncoder = passwordEncoder;
   }
 
   @Override
   public void run(String... args) {
     seedUserIfMissing(
-        "admin@khmermart.local", "Admin@12345", "Admin User", "+85512000001", Role.ADMIN);
+        "admin@khmermart.local", "Admin@12345", "Admin User", "+85512000001", Roles.ADMIN);
     seedUserIfMissing(
-        "staff@khmermart.local", "Staff@12345", "Staff User", "+85512000002", Role.STAFF);
+        "staff@khmermart.local", "Staff@12345", "Staff User", "+85512000002", Roles.STAFF);
     seedUserIfMissing(
         "customer1@khmermart.local",
         "Customer@123",
         "Sopheap Customer",
         "+85512345678",
-        Role.CUSTOMER);
+        Roles.CUSTOMER);
   }
 
   private void seedUserIfMissing(
-      String email, String rawPassword, String fullName, String phone, Role role) {
-    if (!userRepository.existsByEmail(email.toLowerCase())) {
-      User user =
-          User.builder()
+      String email, String rawPassword, String fullName, String phone, Roles role) {
+    if (!appUserRepository.existsByEmail(email.toLowerCase())) {
+      AppUser user =
+          AppUser.builder()
               .email(email.toLowerCase())
               .passwordHash(passwordEncoder.encode(rawPassword))
               .fullName(fullName)
@@ -54,7 +54,7 @@ public class DataSeeder implements CommandLineRunner {
               .createdAt(Instant.now())
               .updatedAt(Instant.now())
               .build();
-      userRepository.save(user);
+      appUserRepository.save(user);
       log.info("Seeded demo account: {}", email);
     }
   }
