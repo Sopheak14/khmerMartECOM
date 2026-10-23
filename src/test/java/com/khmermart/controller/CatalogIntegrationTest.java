@@ -119,10 +119,18 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     assertThat(options.has("ram")).isTrue();
     assertThat(options.has("storage")).isTrue();
 
-    // Rating breakdown
+    // Rating breakdown & reviewCount (C10 computed rule)
     JsonNode breakdown = p.get("ratingBreakdown");
     assertThat(breakdown.has("1")).isTrue();
     assertThat(breakdown.has("5")).isTrue();
+    int breakdownSum = 0;
+    var it = breakdown.elements();
+    while (it.hasNext()) {
+      breakdownSum += it.next().asInt();
+    }
+    int reviewCount = p.get("reviewCount").asInt();
+    assertThat(reviewCount).isEqualTo(breakdownSum);
+    assertThat(reviewCount).isEqualTo(8);
 
     // Related
     assertThat(p.get("related").isArray()).isTrue();

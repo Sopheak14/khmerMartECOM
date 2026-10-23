@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 public interface CouponRepository extends JpaRepository<Coupon, Long> {
   Optional<Coupon> findByCodeIgnoreCaseAndActiveTrue(String code);
 
+  Optional<Coupon> findByCodeIgnoreCase(String code);
+
   Optional<Coupon> findByCode(String code);
 
   boolean existsByCode(String code);

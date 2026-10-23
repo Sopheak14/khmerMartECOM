@@ -9,6 +9,15 @@ public enum ErrorCode {
   FORBIDDEN(HttpStatus.FORBIDDEN, "Access denied"),
   NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
   CONFLICT(HttpStatus.CONFLICT, "Resource conflict"),
+  OUT_OF_STOCK(HttpStatus.CONFLICT, "Item is out of stock"),
+  PRICE_CHANGED(HttpStatus.CONFLICT, "Product price has changed"),
+  COUPON_INVALID(HttpStatus.BAD_REQUEST, "Coupon code is invalid"),
+  COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "Coupon has expired"),
+  COUPON_MIN_ORDER(HttpStatus.BAD_REQUEST, "Minimum order subtotal not met for coupon"),
+  INVALID_STATUS_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid status transition"),
+  PAYMENT_EXPIRED(HttpStatus.GONE, "Payment has expired"),
+  KHQR_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "Failed to generate KHQR code"),
+  BAKONG_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Bakong service is temporarily unavailable"),
   RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

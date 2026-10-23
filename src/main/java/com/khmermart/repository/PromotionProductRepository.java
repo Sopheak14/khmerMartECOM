@@ -13,4 +13,7 @@ public interface PromotionProductRepository
   List<PromotionProduct> findByProductId(Long productId);
 
   List<PromotionProduct> findByProductIdIn(List<Long> productIds);
+
+  java.util.Optional<PromotionProduct> findByPromotionIdAndProductId(
+      Long promotionId, Long productId);
 }

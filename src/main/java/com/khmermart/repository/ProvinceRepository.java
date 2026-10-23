@@ -10,4 +10,6 @@ public interface ProvinceRepository extends JpaRepository<Province, String> {
   Optional<Province> findByNameIgnoreCase(String name);
 
   Optional<Province> findByNameKmIgnoreCase(String nameKm);
+
+  java.util.List<Province> findAllByOrderByCodeAsc();
 }

@@ -15,6 +15,10 @@ public interface AddressMapper {
   @Mapping(target = "isDefault", expression = "java(address.isDefault())")
   AddressDto toDTO(Address address);
 
+  default AddressDto toDto(Address address) {
+    return toDTO(address);
+  }
+
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "userId", ignore = true)
   @Mapping(target = "default", expression = "java(request.isDefault())")

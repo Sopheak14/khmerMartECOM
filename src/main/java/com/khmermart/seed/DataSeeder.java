@@ -26,6 +26,7 @@ public class DataSeeder implements CommandLineRunner {
   private final AppUserRepository appUserRepository;
   private final PasswordEncoder passwordEncoder;
   private final JdbcTemplate jdbcTemplate;
+  private final com.khmermart.service.ReviewService reviewService;
 
   @Value("${app.seed.reset:false}")
   private boolean seedReset;
@@ -33,10 +34,12 @@ public class DataSeeder implements CommandLineRunner {
   public DataSeeder(
       AppUserRepository appUserRepository,
       PasswordEncoder passwordEncoder,
-      JdbcTemplate jdbcTemplate) {
+      JdbcTemplate jdbcTemplate,
+      com.khmermart.service.ReviewService reviewService) {
     this.appUserRepository = appUserRepository;
     this.passwordEncoder = passwordEncoder;
     this.jdbcTemplate = jdbcTemplate;
+    this.reviewService = reviewService;
   }
 
   @Override
@@ -97,6 +100,7 @@ public class DataSeeder implements CommandLineRunner {
             refresh_tokens,
             password_reset_tokens,
             email_verification_tokens,
+            shipping_methods,
             users
         CASCADE
         """);
@@ -111,8 +115,12 @@ public class DataSeeder implements CommandLineRunner {
     seedProducts();
     seedPromotionsAndCoupons();
     seedOrdersAndReviews();
+    for (long pid = 1001L; pid <= 1040L; pid++) {
+      reviewService.recomputeProductRating(pid);
+    }
     resetSequences();
-    log.info("Seeding complete: 5 seed users, 8 root categories, 40 products, 32 orders, reviews.");
+    log.info(
+        "Seeding complete: 8 seed customers, 8 root categories, 40 products, 32 orders, reviews recomputed.");
   }
 
   private void seedUsersAndAddresses() {
@@ -141,6 +149,41 @@ public class DataSeeder implements CommandLineRunner {
         "Customer@123",
         "Bopha Pich",
         "+85512888222",
+        Roles.CUSTOMER);
+    insertUser(
+        6L,
+        "customer4@khmermart.local",
+        "Customer@123",
+        "Vanna Sok",
+        "+85512888333",
+        Roles.CUSTOMER);
+    insertUser(
+        7L,
+        "customer5@khmermart.local",
+        "Customer@123",
+        "Channa Chea",
+        "+85512888444",
+        Roles.CUSTOMER);
+    insertUser(
+        8L,
+        "customer6@khmermart.local",
+        "Customer@123",
+        "Rithy Heng",
+        "+85512888555",
+        Roles.CUSTOMER);
+    insertUser(
+        9L,
+        "customer7@khmermart.local",
+        "Customer@123",
+        "Sreypov Meng",
+        "+85512888666",
+        Roles.CUSTOMER);
+    insertUser(
+        10L,
+        "customer8@khmermart.local",
+        "Customer@123",
+        "Kosal Long",
+        "+85512888777",
         Roles.CUSTOMER);
 
     // Seed addresses for customers
@@ -270,35 +313,11 @@ public class DataSeeder implements CommandLineRunner {
 
   private void seedShippingMethods() {
     insertShippingMethod(
-        1L,
-        "STANDARD_PP",
-        "Standard Phnom Penh Delivery",
-        "សេវាដឹកជញ្ជូនធម្មតា ភ្នំពេញ",
-        150L,
-        5000L,
-        1,
-        2,
-        true);
+        1L, "STANDARD", "Standard Delivery", "សេវាដឹកជញ្ជូនធម្មតា", 200L, 5000L, 2, 4, false);
     insertShippingMethod(
-        2L,
-        "EXPRESS_PP",
-        "Same-Day Express Phnom Penh",
-        "សេវាដឹកជញ្ជូនរហ័សក្នុងថ្ងៃ ភ្នំពេញ",
-        300L,
-        null,
-        0,
-        1,
-        true);
+        2L, "EXPRESS", "Express Delivery", "សេវាដឹកជញ្ជូនរហ័ស", 500L, null, 1, 2, false);
     insertShippingMethod(
-        3L,
-        "PROVINCIAL",
-        "Provincial Standard Delivery",
-        "សេវាដឹកជញ្ជូនតាមបណ្តាខេត្ត",
-        250L,
-        7000L,
-        2,
-        4,
-        false);
+        3L, "SAME_DAY", "Same-Day Delivery", "សេវាដឹកជញ្ជូនក្នុងថ្ងៃតែមួយ", 800L, null, 0, 1, true);
   }
 
   private void insertShippingMethod(
@@ -315,7 +334,15 @@ public class DataSeeder implements CommandLineRunner {
         """
         INSERT INTO shipping_methods (id, code, name, name_km, fee_cents, free_over_cents, eta_days_min, eta_days_max, phnom_penh_only)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+            code = EXCLUDED.code,
+            name = EXCLUDED.name,
+            name_km = EXCLUDED.name_km,
+            fee_cents = EXCLUDED.fee_cents,
+            free_over_cents = EXCLUDED.free_over_cents,
+            eta_days_min = EXCLUDED.eta_days_min,
+            eta_days_max = EXCLUDED.eta_days_max,
+            phnom_penh_only = EXCLUDED.phnom_penh_only
         """,
         id,
         code,
@@ -657,7 +684,17 @@ public class DataSeeder implements CommandLineRunner {
     // Coupons
     insertCoupon(1L, "SAVE5", "FIXED", 500L, "$5 off on orders over $35", 3500L, null);
     insertCoupon(2L, "WELCOME10", "PERCENT", 10L, "10% off welcome coupon", null, 2000L);
-    insertCoupon(3L, "FREESHIP", "FIXED", 250L, "Free standard shipping", 2000L, null);
+    insertCoupon(3L, "FREESHIP", "FREE_SHIPPING", 0L, "Free standard shipping", 2000L, null);
+    insertCoupon(
+        4L,
+        "EXPIRED",
+        "FIXED",
+        500L,
+        "Expired coupon voucher",
+        null,
+        null,
+        Timestamp.from(now.minus(10, ChronoUnit.DAYS)),
+        Timestamp.from(now.minus(2, ChronoUnit.DAYS)));
   }
 
   private void insertPromotionProduct(Long promoId, Long prodId, Long salePrice) {
@@ -674,11 +711,43 @@ public class DataSeeder implements CommandLineRunner {
 
   private void insertCoupon(
       Long id, String code, String type, Long value, String desc, Long minOrder, Long maxDiscount) {
+    Instant now = Instant.now();
+    insertCoupon(
+        id,
+        code,
+        type,
+        value,
+        desc,
+        minOrder,
+        maxDiscount,
+        Timestamp.from(now.minus(1, ChronoUnit.DAYS)),
+        Timestamp.from(now.plus(90, ChronoUnit.DAYS)));
+  }
+
+  private void insertCoupon(
+      Long id,
+      String code,
+      String type,
+      Long value,
+      String desc,
+      Long minOrder,
+      Long maxDiscount,
+      Timestamp startsAt,
+      Timestamp endsAt) {
     jdbcTemplate.update(
         """
         INSERT INTO coupons (id, code, type, value, description, min_order_cents, max_discount_cents, starts_at, ends_at, usage_limit, per_user_limit, used_count, is_active, version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, now() - interval '1 day', now() + interval '90 days', 1000, 1, 15, true, 0)
-        ON CONFLICT (id) DO NOTHING
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1000, 1, 0, true, 0)
+        ON CONFLICT (id) DO UPDATE SET
+            code = EXCLUDED.code,
+            type = EXCLUDED.type,
+            value = EXCLUDED.value,
+            description = EXCLUDED.description,
+            min_order_cents = EXCLUDED.min_order_cents,
+            max_discount_cents = EXCLUDED.max_discount_cents,
+            starts_at = EXCLUDED.starts_at,
+            ends_at = EXCLUDED.ends_at,
+            is_active = EXCLUDED.is_active
         """,
         id,
         code,
@@ -686,7 +755,9 @@ public class DataSeeder implements CommandLineRunner {
         value,
         desc,
         minOrder,
-        maxDiscount);
+        maxDiscount,
+        startsAt,
+        endsAt);
   }
 
   private void seedProducts() {
@@ -1834,7 +1905,7 @@ public class DataSeeder implements CommandLineRunner {
                               currency, shipping_address, shipping_method_code, placed_at, confirmed_at, shipped_at, delivered_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'USD',
                   '{"recipientName": "Demo Customer", "phone": "+85512345678", "line1": "Street 2004", "province": "Phnom Penh"}'::jsonb,
-                  'STANDARD_PP', ?, ?, ?, ?)
+                  'STANDARD', ?, ?, ?, ?)
           ON CONFLICT (id) DO NOTHING
           """,
           (long) i,
@@ -1934,16 +2005,51 @@ public class DataSeeder implements CommandLineRunner {
       }
     }
 
-    // Seed realistic reviews by the 3 seed customers on delivered items
-    // Using distinct user_id & product_id pairs to strictly honor UNIQUE(user_id, product_id)
+    // Seed 8 realistic approved reviews specifically on product 1001 (Laptop Pro 15)
+    // 5x 5-star, 2x 4-star, 1x 3-star => total = 8 reviews, sum = 36, avg = 4.5
     int reviewId = 1;
+    Long[] prod1001Users = {3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
+    int[] prod1001Ratings = {5, 5, 5, 5, 5, 4, 4, 3};
+    String[] prod1001Bodies = {
+      "Best laptop for developers and creatives. Handles heavy workloads with ease.",
+      "Remarkable battery life and vivid display. Highly recommended for work.",
+      "Flawless performance, silent operation, and stunning build quality.",
+      "Fast processing speed and great sound clarity. Worth every dollar.",
+      "Extremely responsive keyboard and trackpad. Best purchase of the year.",
+      "Solid machine with premium feel. A little on the heavier side but great power.",
+      "Great screen and snappy performance. Very satisfied with customer service.",
+      "Good performance overall, though thermals can rise during heavy 3D rendering."
+    };
+
+    for (int i = 0; i < prod1001Users.length; i++) {
+      String adminReply =
+          (i == 0 || i == 5)
+              ? "Thank you for shopping with KhmerMart! We appreciate your support."
+              : null;
+      jdbcTemplate.update(
+          """
+          INSERT INTO reviews (id, product_id, user_id, rating, title, body, status, admin_reply, created_at, updated_at)
+          VALUES (?, 1001, ?, ?, 'Verified Purchase Review', ?, 'APPROVED', ?, now() - interval '5 days', now() - interval '5 days')
+          ON CONFLICT (user_id, product_id) DO UPDATE SET
+              rating = EXCLUDED.rating,
+              body = EXCLUDED.body,
+              status = EXCLUDED.status,
+              admin_reply = EXCLUDED.admin_reply
+          """,
+          (long) (reviewId++),
+          prod1001Users[i],
+          prod1001Ratings[i],
+          prod1001Bodies[i],
+          adminReply);
+    }
+
+    // Seed additional reviews by the first 3 customers on products 1002..1017
     Long[] customerIds = {3L, 4L, 5L};
     for (int cIdx = 0; cIdx < customerIds.length; cIdx++) {
       Long uid = customerIds[cIdx];
-      // Each customer reviews 8 different products
-      for (int pIdx = 1; pIdx <= 8; pIdx++) {
+      for (int pIdx = 2; pIdx <= 8; pIdx++) {
         Long prodId = 1000L + (long) (cIdx * 8 + pIdx);
-        int rating = 4 + ((reviewId % 2)); // 4 or 5 stars
+        int rating = 4 + ((reviewId % 2));
         String reviewStatus = (reviewId % 4 == 0) ? "PENDING" : "APPROVED";
         String adminReply =
             (reviewId % 3 == 0)
@@ -1954,7 +2060,11 @@ public class DataSeeder implements CommandLineRunner {
             """
             INSERT INTO reviews (id, product_id, user_id, rating, title, body, status, admin_reply, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'Exceptional Experience', 'Authentic product with prompt delivery in Cambodia. Exceeded expectations!', ?, ?, now() - interval '5 days', now() - interval '5 days')
-            ON CONFLICT (user_id, product_id) DO NOTHING
+            ON CONFLICT (user_id, product_id) DO UPDATE SET
+                rating = EXCLUDED.rating,
+                body = EXCLUDED.body,
+                status = EXCLUDED.status,
+                admin_reply = EXCLUDED.admin_reply
             """,
             (long) (reviewId++),
             prodId,

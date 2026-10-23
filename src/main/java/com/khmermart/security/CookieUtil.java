@@ -49,4 +49,35 @@ public class CookieUtil {
         .filter(val -> val != null && !val.isBlank())
         .findFirst();
   }
+
+  public ResponseCookie createGuestCartCookie(String token) {
+    return ResponseCookie.from(AppConstant.GUEST_CART_COOKIE_NAME, token)
+        .httpOnly(true)
+        .secure(isProd)
+        .sameSite("Lax")
+        .path("/api/cart")
+        .maxAge(30 * 24 * 3600L)
+        .build();
+  }
+
+  public ResponseCookie deleteGuestCartCookie() {
+    return ResponseCookie.from(AppConstant.GUEST_CART_COOKIE_NAME, "")
+        .httpOnly(true)
+        .secure(isProd)
+        .sameSite("Lax")
+        .path("/api/cart")
+        .maxAge(0)
+        .build();
+  }
+
+  public Optional<String> getGuestTokenFromCookie(HttpServletRequest request) {
+    if (request.getCookies() == null) {
+      return Optional.empty();
+    }
+    return Arrays.stream(request.getCookies())
+        .filter(c -> AppConstant.GUEST_CART_COOKIE_NAME.equals(c.getName()))
+        .map(Cookie::getValue)
+        .filter(val -> val != null && !val.isBlank())
+        .findFirst();
+  }
 }
