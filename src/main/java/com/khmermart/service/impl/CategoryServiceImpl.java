@@ -50,38 +50,36 @@ public class CategoryServiceImpl implements CategoryService {
 
   @Override
   public CategoryDto getCategoryBySlug(String slug) {
-    Category category =
-        categoryRepository
-            .findBySlug(slug)
-            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Category not found"));
-
-    List<Category> allCategories = categoryRepository.findAllByOrderBySortOrderAsc();
-    Map<Long, Long> productCounts = getProductCountsMap();
-
-    Map<Long, List<Category>> childrenMap = new HashMap<>();
-    for (Category c : allCategories) {
-      if (c.getParentId() != null) {
-        childrenMap.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c);
-      }
+    List<CategoryDto> tree = getCategoryTree();
+    CategoryDto found = findInTreeBySlug(tree, slug);
+    if (found == null) {
+      throw new CustomException(ErrorCode.NOT_FOUND, "Category not found");
     }
-
-    return buildDTOWithChildren(category, childrenMap, productCounts);
+    return found;
   }
 
   @Override
   public CategoryDto getCategoryById(Long id) {
     if (id == null) return null;
-    Category category = categoryRepository.findById(id).orElse(null);
-    if (category == null) return null;
-    return new CategoryDto(
-        category.getId(),
-        category.getName(),
-        category.getNameKm(),
-        category.getSlug(),
-        category.getImageUrl(),
-        category.getParentId(),
-        List.of(),
-        0);
+    return findInTreeById(getCategoryTree(), id);
+  }
+
+  private CategoryDto findInTreeById(List<CategoryDto> tree, Long id) {
+    for (CategoryDto dto : tree) {
+      if (dto.id().equals(id)) return dto;
+      CategoryDto found = findInTreeById(dto.children(), id);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  private CategoryDto findInTreeBySlug(List<CategoryDto> tree, String slug) {
+    for (CategoryDto dto : tree) {
+      if (dto.slug().equalsIgnoreCase(slug)) return dto;
+      CategoryDto found = findInTreeBySlug(dto.children(), slug);
+      if (found != null) return found;
+    }
+    return null;
   }
 
   private CategoryDto buildDTOWithChildren(
@@ -91,7 +89,8 @@ public class CategoryServiceImpl implements CategoryService {
     for (Category child : children) {
       childDTOs.add(buildDTOWithChildren(child, childrenMap, productCounts));
     }
-    long count = productCounts.getOrDefault(category.getId(), 0L);
+    long directCount = productCounts.getOrDefault(category.getId(), 0L);
+    long totalCount = directCount + childDTOs.stream().mapToLong(CategoryDto::productCount).sum();
     return new CategoryDto(
         category.getId(),
         category.getName(),
@@ -100,7 +99,7 @@ public class CategoryServiceImpl implements CategoryService {
         category.getImageUrl(),
         category.getParentId(),
         childDTOs,
-        count);
+        totalCount);
   }
 
   private Map<Long, Long> getProductCountsMap() {

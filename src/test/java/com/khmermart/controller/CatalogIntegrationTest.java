@@ -42,6 +42,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     assertThat(data.has("seasonalBanner")).isTrue();
     assertThat(data.has("flashSale")).isTrue();
     assertThat(data.get("flashSale").get("endsAt").asText()).isNotEmpty();
+    assertThat(data.get("flashSale").get("products").size()).isEqualTo(4);
     assertThat(data.get("categories").isArray()).isTrue();
     assertThat(data.get("bestSellers").isArray()).isTrue();
     assertThat(data.get("newArrivals").isArray()).isTrue();
@@ -57,13 +58,14 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     JsonNode json = objectMapper.readTree(response.getBody());
     assertThat(json.get("success").asBoolean()).isTrue();
     JsonNode categories = json.get("data");
-    assertThat(categories.size()).isGreaterThanOrEqualTo(3);
+    assertThat(categories.size()).isEqualTo(8);
 
     // Electronics category with children
     JsonNode electronics = categories.get(0); // Assuming sorted by sort_order
     assertThat(electronics.get("slug").asText()).isEqualTo("electronics");
-    assertThat(electronics.get("nameKm").asText()).isEqualTo("គ្រឿងអេឡិចត្រូនិក");
-    assertThat(electronics.get("children").size()).isGreaterThanOrEqualTo(3);
+    assertThat(electronics.get("nameKm").asText()).isEqualTo("គ្រឿងអេឡិចត្រូនិច");
+    assertThat(electronics.get("children").size()).isGreaterThanOrEqualTo(2);
+    assertThat(electronics.get("productCount").asLong()).isGreaterThanOrEqualTo(2);
   }
 
   @Test
@@ -109,6 +111,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     // Variants
     JsonNode variants = p.get("variants");
     assertThat(variants.size()).isEqualTo(4);
+    assertThat(p.get("available").asInt()).isEqualTo(50);
 
     // Variant Options: color, ram, storage
     JsonNode options = p.get("variantOptions");

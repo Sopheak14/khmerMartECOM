@@ -24,6 +24,8 @@ public interface ProductRepository
 
   List<Product> findTop10ByCategoryIdAndActiveTrueOrderBySoldCountDesc(Long categoryId);
 
+  List<Product> findTop8ByActiveTrueOrderBySoldCountDesc();
+
   List<Product> findTop10ByActiveTrueOrderBySoldCountDesc();
 
   List<Product> findTop10ByActiveTrueOrderByCreatedAtDesc();

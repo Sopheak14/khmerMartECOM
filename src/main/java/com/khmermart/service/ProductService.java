@@ -29,4 +29,6 @@ public interface ProductService {
   List<ProductCardDto> getBestSellers(int limit);
 
   List<ProductCardDto> getNewArrivals(int limit);
+
+  List<ProductCardDto> getFlashSaleCards(List<Long> productIds);
 }

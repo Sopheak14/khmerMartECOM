@@ -172,14 +172,23 @@ public class ProductServiceImpl implements ProductService {
         productVariantRepository.findByProductIdAndActiveTrue(productId);
     List<Inventory> inventories = inventoryRepository.findByProductId(productId);
     Map<Long, Integer> variantAvailableMap = new HashMap<>();
-    int totalAvailable = 0;
 
     for (Inventory inv : inventories) {
       int avail = Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved());
       if (inv.getVariantId() != null) {
         variantAvailableMap.put(inv.getVariantId(), avail);
       }
-      totalAvailable += avail;
+    }
+
+    int totalAvailable;
+    if (!variants.isEmpty()) {
+      totalAvailable = variantAvailableMap.values().stream().mapToInt(Integer::intValue).sum();
+    } else {
+      totalAvailable =
+          inventories.stream()
+              .filter(inv -> inv.getVariantId() == null)
+              .mapToInt(inv -> Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved()))
+              .sum();
     }
 
     List<VariantDto> variantDtos =
@@ -239,8 +248,24 @@ public class ProductServiceImpl implements ProductService {
     CategoryDto categoryDto = categoryService.getCategoryById(product.getCategoryId());
 
     // 7. Badges
+    java.util.Set<Long> top8PopularIds =
+        productRepository.findTop8ByActiveTrueOrderBySoldCountDesc().stream()
+            .map(Product::getId)
+            .collect(Collectors.toSet());
+
+    java.util.Set<Long> bogoProductIds = new java.util.HashSet<>();
+    Optional<Promotion> bogoPromo =
+        promotionRepository.findFirstActiveByType(PromotionType.BOGO, now);
+    if (bogoPromo.isPresent()) {
+      List<PromotionProduct> bogoPps =
+          promotionProductRepository.findByPromotionId(bogoPromo.get().getId());
+      for (PromotionProduct pp : bogoPps) {
+        bogoProductIds.add(pp.getProductId());
+      }
+    }
+
     List<String> badges = new ArrayList<>();
-    if (product.getSoldCount() >= 20) {
+    if (top8PopularIds.contains(product.getId())) {
       badges.add("POPULAR");
     }
     if (Duration.between(product.getCreatedAt(), now).toDays() <= 14) {
@@ -248,6 +273,12 @@ public class ProductServiceImpl implements ProductService {
     }
     if (flashSaleEndsAt != null) {
       badges.add("FLASH_SALE");
+    }
+    if (totalAvailable <= 5) {
+      badges.add("LOW_STOCK");
+    }
+    if (bogoProductIds.contains(product.getId())) {
+      badges.add("BOGO");
     }
 
     // 8. Related products in same category
@@ -380,6 +411,16 @@ public class ProductServiceImpl implements ProductService {
     };
   }
 
+  @Override
+  public List<ProductCardDto> getFlashSaleCards(List<Long> productIds) {
+    if (productIds == null || productIds.isEmpty()) return Collections.emptyList();
+    List<Product> products = productRepository.findAllById(productIds);
+    Map<Long, Product> map = products.stream().collect(Collectors.toMap(Product::getId, p -> p));
+    List<Product> ordered =
+        productIds.stream().map(map::get).filter(java.util.Objects::nonNull).toList();
+    return mapToCards(ordered);
+  }
+
   private List<ProductCardDto> mapToCards(List<Product> products) {
     if (products.isEmpty()) return Collections.emptyList();
 
@@ -393,15 +434,58 @@ public class ProductServiceImpl implements ProductService {
       primaryImageMap.putIfAbsent(img.getProductId(), img.getUrl());
     }
 
+    // Determine products with active variants
+    List<ProductVariant> allVariants =
+        productVariantRepository.findByProductIdInAndActiveTrue(productIds);
+    java.util.Set<Long> productsWithVariants =
+        allVariants.stream().map(ProductVariant::getProductId).collect(Collectors.toSet());
+
     // Bulk fetch inventory
     List<Inventory> allInventory = inventoryRepository.findByProductIdIn(productIds);
     Map<Long, Integer> inventoryMap = new HashMap<>();
     for (Inventory inv : allInventory) {
       int avail = Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved());
-      inventoryMap.merge(inv.getProductId(), avail, Integer::sum);
+      boolean hasVariants = productsWithVariants.contains(inv.getProductId());
+      if (hasVariants) {
+        if (inv.getVariantId() != null) {
+          inventoryMap.merge(inv.getProductId(), avail, Integer::sum);
+        }
+      } else {
+        if (inv.getVariantId() == null) {
+          inventoryMap.merge(inv.getProductId(), avail, Integer::sum);
+        }
+      }
     }
 
     Instant now = Instant.now();
+    java.util.Set<Long> top8PopularIds =
+        productRepository.findTop8ByActiveTrueOrderBySoldCountDesc().stream()
+            .map(Product::getId)
+            .collect(Collectors.toSet());
+
+    // Flash sale active promo products
+    Map<Long, Long> flashSalePrices = new HashMap<>();
+    Optional<Promotion> flashPromo =
+        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
+    if (flashPromo.isPresent()) {
+      List<PromotionProduct> pps =
+          promotionProductRepository.findByPromotionId(flashPromo.get().getId());
+      for (PromotionProduct pp : pps) {
+        flashSalePrices.put(pp.getProductId(), pp.getSalePriceCents());
+      }
+    }
+
+    // BOGO promo product IDs
+    java.util.Set<Long> bogoProductIds = new java.util.HashSet<>();
+    Optional<Promotion> bogoPromo =
+        promotionRepository.findFirstActiveByType(PromotionType.BOGO, now);
+    if (bogoPromo.isPresent()) {
+      List<PromotionProduct> bogoPps =
+          promotionProductRepository.findByPromotionId(bogoPromo.get().getId());
+      for (PromotionProduct pp : bogoPps) {
+        bogoProductIds.add(pp.getProductId());
+      }
+    }
 
     return products.stream()
         .map(
@@ -410,12 +494,23 @@ public class ProductServiceImpl implements ProductService {
               String img =
                   primaryImageMap.getOrDefault(p.getId(), "https://via.placeholder.com/300");
               List<String> badges = new ArrayList<>();
-              if (p.getSoldCount() >= 20) {
+              if (top8PopularIds.contains(p.getId())) {
                 badges.add("POPULAR");
               }
               if (Duration.between(p.getCreatedAt(), now).toDays() <= 14) {
                 badges.add("NEW");
               }
+              if (flashSalePrices.containsKey(p.getId())) {
+                badges.add("FLASH_SALE");
+              }
+              if (avail <= 5) {
+                badges.add("LOW_STOCK");
+              }
+              if (bogoProductIds.contains(p.getId())) {
+                badges.add("BOGO");
+              }
+
+              Long salePriceCents = flashSalePrices.get(p.getId());
 
               return new ProductCardDto(
                   p.getId(),
@@ -426,7 +521,7 @@ public class ProductServiceImpl implements ProductService {
                   p.getBrand(),
                   p.getPriceCents(),
                   p.getCompareAtCents(),
-                  null,
+                  salePriceCents,
                   img,
                   p.getAvgRating(),
                   p.getReviewCount(),

@@ -66,7 +66,7 @@ public class HomeServiceImpl implements HomeService {
       List<ProductCardDto> products =
           productIds.isEmpty()
               ? Collections.emptyList()
-              : productService.getBestSellers(productIds.size());
+              : productService.getFlashSaleCards(productIds);
       flashSale =
           new HomeDto.FlashSaleDto(promo.getId(), promo.getName(), promo.getEndsAt(), products);
     }
