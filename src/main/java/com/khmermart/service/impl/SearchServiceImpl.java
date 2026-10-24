@@ -3,17 +3,24 @@ package com.khmermart.service.impl;
 import com.khmermart.model.entity.Category;
 import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.ProductImage;
+import com.khmermart.model.entity.Promotion;
+import com.khmermart.model.entity.PromotionProduct;
+import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.model.response.SearchSuggestDto;
 import com.khmermart.repository.CategoryRepository;
 import com.khmermart.repository.ProductImageRepository;
 import com.khmermart.repository.ProductRepository;
+import com.khmermart.repository.PromotionProductRepository;
+import com.khmermart.repository.PromotionRepository;
 import com.khmermart.service.SearchService;
 import jakarta.persistence.criteria.Predicate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,14 +32,20 @@ public class SearchServiceImpl implements SearchService {
   private final ProductRepository productRepository;
   private final ProductImageRepository productImageRepository;
   private final CategoryRepository categoryRepository;
+  private final PromotionRepository promotionRepository;
+  private final PromotionProductRepository promotionProductRepository;
 
   public SearchServiceImpl(
       ProductRepository productRepository,
       ProductImageRepository productImageRepository,
-      CategoryRepository categoryRepository) {
+      CategoryRepository categoryRepository,
+      PromotionRepository promotionRepository,
+      PromotionProductRepository promotionProductRepository) {
     this.productRepository = productRepository;
     this.productImageRepository = productImageRepository;
     this.categoryRepository = categoryRepository;
+    this.promotionRepository = promotionRepository;
+    this.promotionProductRepository = promotionProductRepository;
   }
 
   @Override
@@ -71,6 +84,21 @@ public class SearchServiceImpl implements SearchService {
       imgMap.putIfAbsent(img.getProductId(), img.getUrl());
     }
 
+    // Resolve active flash sale prices if applicable
+    Instant now = Instant.now();
+    Map<Long, Long> flashSalePrices = new HashMap<>();
+    Optional<Promotion> flashPromo =
+        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
+    if (flashPromo.isPresent() && !prodIds.isEmpty()) {
+      List<PromotionProduct> promoProducts =
+          promotionProductRepository.findByPromotionId(flashPromo.get().getId());
+      for (PromotionProduct pp : promoProducts) {
+        if (prodIds.contains(pp.getProductId())) {
+          flashSalePrices.put(pp.getProductId(), pp.getSalePriceCents());
+        }
+      }
+    }
+
     List<SearchSuggestDto.ProductSuggestItem> productItems =
         products.stream()
             .map(
@@ -80,7 +108,7 @@ public class SearchServiceImpl implements SearchService {
                         p.getName(),
                         p.getNameKm(),
                         imgMap.getOrDefault(p.getId(), "https://via.placeholder.com/100"),
-                        p.getPriceCents()))
+                        flashSalePrices.getOrDefault(p.getId(), p.getPriceCents())))
             .toList();
 
     // 2. Search matching categories (limit 4)
@@ -94,10 +122,7 @@ public class SearchServiceImpl implements SearchService {
                         || (c.getNameKm() != null
                             && c.getNameKm().toLowerCase().contains(q.trim().toLowerCase())))
             .limit(4)
-            .map(
-                c ->
-                    new SearchSuggestDto.CategorySuggestItem(
-                        c.getSlug(), c.getName(), c.getNameKm()))
+            .map(c -> new SearchSuggestDto.CategorySuggestItem(c.getSlug(), c.getName(), c.getNameKm()))
             .toList();
 
     return new SearchSuggestDto(productItems, categoryItems);

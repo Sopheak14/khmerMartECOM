@@ -507,6 +507,27 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+    // Verify product rating and review count recomputed on approval
+    Product approvedProd = productRepository.findById(testProduct.getId()).orElseThrow();
+    assertThat(approvedProd.getReviewCount()).isEqualTo(1);
+    assertThat(approvedProd.getAvgRating().doubleValue()).isEqualTo(4.0);
+
+    // 10. Admin rejects review -> product rating and count revert to 0
+    AdminReviewUpdateRequest rejectReq =
+        new AdminReviewUpdateRequest(ReviewStatus.REJECTED, null);
+    mockMvc
+        .perform(
+            patch("/api/admin/reviews/" + reviewId)
+                .header("Authorization", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(rejectReq)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("REJECTED"));
+
+    Product rejectedProd = productRepository.findById(testProduct.getId()).orElseThrow();
+    assertThat(rejectedProd.getReviewCount()).isEqualTo(0);
+    assertThat(rejectedProd.getAvgRating().doubleValue()).isEqualTo(0.0);
   }
 
   @Test

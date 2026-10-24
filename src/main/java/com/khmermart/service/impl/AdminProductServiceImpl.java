@@ -25,6 +25,7 @@ import com.khmermart.repository.ProductVariantRepository;
 import com.khmermart.service.AdminProductService;
 import com.khmermart.service.AuditLogService;
 import com.khmermart.service.ProductService;
+import java.math.BigDecimal;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -131,7 +132,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                   p.getCompareAtCents(),
                   null,
                   imgUrl,
-                  p.getAvgRating(),
+                  p.getReviewCount() == 0 ? BigDecimal.ZERO : p.getAvgRating(),
                   p.getReviewCount(),
                   0,
                   p.isActive(),

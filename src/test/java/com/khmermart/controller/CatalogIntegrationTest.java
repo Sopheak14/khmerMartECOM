@@ -207,4 +207,41 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     assertThat(json.get("error").get("code").asText()).isEqualTo("NOT_FOUND");
     assertThat(json.get("error").get("message").asText()).isEqualTo("Product not found");
   }
+
+  @Test
+  @DisplayName(
+      "Product with no APPROVED reviews must have avgRating = 0 and reviewCount = 0 (e.g. Dell Latitude 5520, product 1002)")
+  void testProductWithNoApprovedReviewsHasZeroRatingAndCount() throws Exception {
+    // 1. GET /api/products/1002
+    ResponseEntity<String> detailResp =
+        restTemplate.getForEntity("/api/products/1002", String.class);
+    assertThat(detailResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode detailJson = objectMapper.readTree(detailResp.getBody());
+    assertThat(detailJson.get("success").asBoolean()).isTrue();
+    JsonNode p = detailJson.get("data");
+
+    assertThat(p.get("id").asLong()).isEqualTo(1002L);
+    assertThat(p.get("reviewCount").asInt()).isEqualTo(0);
+    assertThat(p.get("avgRating").asDouble()).isEqualTo(0.0);
+
+    // Breakdown must be all 0s
+    JsonNode breakdown = p.get("ratingBreakdown");
+    for (int star = 1; star <= 5; star++) {
+      assertThat(breakdown.get(String.valueOf(star)).asInt()).isEqualTo(0);
+    }
+
+    // 2. GET /api/products?q=Latitude card view must also show avgRating 0 and reviewCount 0
+    ResponseEntity<String> listResp =
+        restTemplate.getForEntity("/api/products?q=Latitude", String.class);
+    assertThat(listResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode listJson = objectMapper.readTree(listResp.getBody());
+    assertThat(listJson.get("data").isArray()).isTrue();
+    assertThat(listJson.get("data").size()).isGreaterThanOrEqualTo(1);
+
+    JsonNode card = listJson.get("data").get(0);
+    assertThat(card.get("id").asLong()).isEqualTo(1002L);
+    assertThat(card.get("reviewCount").asInt()).isEqualTo(0);
+    assertThat(card.get("avgRating").asDouble()).isEqualTo(0.0);
+  }
 }

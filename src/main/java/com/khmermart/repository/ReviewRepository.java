@@ -22,6 +22,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
   Page<Review> findByStatus(ReviewStatus status, Pageable pageable);
 
   @Query(
-      "SELECT r.rating, COUNT(r) FROM Review r WHERE r.productId = :productId AND r.status = 'APPROVED' GROUP BY r.rating")
+      "SELECT r.rating, COUNT(r) FROM Review r WHERE r.productId = :productId AND r.status = com.khmermart.model.enumerate.ReviewStatus.APPROVED GROUP BY r.rating")
   List<Object[]> countRatingsByProduct(@Param("productId") Long productId);
 }

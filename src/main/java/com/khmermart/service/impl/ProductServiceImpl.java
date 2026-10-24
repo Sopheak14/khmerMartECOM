@@ -27,6 +27,7 @@ import com.khmermart.repository.PromotionRepository;
 import com.khmermart.repository.ReviewRepository;
 import com.khmermart.service.CategoryService;
 import com.khmermart.service.ProductService;
+import java.math.BigDecimal;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -302,7 +303,7 @@ public class ProductServiceImpl implements ProductService {
         product.getCompareAtCents(),
         salePriceCents,
         primaryImageUrl,
-        product.getAvgRating(),
+        product.getReviewCount() == 0 ? BigDecimal.ZERO : product.getAvgRating(),
         product.getReviewCount(),
         totalAvailable,
         totalAvailable > 0,
@@ -523,7 +524,7 @@ public class ProductServiceImpl implements ProductService {
                   p.getCompareAtCents(),
                   salePriceCents,
                   img,
-                  p.getAvgRating(),
+                  p.getReviewCount() == 0 ? BigDecimal.ZERO : p.getAvgRating(),
                   p.getReviewCount(),
                   avail,
                   avail > 0,

@@ -133,7 +133,9 @@ public class DataSeeder implements CommandLineRunner {
     seedProducts();
     seedPromotionsAndCoupons();
     seedOrdersAndReviews();
-    for (long pid = 1001L; pid <= 1040L; pid++) {
+    List<Long> allProductIds =
+        jdbcTemplate.queryForList("SELECT id FROM products ORDER BY id", Long.class);
+    for (Long pid : allProductIds) {
       reviewService.recomputeProductRating(pid);
     }
     resetSequences();
@@ -763,8 +765,8 @@ public class DataSeeder implements CommandLineRunner {
         99900L,
         119900L,
         13L,
-        4.8,
-        48,
+        4.7,
+        3,
         70,
         now.minus(20, ChronoUnit.DAYS));
     insertProductImages(
@@ -812,8 +814,8 @@ public class DataSeeder implements CommandLineRunner {
         75000L,
         89900L,
         13L,
-        4.6,
-        18,
+        0.0,
+        0,
         45,
         now.minus(5, ChronoUnit.DAYS));
     insertProductImages(
@@ -840,8 +842,8 @@ public class DataSeeder implements CommandLineRunner {
         85000L,
         95000L,
         13L,
-        4.5,
-        24,
+        5.0,
+        1,
         55,
         now.minus(8, ChronoUnit.DAYS));
     insertProductImages(
@@ -868,8 +870,8 @@ public class DataSeeder implements CommandLineRunner {
         159900L,
         179900L,
         13L,
-        4.9,
-        35,
+        4.0,
+        1,
         65,
         now.minus(10, ChronoUnit.DAYS));
     insertProductImages(
@@ -896,8 +898,8 @@ public class DataSeeder implements CommandLineRunner {
         59900L,
         69900L,
         13L,
-        4.3,
-        12,
+        5.0,
+        1,
         15,
         now.minus(25, ChronoUnit.DAYS));
     insertProductImages(
@@ -924,8 +926,8 @@ public class DataSeeder implements CommandLineRunner {
         139900L,
         159900L,
         14L,
-        4.8,
-        28,
+        0.0,
+        0,
         28,
         now.minus(18, ChronoUnit.DAYS));
     insertProductImages(
@@ -946,8 +948,8 @@ public class DataSeeder implements CommandLineRunner {
         109900L,
         129900L,
         14L,
-        4.4,
-        15,
+        5.0,
+        1,
         30,
         now.minus(35, ChronoUnit.DAYS));
     insertProductImages(
@@ -968,8 +970,8 @@ public class DataSeeder implements CommandLineRunner {
         89900L,
         99900L,
         15L,
-        4.7,
-        22,
+        4.0,
+        1,
         38,
         now.minus(4, ChronoUnit.DAYS));
     insertProductImages(
@@ -996,8 +998,8 @@ public class DataSeeder implements CommandLineRunner {
         109900L,
         119900L,
         15L,
-        4.9,
-        45,
+        0.0,
+        0,
         80,
         now.minus(22, ChronoUnit.DAYS));
     insertProductImages(
@@ -1021,8 +1023,8 @@ public class DataSeeder implements CommandLineRunner {
         99900L,
         109900L,
         11L,
-        4.9,
-        65,
+        5.0,
+        1,
         120,
         now.minus(40, ChronoUnit.DAYS));
     insertProductImages(
@@ -1056,8 +1058,8 @@ public class DataSeeder implements CommandLineRunner {
         119900L,
         129900L,
         11L,
-        4.8,
-        42,
+        0.0,
+        0,
         110,
         now.minus(30, ChronoUnit.DAYS));
     insertProductImages(
@@ -1084,8 +1086,8 @@ public class DataSeeder implements CommandLineRunner {
         79900L,
         89900L,
         11L,
-        4.6,
-        26,
+        5.0,
+        1,
         60,
         now.minus(45, ChronoUnit.DAYS));
     insertProductImages(
@@ -1106,8 +1108,8 @@ public class DataSeeder implements CommandLineRunner {
         4500L,
         5500L,
         12L,
-        4.8,
-        38,
+        4.0,
+        1,
         95,
         now.minus(25, ChronoUnit.DAYS));
     insertProductImages(
@@ -1128,8 +1130,8 @@ public class DataSeeder implements CommandLineRunner {
         3900L,
         4500L,
         12L,
-        4.6,
-        22,
+        5.0,
+        1,
         50,
         now.minus(35, ChronoUnit.DAYS));
     insertProductImages(
@@ -1153,8 +1155,8 @@ public class DataSeeder implements CommandLineRunner {
         34900L,
         39900L,
         9L,
-        4.7,
-        38,
+        0.0,
+        0,
         85,
         now.minus(12, ChronoUnit.DAYS));
     insertProductImages(
@@ -1175,8 +1177,8 @@ public class DataSeeder implements CommandLineRunner {
         11900L,
         13900L,
         9L,
-        4.6,
-        29,
+        5.0,
+        1,
         75,
         now.minus(28, ChronoUnit.DAYS));
     insertProductImages(
@@ -1197,8 +1199,8 @@ public class DataSeeder implements CommandLineRunner {
         249900L,
         269900L,
         10L,
-        4.9,
-        18,
+        0.0,
+        0,
         18,
         now.minus(50, ChronoUnit.DAYS));
     insertProductImages(
@@ -1219,8 +1221,8 @@ public class DataSeeder implements CommandLineRunner {
         95900L,
         105900L,
         10L,
-        4.8,
-        15,
+        4.0,
+        1,
         22,
         now.minus(9, ChronoUnit.DAYS));
     insertProductImages(
@@ -1244,8 +1246,8 @@ public class DataSeeder implements CommandLineRunner {
         2900L,
         3500L,
         16L,
-        4.4,
-        19,
+        5.0,
+        1,
         90,
         now.minus(40, ChronoUnit.DAYS));
     insertProductImages(
@@ -1266,8 +1268,8 @@ public class DataSeeder implements CommandLineRunner {
         3200L,
         3900L,
         16L,
-        4.3,
-        14,
+        0.0,
+        0,
         35,
         now.minus(30, ChronoUnit.DAYS));
     insertProductImages(
@@ -1288,8 +1290,8 @@ public class DataSeeder implements CommandLineRunner {
         5900L,
         6900L,
         17L,
-        4.7,
-        18,
+        5.0,
+        1,
         42,
         now.minus(20, ChronoUnit.DAYS));
     insertProductImages(
@@ -1310,8 +1312,8 @@ public class DataSeeder implements CommandLineRunner {
         2400L,
         2900L,
         17L,
-        4.5,
-        20,
+        4.0,
+        1,
         38,
         now.minus(15, ChronoUnit.DAYS));
     insertProductImages(
@@ -1335,8 +1337,8 @@ public class DataSeeder implements CommandLineRunner {
         8900L,
         10900L,
         18L,
-        4.8,
-        52,
+        5.0,
+        1,
         130,
         now.minus(7, ChronoUnit.DAYS));
     insertProductImages(
@@ -1357,8 +1359,8 @@ public class DataSeeder implements CommandLineRunner {
         6500L,
         7900L,
         18L,
-        4.6,
-        21,
+        0.0,
+        0,
         25,
         now.minus(25, ChronoUnit.DAYS));
     insertProductImages(
@@ -1379,8 +1381,8 @@ public class DataSeeder implements CommandLineRunner {
         1800L,
         2200L,
         19L,
-        4.5,
-        17,
+        0.0,
+        0,
         32,
         now.minus(33, ChronoUnit.DAYS));
     insertProductImages(
@@ -1401,8 +1403,8 @@ public class DataSeeder implements CommandLineRunner {
         2800L,
         3500L,
         19L,
-        4.4,
-        25,
+        0.0,
+        0,
         40,
         now.minus(29, ChronoUnit.DAYS));
     insertProductImages(
@@ -1426,8 +1428,8 @@ public class DataSeeder implements CommandLineRunner {
         1900L,
         2400L,
         20L,
-        4.8,
-        40,
+        0.0,
+        0,
         88,
         now.minus(24, ChronoUnit.DAYS));
     insertProductImages(
@@ -1448,8 +1450,8 @@ public class DataSeeder implements CommandLineRunner {
         2100L,
         2600L,
         20L,
-        4.7,
-        32,
+        0.0,
+        0,
         65,
         now.minus(16, ChronoUnit.DAYS));
     insertProductImages(
@@ -1470,8 +1472,8 @@ public class DataSeeder implements CommandLineRunner {
         16500L,
         18500L,
         21L,
-        4.9,
-        24,
+        0.0,
+        0,
         26,
         now.minus(48, ChronoUnit.DAYS));
     insertProductImages(
@@ -1492,8 +1494,8 @@ public class DataSeeder implements CommandLineRunner {
         2600L,
         3200L,
         21L,
-        4.6,
-        29,
+        0.0,
+        0,
         72,
         now.minus(38, ChronoUnit.DAYS));
     insertProductImages(
@@ -1517,8 +1519,8 @@ public class DataSeeder implements CommandLineRunner {
         1200L,
         1500L,
         22L,
-        4.9,
-        88,
+        0.0,
+        0,
         320,
         now.minus(55, ChronoUnit.DAYS));
     insertProductImages(
@@ -1539,8 +1541,8 @@ public class DataSeeder implements CommandLineRunner {
         650L,
         800L,
         22L,
-        4.6,
-        22,
+        0.0,
+        0,
         45,
         now.minus(35, ChronoUnit.DAYS));
     insertProductImages(
@@ -1561,8 +1563,8 @@ public class DataSeeder implements CommandLineRunner {
         950L,
         1200L,
         23L,
-        4.8,
-        36,
+        0.0,
+        0,
         78,
         now.minus(19, ChronoUnit.DAYS));
     insertProductImages(
@@ -1583,8 +1585,8 @@ public class DataSeeder implements CommandLineRunner {
         550L,
         700L,
         23L,
-        4.9,
-        45,
+        0.0,
+        0,
         92,
         now.minus(42, ChronoUnit.DAYS));
     insertProductImages(
@@ -1605,8 +1607,8 @@ public class DataSeeder implements CommandLineRunner {
         380L,
         480L,
         23L,
-        4.7,
-        34,
+        0.0,
+        0,
         82,
         now.minus(27, ChronoUnit.DAYS));
     insertProductImages(
@@ -1630,8 +1632,8 @@ public class DataSeeder implements CommandLineRunner {
         2800L,
         3200L,
         24L,
-        4.9,
-        25,
+        0.0,
+        0,
         34,
         now.minus(45, ChronoUnit.DAYS));
     insertProductImages(
@@ -1652,8 +1654,8 @@ public class DataSeeder implements CommandLineRunner {
         1500L,
         1800L,
         24L,
-        4.8,
-        19,
+        0.0,
+        0,
         28,
         now.minus(32, ChronoUnit.DAYS));
     insertProductImages(
@@ -1674,8 +1676,8 @@ public class DataSeeder implements CommandLineRunner {
         1400L,
         1600L,
         25L,
-        4.9,
-        42,
+        0.0,
+        0,
         85,
         now.minus(11, ChronoUnit.DAYS));
     insertProductImages(
@@ -1696,8 +1698,8 @@ public class DataSeeder implements CommandLineRunner {
         1400L,
         1600L,
         25L,
-        4.8,
-        30,
+        0.0,
+        0,
         70,
         now.minus(21, ChronoUnit.DAYS));
     insertProductImages(
@@ -1718,8 +1720,8 @@ public class DataSeeder implements CommandLineRunner {
         1350L,
         1550L,
         25L,
-        4.7,
-        18,
+        0.0,
+        0,
         15,
         now.minus(52, ChronoUnit.DAYS));
     insertProductImages(

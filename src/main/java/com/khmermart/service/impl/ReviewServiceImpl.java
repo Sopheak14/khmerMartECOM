@@ -68,11 +68,13 @@ public class ReviewServiceImpl implements ReviewService {
     long totalCount = 0;
     long totalScore = 0;
 
-    for (Object[] row : ratings) {
-      int star = ((Number) row[0]).intValue();
-      long count = ((Number) row[1]).longValue();
-      totalCount += count;
-      totalScore += ((long) star * count);
+    if (ratings != null) {
+      for (Object[] row : ratings) {
+        int star = ((Number) row[0]).intValue();
+        long count = ((Number) row[1]).longValue();
+        totalCount += count;
+        totalScore += ((long) star * count);
+      }
     }
 
     if (totalCount > 0) {
@@ -85,7 +87,7 @@ public class ReviewServiceImpl implements ReviewService {
       product.setReviewCount(0);
     }
 
-    productRepository.save(product);
+    productRepository.saveAndFlush(product);
   }
 
   @Override
