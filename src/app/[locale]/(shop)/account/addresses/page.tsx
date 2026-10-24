@@ -53,6 +53,8 @@ export default function AddressesPage() {
     },
   });
 
+  const provinceMap = React.useMemo(() => new Map(provinces.map((p) => [p.name, p.nameKm])), [provinces]);
+
   const resetForm = () => {
     setEditingAddress(null);
     setLabel('');
@@ -453,7 +455,9 @@ export default function AddressesPage() {
                   <p className="font-semibold text-foreground">{addr.recipientName}</p>
                   <p>{addr.phone}</p>
                   <p>{addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}</p>
-                  <p>{addr.district}, {addr.province} {addr.postalCode || ''}</p>
+                  <p>
+                    {addr.district}, {locale === 'km' && provinceMap.get(addr.province) ? provinceMap.get(addr.province) : addr.province} {addr.postalCode || ''}
+                  </p>
                 </div>
               </div>
 

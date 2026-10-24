@@ -17,10 +17,14 @@ export interface ProductCardProps {
 
 export function ProductCard({ product, khrRate = 4100, locale = 'en' }: ProductCardProps) {
   const common = useTranslations('common');
+  const t = useTranslations('product');
   const name = locale === 'km' && product.nameKm ? product.nameKm : product.name;
 
   return (
-    <div className="group rounded-card bg-surface border border-border p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+    <div
+      data-testid="product-card"
+      className="group rounded-card bg-surface border border-border p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+    >
       <div className="space-y-3">
         {/* Top Badges & Stock */}
         <div className="flex items-center justify-between gap-1 min-h-[22px]">
@@ -78,17 +82,23 @@ export function ProductCard({ product, khrRate = 4100, locale = 'en' }: ProductC
         </div>
 
         {/* Rating & Reviews */}
-        <div className="flex items-center gap-1.5 text-xs text-muted">
-          <div className="flex items-center text-amber-500">
-            <Star className="w-3.5 h-3.5 fill-current" />
-            <span className="ml-1 text-[11px] font-bold text-foreground">
-              {product.avgRating && product.avgRating > 0 ? Number(product.avgRating).toFixed(1) : '5.0'}
+        {(!product.reviewCount || product.reviewCount === 0) ? (
+          <div className="text-[11px] text-muted py-0.5">
+            {t('noReviewsYet')}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-muted">
+            <div className="flex items-center text-amber-500">
+              <Star className="w-3.5 h-3.5 fill-current" />
+              <span className="ml-1 text-[11px] font-bold text-foreground">
+                {product.avgRating && product.avgRating > 0 ? Number(product.avgRating).toFixed(1) : '5.0'}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted">
+              ({product.reviewCount})
             </span>
           </div>
-          <span className="text-[10px] text-muted">
-            ({product.reviewCount || 0})
-          </span>
-        </div>
+        )}
       </div>
 
       {/* Pricing */}

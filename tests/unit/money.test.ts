@@ -14,20 +14,25 @@ describe('Money Utilities (USD & KHR calculations)', () => {
     expect(calculateKhr(3000, 4100)).toBe(123000);
     // 99900 cents ($999.00) * 4100 = 4,095,900 KHR
     expect(calculateKhr(99900, 4100)).toBe(4095900);
+    // 89900 cents ($899.00) * 4100 = 3,685,900 KHR
+    expect(calculateKhr(89900, 4100)).toBe(3685900);
   });
 
   it('uses DEFAULT_KHR_RATE (4100) when rate is not provided', () => {
     expect(calculateKhr(100)).toBe(DEFAULT_KHR_RATE);
   });
 
-  it('formats KHR string with prefix and symbol', () => {
-    const khrFormatted = formatKhr(3000, 4100);
-    expect(khrFormatted).toContain('123,000');
-    expect(khrFormatted).toContain('≈');
+  it('formats KHR string with single ≈ prefix and ៛ suffix (Item 2 specification)', () => {
+    // $899.00 at 4100 KHR rate
+    const khrFormatted = formatKhr(89900, 4100);
+    expect(khrFormatted).toBe('≈ 3,685,900 ៛');
+    expect(khrFormatted.startsWith('≈ ')).toBe(true);
+    expect(khrFormatted.includes('≈≈')).toBe(false);
+    expect(khrFormatted.endsWith(' ៛')).toBe(true);
   });
 
-  it('formats raw KHR amount correctly', () => {
+  it('formats raw KHR amount correctly with ៛ suffix', () => {
     const formatted = formatKhrRaw(123000);
-    expect(formatted).toContain('123,000');
+    expect(formatted).toBe('123,000 ៛');
   });
 });

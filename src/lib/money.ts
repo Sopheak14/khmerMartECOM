@@ -26,27 +26,27 @@ export function calculateKhr(cents: number, rate: number = DEFAULT_KHR_RATE): nu
 }
 
 /**
- * Format USD cents into Cambodian Riel string, e.g. 3000 -> "≈ ៛123,000"
+ * Format USD cents into Cambodian Riel string, e.g. 89900 -> "≈ 3,685,900 ៛"
+ * Standardized format used everywhere: single "≈ " prefix, commas as thousands separators, and " ៛" suffix.
+ * Deterministic across Node.js SSR and Browser client environments to prevent hydration mismatches.
  */
 export function formatKhr(cents: number, rate: number = DEFAULT_KHR_RATE, prefix: string = "≈ "): string {
   const khr = calculateKhr(cents, rate);
-  const formatted = new Intl.NumberFormat("km-KH", {
-    style: "currency",
-    currency: "KHR",
+  const formattedNumber = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0,
   }).format(khr);
 
-  return `${prefix}${formatted}`;
+  return `${prefix}${formattedNumber} ៛`;
 }
 
 /**
- * Format a raw KHR amount (riel) directly, e.g. 123000 -> "៛123,000"
+ * Format a raw KHR amount (riel) directly, e.g. 123000 -> "123,000 ៛"
  */
 export function formatKhrRaw(amount: number): string {
-  if (isNaN(amount)) return "៛0";
-  return new Intl.NumberFormat("km-KH", {
-    style: "currency",
-    currency: "KHR",
+  if (isNaN(amount)) return "0 ៛";
+  const formattedNumber = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0,
   }).format(amount);
+
+  return `${formattedNumber} ៛`;
 }

@@ -32,7 +32,7 @@ export function Header() {
 
   const freeShippingThreshold = settings?.freeShippingOverCents
     ? formatUsd(settings.freeShippingOverCents)
-    : '$50';
+    : '$50.00';
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

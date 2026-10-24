@@ -1,4 +1,41 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+async function scrollFullPageAndSettle(page: Page) {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      let totalHeight = 0;
+      const distance = 400;
+      const timer = setInterval(() => {
+        const scrollHeight = document.body.scrollHeight;
+        window.scrollBy(0, distance);
+        totalHeight += distance;
+        if (totalHeight >= scrollHeight) {
+          clearInterval(timer);
+          window.scrollTo(0, 0);
+          resolve();
+        }
+      }, 50);
+    });
+  });
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(async () => {
+    const images = Array.from(document.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete) {
+              resolve(true);
+            } else {
+              img.addEventListener('load', () => resolve(true));
+              img.addEventListener('error', () => resolve(true));
+            }
+          })
+      )
+    );
+  });
+  await page.waitForTimeout(300);
+}
 
 test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
   test('renders English shell with real backend data, switches to Khmer, and verifies localization', async ({ page }) => {
@@ -20,6 +57,7 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     await expect(exploreBtn).toBeVisible();
 
     // Take full page screenshot of English shell
+    await scrollFullPageAndSettle(page);
     await page.screenshot({ path: 'docs/screenshots/phase1-en.png', fullPage: true });
 
     // 2. Click language switcher to switch to Khmer
@@ -63,6 +101,7 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     }
 
     // Take full page screenshot of Khmer shell
+    await scrollFullPageAndSettle(page);
     await page.screenshot({ path: 'docs/screenshots/phase1-km.png', fullPage: true });
   });
 
@@ -85,6 +124,7 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     await expect(copyright).toBeVisible();
 
     // Take screenshot of Mobile viewport
+    await scrollFullPageAndSettle(page);
     await page.screenshot({ path: 'docs/screenshots/phase1-mobile.png', fullPage: true });
   });
 });

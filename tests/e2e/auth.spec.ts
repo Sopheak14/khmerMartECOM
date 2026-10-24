@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createThrowawayUser, loginViaUI } from './helpers/auth';
 
 test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
 
@@ -172,13 +173,10 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     await expect(page.locator('a[href="/en"]').first()).toBeVisible();
   });
 
-  test('1f: Profile: edit name/phone is saved and re-fetch displays new value', async ({ page }) => {
-    // Login
-    await page.goto('/en/login');
-    await page.fill('#login-email', 'customer1@khmermart.local');
-    await page.fill('#login-password', 'Customer@123');
-    await page.click('button[type="submit"]');
-    await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+  test('1f: Profile: edit name/phone is saved and re-fetch displays new value', async ({ page, request }) => {
+    // Isolated throwaway user - never mutate demo accounts
+    const throwaway = await createThrowawayUser(request);
+    await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
     // Go to account profile
     await page.goto('/en/account');
@@ -204,13 +202,10 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     await expect(page.locator('#profile-phone')).toHaveValue(newPhone);
   });
 
-  test('1g: Addresses: create (25 provinces in /km), edit, set default (only one default), delete', async ({ page }) => {
-    // Login
-    await page.goto('/km/login');
-    await page.fill('#login-email', 'customer1@khmermart.local');
-    await page.fill('#login-password', 'Customer@123');
-    await page.click('button[type="submit"]');
-    await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+  test('1g: Addresses: create (25 provinces in /km), edit, set default (only one default), delete', async ({ page, request }) => {
+    // Isolated throwaway user - never mutate demo accounts
+    const throwaway = await createThrowawayUser(request);
+    await loginViaUI(page, throwaway.email, throwaway.password, 'km');
 
     // Go to addresses in Khmer
     await page.goto('/km/account/addresses');
@@ -266,13 +261,10 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     await expect(page.locator(`text=${addrLabel}`)).toHaveCount(0);
   });
 
-  test('1h: Change password with wrong current password shows error under currentPassword field', async ({ page }) => {
-    // Login
-    await page.goto('/en/login');
-    await page.fill('#login-email', 'customer1@khmermart.local');
-    await page.fill('#login-password', 'Customer@123');
-    await page.click('button[type="submit"]');
-    await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+  test('1h: Change password with wrong current password shows error under currentPassword field', async ({ page, request }) => {
+    // Isolated throwaway user - never mutate demo accounts
+    const throwaway = await createThrowawayUser(request);
+    await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
     // Go to security page
     await page.goto('/en/account/security');
@@ -291,8 +283,9 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     // Clear Mailpit inbox
     await request.delete('http://localhost:8025/api/v1/messages');
 
-    // 1. Submit Forgot Password for customer2
-    const forgotEmail = 'customer2@khmermart.local';
+    // 1. Isolated throwaway user for forgot/reset password
+    const throwaway = await createThrowawayUser(request);
+    const forgotEmail = throwaway.email;
     await page.goto('/en/forgot-password');
     await page.fill('#forgot-email', forgotEmail);
     await page.click('button[type="submit"]');

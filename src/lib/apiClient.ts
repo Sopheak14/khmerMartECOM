@@ -24,6 +24,7 @@ export interface RequestOptions extends Omit<RequestInit, "body"> {
 export interface ApiResponse<T> {
   data: T;
   meta?: PaginationMeta;
+  facets?: any;
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
@@ -182,5 +183,6 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
   return {
     data: envelope.data,
     meta: envelope.meta,
+    facets: (envelope as any).facets,
   };
 }

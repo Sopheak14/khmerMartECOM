@@ -22,7 +22,13 @@ import { ProductCard } from '@/components/common/ProductCard';
 import { FlashSaleCountdown } from '@/components/home/FlashSaleCountdown';
 import { HomeSkeleton } from '@/components/home/HomeSkeleton';
 
-export function HomeView() {
+export function HomeView({
+  initialHomeData,
+  initialSettingsData,
+}: {
+  initialHomeData?: HomeDTO;
+  initialSettingsData?: PublicSettingsDTO;
+} = {}) {
   const locale = useLocale();
   const t = useTranslations('home');
   const common = useTranslations('common');
@@ -33,6 +39,7 @@ export function HomeView() {
       const res = await apiClient<HomeDTO>('/home');
       return res.data;
     },
+    initialData: initialHomeData,
   });
 
   const { data: settingsData } = useQuery({
@@ -41,6 +48,7 @@ export function HomeView() {
       const res = await apiClient<PublicSettingsDTO>('/settings/public');
       return res.data;
     },
+    initialData: initialSettingsData,
   });
 
   if (isHomeLoading || !homeData) {
