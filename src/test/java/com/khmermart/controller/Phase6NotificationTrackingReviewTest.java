@@ -49,6 +49,7 @@ import com.khmermart.repository.ShipmentRepository;
 import com.khmermart.security.JwtService;
 import com.khmermart.service.PushSender;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -656,11 +657,15 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
                 .isDefault(true)
                 .build());
 
+    long expectedRecipients =
+        appUserRepository.findByRoleIn(List.of(Roles.ADMIN, Roles.STAFF)).size();
+
     long initialCount =
         notificationRepository.findAll().stream()
             .filter(
                 n ->
                     "INVENTORY_LOW".equals(n.getType())
+                        && n.getChannel() == NotificationChannel.IN_APP
                         && n.getTitle() != null
                         && n.getTitle().contains("Dedup Alert Product"))
             .count();
@@ -694,13 +699,14 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
               .filter(
                   n ->
                       "INVENTORY_LOW".equals(n.getType())
+                          && n.getChannel() == NotificationChannel.IN_APP
                           && n.getTitle() != null
                           && n.getTitle().contains("Dedup Alert Product"))
               .count();
-      if (count > initialCount) {
+      if (count >= initialCount + expectedRecipients) {
         break;
       }
-      Thread.sleep(100);
+      Thread.sleep(50);
     }
 
     long afterFirstCheckoutCount =
@@ -708,10 +714,11 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
             .filter(
                 n ->
                     "INVENTORY_LOW".equals(n.getType())
+                        && n.getChannel() == NotificationChannel.IN_APP
                         && n.getTitle() != null
                         && n.getTitle().contains("Dedup Alert Product"))
             .count();
-    assertThat(afterFirstCheckoutCount).isGreaterThan(initialCount);
+    assertThat(afterFirstCheckoutCount - initialCount).isEqualTo(expectedRecipients);
 
     Inventory updatedInv = inventoryRepository.findById(inv.getId()).orElseThrow();
     assertThat(updatedInv.isLowStockAlerted()).isTrue();
@@ -746,6 +753,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
             .filter(
                 n ->
                     "INVENTORY_LOW".equals(n.getType())
+                        && n.getChannel() == NotificationChannel.IN_APP
                         && n.getTitle() != null
                         && n.getTitle().contains("Dedup Alert Product"))
             .count();
