@@ -125,7 +125,8 @@ export async function apiClient<T>(
   }
 
   // Handle Token Expiry & Automatic Refresh Retry
-  if (response.status === 401) {
+  const isAuthRoute = path.includes('/auth/login') || path.includes('/auth/refresh') || path.includes('/auth/register');
+  if (response.status === 401 && !isAuthRoute) {
     let errorJson: any = null;
     try {
       const clone = response.clone();
@@ -143,6 +144,8 @@ export async function apiClient<T>(
           headers: reqHeaders,
         });
         return handleResponse<T>(retryResponse);
+      } else {
+        useAuthStore.getState().clearAuth();
       }
     }
   }

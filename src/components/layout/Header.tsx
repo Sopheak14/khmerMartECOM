@@ -102,6 +102,7 @@ export function Header() {
               {user ? (
                 <div>
                   <button
+                    data-testid="account-menu-button"
                     onClick={() => setAccountMenuOpen(!accountMenuOpen)}
                     aria-expanded={accountMenuOpen}
                     className="flex items-center gap-1.5 p-1.5 rounded-btn hover:bg-muted/10 text-foreground transition-colors"
@@ -109,7 +110,10 @@ export function Header() {
                     <div className="w-7 h-7 rounded-chip bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
                       {user.fullName.charAt(0).toUpperCase()}
                     </div>
-                    <span className="hidden md:inline-block text-xs font-semibold max-w-[100px] truncate">
+                    <span
+                      data-testid="header-user-name"
+                      className="hidden sm:inline-block text-xs font-semibold max-w-[120px] truncate"
+                    >
                       {user.fullName}
                     </span>
                     <ChevronDown className="w-3.5 h-3.5 text-muted" />
@@ -152,6 +156,7 @@ export function Header() {
                       </Link>
 
                       <button
+                        data-testid="logout-button"
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 border-t border-border mt-1"
                       >
