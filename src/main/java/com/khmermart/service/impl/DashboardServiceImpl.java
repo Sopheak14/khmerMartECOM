@@ -1,18 +1,23 @@
 package com.khmermart.service.impl;
 
+import com.khmermart.model.entity.Order;
 import com.khmermart.model.response.DashboardDto;
 import com.khmermart.model.response.DashboardDto.DailySalesDto;
+import com.khmermart.model.response.DashboardDto.LowStockItemDto;
 import com.khmermart.model.response.DashboardDto.PaymentMethodBreakdownDto;
-import com.khmermart.model.response.DashboardDto.RecentOrderDto;
 import com.khmermart.model.response.DashboardDto.TopProductDto;
+import com.khmermart.model.response.OrderDto;
+import com.khmermart.repository.OrderRepository;
 import com.khmermart.service.DashboardService;
-import java.sql.Timestamp;
+import com.khmermart.service.OrderService;
+import com.khmermart.service.ReportService;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,9 +27,19 @@ public class DashboardServiceImpl implements DashboardService {
 
   private static final ZoneId PHNOM_PENH = ZoneId.of("Asia/Phnom_Penh");
 
+  private final ReportService reportService;
+  private final OrderService orderService;
+  private final OrderRepository orderRepository;
   private final JdbcTemplate jdbcTemplate;
 
-  public DashboardServiceImpl(JdbcTemplate jdbcTemplate) {
+  public DashboardServiceImpl(
+      ReportService reportService,
+      OrderService orderService,
+      OrderRepository orderRepository,
+      JdbcTemplate jdbcTemplate) {
+    this.reportService = reportService;
+    this.orderService = orderService;
+    this.orderRepository = orderRepository;
     this.jdbcTemplate = jdbcTemplate;
   }
 
@@ -32,153 +47,107 @@ public class DashboardServiceImpl implements DashboardService {
   @Cacheable(value = "adminDashboard", key = "#range != null ? #range : '30d'")
   @Transactional(readOnly = true)
   public DashboardDto getDashboard(String range) {
-    Instant startDate = calculateStartDate(range);
-    Timestamp startTimestamp = Timestamp.from(startDate);
+    LocalDate today = LocalDate.now(PHNOM_PENH);
+    Instant todayStart = today.atStartOfDay(PHNOM_PENH).toInstant();
+    Instant todayEnd = today.plusDays(1).atStartOfDay(PHNOM_PENH).toInstant();
 
-    // 1. Revenue & Orders in range
-    String revenueSql =
-        """
-        SELECT COALESCE(SUM(total_cents), 0) AS revenue, COUNT(*) AS cnt
-        FROM orders
-        WHERE placed_at >= ?
-          AND status NOT IN ('CANCELLED')
-          AND (payment_status = 'PAID' OR status IN ('CONFIRMED', 'SHIPPED', 'DELIVERED', 'OUT_FOR_DELIVERY'))
-        """;
+    Instant sevenDaysStart = today.minusDays(6).atStartOfDay(PHNOM_PENH).toInstant();
+    Instant thirtyDaysStart = today.minusDays(29).atStartOfDay(PHNOM_PENH).toInstant();
 
-    long[] revenueAndOrders =
-        jdbcTemplate.queryForObject(
-            revenueSql,
-            (rs, rowNum) -> new long[] {rs.getLong("revenue"), rs.getLong("cnt")},
-            startTimestamp);
+    // 1. The three revenue KPIs are ALWAYS returned
+    long revenueTodayCents = reportService.calculateNetRevenue(todayStart, todayEnd);
+    long revenue7dCents = reportService.calculateNetRevenue(sevenDaysStart, todayEnd);
+    long revenue30dCents = reportService.calculateNetRevenue(thirtyDaysStart, todayEnd);
 
-    long revenueUsdCents = revenueAndOrders != null ? revenueAndOrders[0] : 0L;
-    long ordersCount = revenueAndOrders != null ? revenueAndOrders[1] : 0L;
-    long aovCents = ordersCount > 0 ? (revenueUsdCents / ordersCount) : 0L;
+    // 2. Orders today & orders pending
+    long ordersToday = reportService.countPaidOrders(todayStart, todayEnd);
+    String pendingOrdersSql =
+        "SELECT COUNT(*) FROM orders WHERE status != 'CANCELLED' AND (status = 'PENDING' OR payment_status = 'PENDING')";
+    Long pendingOrdersCount = jdbcTemplate.queryForObject(pendingOrdersSql, Long.class);
+    long ordersPending = pendingOrdersCount != null ? pendingOrdersCount : 0L;
 
-    // 2. Pending Payments
+    // 3. Pending payments
     String pendingPaymentsSql = "SELECT COUNT(*) FROM payments WHERE status = 'PENDING'";
-    Long pendingPayments = jdbcTemplate.queryForObject(pendingPaymentsSql, Long.class);
-    long pendingPaymentsCount = pendingPayments != null ? pendingPayments : 0L;
+    Long pendingPaymentsRes = jdbcTemplate.queryForObject(pendingPaymentsSql, Long.class);
+    long pendingPayments = pendingPaymentsRes != null ? pendingPaymentsRes : 0L;
 
-    // 3. Low stock count
-    String lowStockSql =
-        "SELECT COUNT(*) FROM inventory WHERE (quantity_on_hand - quantity_reserved) <= low_stock_threshold";
-    Long lowStock = jdbcTemplate.queryForObject(lowStockSql, Long.class);
-    long lowStockCount = lowStock != null ? lowStock : 0L;
+    // 4. Determine range (today | 7d | 30d)
+    int chartDays = 30;
+    Instant rangeFrom = thirtyDaysStart;
+    Instant rangeTo = todayEnd;
+    if (range != null) {
+      String normalized = range.trim().toLowerCase();
+      if ("today".equals(normalized)) {
+        chartDays = 1;
+        rangeFrom = todayStart;
+        rangeTo = todayEnd;
+      } else if ("7d".equals(normalized)) {
+        chartDays = 7;
+        rangeFrom = sevenDaysStart;
+        rangeTo = todayEnd;
+      }
+    }
 
-    // 4. Recent orders
-    String recentOrdersSql =
-        """
-        SELECT o.id, o.order_number, COALESCE(u.full_name, 'Guest Customer') AS customer_name,
-               o.total_cents, o.status, o.placed_at
-        FROM orders o
-        LEFT JOIN users u ON o.user_id = u.id
-        ORDER BY o.placed_at DESC
-        LIMIT 5
-        """;
+    long rangeRevenue = reportService.calculateNetRevenue(rangeFrom, rangeTo);
+    long rangeOrders = reportService.countPaidOrders(rangeFrom, rangeTo);
+    long avgOrderValueCents = rangeOrders > 0 ? (rangeRevenue / rangeOrders) : 0L;
 
-    List<RecentOrderDto> recentOrders =
-        jdbcTemplate.query(
-            recentOrdersSql,
-            (rs, rowNum) ->
-                new RecentOrderDto(
-                    rs.getLong("id"),
-                    rs.getString("order_number"),
-                    rs.getString("customer_name"),
-                    rs.getLong("total_cents"),
-                    rs.getString("status"),
-                    rs.getTimestamp("placed_at").toInstant()));
+    // 5. Sales chart zero-filled
+    List<DailySalesDto> salesChart = reportService.getDailySalesChart(chartDays, today);
 
-    // 5. Daily sales chart
-    String salesChartSql =
-        """
-        SELECT TO_CHAR(date_trunc('day', placed_at AT TIME ZONE 'Asia/Phnom_Penh'), 'YYYY-MM-DD') AS day,
-               COALESCE(SUM(total_cents), 0) AS revenue,
-               COUNT(*) AS orders_count
-        FROM orders
-        WHERE placed_at >= ?
-          AND status NOT IN ('CANCELLED')
-          AND (payment_status = 'PAID' OR status IN ('CONFIRMED', 'SHIPPED', 'DELIVERED', 'OUT_FOR_DELIVERY'))
-        GROUP BY day
-        ORDER BY day ASC
-        """;
+    // 6. Top products in range
+    List<TopProductDto> topProducts = reportService.getTopProducts(rangeFrom, rangeTo, 5);
 
-    List<DailySalesDto> salesChart =
-        jdbcTemplate.query(
-            salesChartSql,
-            (rs, rowNum) ->
-                new DailySalesDto(
-                    rs.getString("day"), rs.getLong("revenue"), rs.getLong("orders_count")),
-            startTimestamp);
-
-    // 6. Top products
-    String topProductsSql =
-        """
-        SELECT p.id, p.name, COALESCE(SUM(oi.quantity), 0) AS units_sold,
-               COALESCE(SUM(oi.line_total_cents), 0) AS revenue
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        JOIN orders o ON oi.order_id = o.id
-        WHERE o.placed_at >= ?
-          AND o.status NOT IN ('CANCELLED')
-        GROUP BY p.id, p.name
-        ORDER BY units_sold DESC
-        LIMIT 5
-        """;
-
-    List<TopProductDto> topProducts =
-        jdbcTemplate.query(
-            topProductsSql,
-            (rs, rowNum) ->
-                new TopProductDto(
-                    rs.getLong("id"),
-                    rs.getString("name"),
-                    rs.getLong("units_sold"),
-                    rs.getLong("revenue")),
-            startTimestamp);
-
-    // 7. Payment method breakdown
-    String paymentMethodSql =
-        """
-        SELECT o.payment_method, COUNT(*) AS cnt, COALESCE(SUM(o.total_cents), 0) AS total_cents
-        FROM orders o
-        WHERE o.placed_at >= ?
-          AND o.status NOT IN ('CANCELLED')
-        GROUP BY o.payment_method
-        ORDER BY total_cents DESC
-        """;
-
+    // 7. Payment method breakdown in range
     List<PaymentMethodBreakdownDto> paymentMethodBreakdown =
+        reportService.getPaymentMethodBreakdown(rangeFrom, rangeTo);
+
+    // 8. Low stock items
+    String lowStockSql =
+        """
+        SELECT 
+          p.id AS product_id,
+          p.name AS product_name,
+          COALESCE(pv.sku, p.sku) AS sku,
+          (i.quantity_on_hand - i.quantity_reserved) AS available,
+          i.low_stock_threshold AS threshold
+        FROM inventory i
+        JOIN products p ON i.product_id = p.id
+        LEFT JOIN product_variants pv ON i.variant_id = pv.id
+        WHERE (i.quantity_on_hand - i.quantity_reserved) <= i.low_stock_threshold
+        ORDER BY available ASC, p.id ASC
+        """;
+    List<LowStockItemDto> lowStock =
         jdbcTemplate.query(
-            paymentMethodSql,
+            lowStockSql,
             (rs, rowNum) ->
-                new PaymentMethodBreakdownDto(
-                    rs.getString("payment_method"), rs.getLong("cnt"), rs.getLong("total_cents")),
-            startTimestamp);
+                new LowStockItemDto(
+                    rs.getLong("product_id"),
+                    rs.getString("product_name"),
+                    rs.getString("sku"),
+                    rs.getInt("available"),
+                    rs.getInt("threshold")));
+
+    // 9. Recent orders with customer
+    List<OrderDto> recentOrders =
+        orderRepository
+            .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "placedAt")))
+            .stream()
+            .map(orderService::toDto)
+            .toList();
 
     return new DashboardDto(
-        revenueUsdCents,
-        ordersCount,
-        aovCents,
-        pendingPaymentsCount,
-        lowStockCount,
+        revenueTodayCents,
+        revenue7dCents,
+        revenue30dCents,
+        ordersToday,
+        ordersPending,
+        avgOrderValueCents,
+        pendingPayments,
+        lowStock,
         recentOrders,
         salesChart,
         topProducts,
         paymentMethodBreakdown);
-  }
-
-  private Instant calculateStartDate(String range) {
-    if (range == null) {
-      return Instant.now().minus(30, ChronoUnit.DAYS);
-    }
-    String normalized = range.trim().toLowerCase();
-    if ("today".equals(normalized)) {
-      return ZonedDateTime.now(PHNOM_PENH).truncatedTo(ChronoUnit.DAYS).toInstant();
-    } else if ("7d".equals(normalized)) {
-      return Instant.now().minus(7, ChronoUnit.DAYS);
-    } else {
-      return Instant.now().minus(30, ChronoUnit.DAYS);
-    }
   }
 }

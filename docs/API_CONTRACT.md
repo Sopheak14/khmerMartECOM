@@ -1,0 +1,139 @@
+# KhmerMart Complete API Contract Specification
+
+This document details the complete REST API contract for KhmerMart, covering all public endpoints and the Section H (Admin Backoffice) contract.
+
+---
+
+## 1. Authentication & Users
+- `POST /api/auth/register`: Create customer account.
+- `POST /api/auth/login`: Issue access token + `km_rt` cookie.
+- `POST /api/auth/refresh`: Refresh expired access token using rotating cookie.
+- `POST /api/auth/logout`: Revoke active refresh token.
+- `GET /api/users/me`: Current user profile.
+- `PATCH /api/users/me`: Update profile (name, phone).
+- `PUT /api/users/me/password`: Change account password (invalidates sessions).
+- `GET /api/users/me/addresses`: List user delivery addresses.
+- `POST /api/users/me/addresses`: Create new delivery address.
+- `PUT /api/users/me/addresses/{id}`: Update delivery address.
+- `DELETE /api/users/me/addresses/{id}`: Delete delivery address.
+
+---
+
+## 2. Catalog & Discovery
+- `GET /api/home`: Curated home feeds (featured, flash sale, new arrivals, popular).
+- `GET /api/categories`: Category tree with subcategories and product counts.
+- `GET /api/products`: Full-text search, multi-faceted filtering, sorting, pagination.
+- `GET /api/products/{idOrSlug}`: Full product detail with variants and active promotions.
+- `GET /api/search/suggestions`: Fast typeahead autocomplete suggestions.
+
+---
+
+## 3. Cart & Checkout
+- `GET /api/cart`: Current shopping cart with live price calculations.
+- `POST /api/cart/items`: Add or update item quantity.
+- `DELETE /api/cart/items/{id}`: Remove item from cart.
+- `POST /api/cart/coupon`: Apply promotional coupon code.
+- `DELETE /api/cart/coupon`: Remove applied coupon code.
+- `POST /api/checkout`: Idempotent order checkout with stock reservation (`Idempotency-Key`).
+
+---
+
+## 4. Orders & Public Payments
+- `GET /api/orders`: List customer purchase history.
+- `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline.
+- `POST /api/orders/{orderNumber}/cancel`: Customer order cancellation.
+- `GET /api/orders/{orderNumber}/invoice.pdf`: Download PDF tax invoice.
+- `GET /api/payments/{id}`: Fetch payment status and KHQR payload.
+- `GET /api/payments/{id}/events`: Real-time Server-Sent Events (SSE) payment status stream.
+- `POST /api/payments/{id}/simulate-paid`: Development & test payment settlement simulator.
+- `POST /api/payments/{id}/bank-transfer/slip`: Upload bank transfer deposit slip.
+
+---
+
+## 5. Shipping & Public Tracking
+- `GET /api/shipping/methods`: Available shipping methods and rates.
+- `GET /api/track/{trackingNumber}`: Public shipment milestone tracking.
+
+---
+
+## 6. Reviews & Notifications
+- `GET /api/products/{productId}/reviews`: Approved reviews and rating histogram.
+- `POST /api/products/{productId}/reviews`: Submit customer review (verified purchase).
+- `PATCH /api/reviews/{id}`: Edit customer review.
+- `GET /api/notifications`: Customer in-app notification inbox.
+- `GET /api/notifications/unread-count`: Returns `{"count": N}`.
+- `PATCH /api/notifications/{id}/read`: Mark notification as read.
+- `PATCH /api/notifications/read-all`: Mark all notifications as read.
+- `GET /api/push/vapid-public-key`: Returns `{"key": "..."}`.
+- `POST /api/push/subscribe`: Register WebPush browser subscription.
+
+---
+
+## 7. Section H: Backoffice Administration (Admin API)
+
+### 7.1 Dashboard
+- `GET /api/admin/dashboard?range=today|7d|30d`: Comprehensive executive KPI dashboard matching [`DashboardDto`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/main/java/com/khmermart/model/response/DashboardDto.java).
+
+### 7.2 Users Management
+- `GET /api/admin/users`: Search, filter by role/status, paginate users.
+- `PATCH /api/admin/users/{id}`: Change role (`CUSTOMER`, `STAFF`, `ADMIN`) or activate/deactivate account (revoking all refresh tokens).
+
+### 7.3 Products & Catalog
+- `GET /api/admin/products`: Admin catalog table with stock and pricing.
+- `POST /api/admin/products`: Create product with variants, attributes, and Khmer name (`nameKm`).
+- `GET /api/admin/products/{id}`: Full backoffice product detail.
+- `PUT /api/admin/products/{id}`: Update product information and variants.
+- `DELETE /api/admin/products/{id}`: Delete product (soft-deletes if historical orders exist).
+- `POST /api/admin/products/{id}/images`: Upload product image with binary magic bytes validation.
+- `PATCH /api/admin/products/{id}/images/order`: Reorder product images.
+- `GET /api/admin/products/export.csv`: Export product catalog as CSV.
+- `POST /api/admin/products/import`: Batch import products from CSV with per-row error tracking.
+
+### 7.4 Categories
+- `GET /api/admin/categories`: List category hierarchy.
+- `POST /api/admin/categories`: Create category.
+- `PUT /api/admin/categories/{id}`: Update category.
+- `DELETE /api/admin/categories/{id}`: Delete category (rejects with 409 if category has products).
+
+### 7.5 Inventory
+- `GET /api/admin/inventory`: Stock listing with `lowStock=true` filter.
+- `POST /api/admin/inventory/{id}/restock`: Restock quantity (resets `lowStockAlerted` flag).
+- `POST /api/admin/inventory/{id}/adjust`: Audit adjustment with reason.
+- `GET /api/admin/inventory/{id}/movements`: Complete ledger of inventory movements (`RESTOCK`, `SALE`, `RESERVE`, `RELEASE`, `ADJUST`, `RETURN`).
+
+### 7.6 Orders Management
+- `GET /api/admin/orders`: Filter by status, payment status, date range, search query.
+- `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, and items.
+- `PATCH /api/admin/orders/{orderNumber}/status`: Update order status obeying state machine, recording reason `note` in timeline.
+- `POST /api/admin/orders/{orderNumber}/ship`: Ship order with carrier and generate `KMTRK` tracking number.
+
+### 7.7 Payments & Reconciliation
+- `GET /api/admin/payments`: Filter payments by method, status, date.
+- `GET /api/admin/payments/{id}`: Payment detail with gateway response and raw payload.
+- `POST /api/admin/payments/{id}/refund`: Issue full or partial refund (sets order to `PARTIALLY_REFUNDED` or `REFUNDED`).
+- `GET /api/admin/payments/reconciliation`: Reconcile internal payments against Bakong transaction logs.
+- `GET /api/admin/payments/export.csv`: Export payment records to CSV.
+
+### 7.8 Marketing: Coupons & Promotions
+- `GET /api/admin/coupons`: List promotional coupons.
+- `POST /api/admin/coupons`: Create coupon (`FIXED` or `PERCENTAGE`).
+- `PUT /api/admin/coupons/{id}`: Update coupon.
+- `DELETE /api/admin/coupons/{id}`: Delete coupon.
+- `GET /api/admin/promotions`: List campaigns (`FLASH_SALE`, `SEASONAL`, `BOGO`).
+- `POST /api/admin/promotions`: Create promotion campaign and evict home cache.
+- `PUT /api/admin/promotions/{id}`: Update promotion campaign.
+- `DELETE /api/admin/promotions/{id}`: Delete promotion campaign.
+
+### 7.9 Reviews Moderation
+- `GET /api/admin/reviews`: List reviews by moderation status (`PENDING`, `APPROVED`, `REJECTED`).
+- `PATCH /api/admin/reviews/{id}`: Approve/Reject review with optional administrative reply.
+
+### 7.10 Analytics & Reports
+- `GET /api/admin/reports/sales?groupBy=day|month|category|product|paymentMethod&from=&to=`: Dynamic aggregation report.
+- `GET /api/admin/reports/sales.csv`: Export sales report to CSV.
+- `GET /api/admin/reports/sales.xlsx`: Export sales report to Microsoft Excel format.
+
+### 7.11 System Settings & Audit Logs
+- `GET /api/admin/settings`: Read global configurations (`khrRate`, `khqrMode`, merchant tags).
+- `PUT /api/admin/settings`: Update settings (enforces `BAKONG_TOKEN` when switching to `LIVE`).
+- `GET /api/admin/audit-logs`: Audit trail listing backoffice writes with actor, action, entity, before/after JSON, and IP.

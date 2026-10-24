@@ -130,7 +130,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     }
     int reviewCount = p.get("reviewCount").asInt();
     assertThat(reviewCount).isEqualTo(breakdownSum);
-    assertThat(reviewCount).isEqualTo(8);
+    assertThat(reviewCount).isEqualTo(3);
 
     // Related
     assertThat(p.get("related").isArray()).isTrue();

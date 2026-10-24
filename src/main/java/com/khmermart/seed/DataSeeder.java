@@ -1,15 +1,27 @@
 package com.khmermart.seed;
 
+import com.khmermart.model.entity.Coupon;
+import com.khmermart.model.entity.Promotion;
+import com.khmermart.model.entity.ShippingMethod;
+import com.khmermart.model.enumerate.CouponType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.model.enumerate.Roles;
 import com.khmermart.repository.AppUserRepository;
+import com.khmermart.service.PricingItem;
+import com.khmermart.service.PricingResult;
+import com.khmermart.service.PricingService;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +42,7 @@ public class DataSeeder implements CommandLineRunner {
   private final PasswordEncoder passwordEncoder;
   private final JdbcTemplate jdbcTemplate;
   private final com.khmermart.service.ReviewService reviewService;
+  private final PricingService pricingService;
 
   @Value("${app.seed.reset:false}")
   private boolean seedReset;
@@ -38,11 +51,13 @@ public class DataSeeder implements CommandLineRunner {
       AppUserRepository appUserRepository,
       PasswordEncoder passwordEncoder,
       JdbcTemplate jdbcTemplate,
-      com.khmermart.service.ReviewService reviewService) {
+      com.khmermart.service.ReviewService reviewService,
+      PricingService pricingService) {
     this.appUserRepository = appUserRepository;
     this.passwordEncoder = passwordEncoder;
     this.jdbcTemplate = jdbcTemplate;
     this.reviewService = reviewService;
+    this.pricingService = pricingService;
   }
 
   @Override
@@ -123,7 +138,7 @@ public class DataSeeder implements CommandLineRunner {
     }
     resetSequences();
     log.info(
-        "Seeding complete: 8 seed customers, 8 root categories, 40 products, 32 orders, reviews recomputed.");
+        "Seeding complete: 3 seed customers, 8 root categories, 40 products, 32 orders, reviews recomputed.");
   }
 
   private void seedUsersAndAddresses() {
@@ -152,41 +167,6 @@ public class DataSeeder implements CommandLineRunner {
         "Customer@123",
         "Bopha Pich",
         "+85512888222",
-        Roles.CUSTOMER);
-    insertUser(
-        6L,
-        "customer4@khmermart.local",
-        "Customer@123",
-        "Vanna Sok",
-        "+85512888333",
-        Roles.CUSTOMER);
-    insertUser(
-        7L,
-        "customer5@khmermart.local",
-        "Customer@123",
-        "Channa Chea",
-        "+85512888444",
-        Roles.CUSTOMER);
-    insertUser(
-        8L,
-        "customer6@khmermart.local",
-        "Customer@123",
-        "Rithy Heng",
-        "+85512888555",
-        Roles.CUSTOMER);
-    insertUser(
-        9L,
-        "customer7@khmermart.local",
-        "Customer@123",
-        "Sreypov Meng",
-        "+85512888666",
-        Roles.CUSTOMER);
-    insertUser(
-        10L,
-        "customer8@khmermart.local",
-        "Customer@123",
-        "Kosal Long",
-        "+85512888777",
         Roles.CUSTOMER);
 
     // Seed addresses for customers
@@ -1848,8 +1828,81 @@ public class DataSeeder implements CommandLineRunner {
         quantity);
   }
 
+  private record SeedProductLookup(
+      long productId,
+      String name,
+      String sku,
+      long priceCents,
+      Long variantId,
+      String variantSku,
+      Long variantPriceCents,
+      Long flashSalePriceCents) {}
+
+  private record SeedOrderItemSpec(long productId, int quantity) {}
+
+  private record OrderItemToInsert(
+      long productId,
+      Long variantId,
+      String productName,
+      String sku,
+      long unitPriceCents,
+      int quantity,
+      long lineTotalCents) {}
+
   private void seedOrdersAndReviews() {
     Instant now = Instant.now();
+
+    // 1. Fetch real product details, variants, and active promotional prices from DB
+    Map<Long, SeedProductLookup> catalog = new HashMap<>();
+    jdbcTemplate.query(
+        """
+        SELECT p.id, p.name, p.sku, p.price_cents,
+               pv.id AS v_id, pv.sku AS v_sku, pv.price_cents AS v_price,
+               pp.sale_price_cents AS flash_price
+        FROM products p
+        LEFT JOIN LATERAL (
+          SELECT id, sku, price_cents FROM product_variants WHERE product_id = p.id ORDER BY id ASC LIMIT 1
+        ) pv ON true
+        LEFT JOIN promotion_products pp ON pp.product_id = p.id AND pp.promotion_id = 1
+        """,
+        rs -> {
+          long pId = rs.getLong("id");
+          String name = rs.getString("name");
+          String sku = rs.getString("sku");
+          long priceCents = rs.getLong("price_cents");
+          Long vId = rs.getObject("v_id") != null ? rs.getLong("v_id") : null;
+          String vSku = rs.getString("v_sku");
+          Long vPrice = rs.getObject("v_price") != null ? rs.getLong("v_price") : null;
+          Long flashPrice = rs.getObject("flash_price") != null ? rs.getLong("flash_price") : null;
+          catalog.put(
+              pId,
+              new SeedProductLookup(
+                  pId, name, sku, priceCents, vId, vSku, vPrice, flashPrice));
+        });
+
+    // Configure standard shipping method and active promotion entities for PricingService
+    ShippingMethod standardShipping = new ShippingMethod();
+    standardShipping.setCode("STANDARD");
+    standardShipping.setFeeCents(150L);
+    standardShipping.setFreeOverCents(5000L);
+
+    List<Promotion> promotions = new ArrayList<>();
+    Promotion promoFlash = new Promotion();
+    promoFlash.setType(PromotionType.FLASH_SALE);
+    promoFlash.setActive(true);
+    promotions.add(promoFlash);
+
+    Promotion promoSeasonal = new Promotion();
+    promoSeasonal.setType(PromotionType.SEASONAL);
+    promoSeasonal.setDiscountPercent(20);
+    promoSeasonal.setThresholdCents(5000L);
+    promoSeasonal.setActive(true);
+    promotions.add(promoSeasonal);
+
+    Promotion promoBogo = new Promotion();
+    promoBogo.setType(PromotionType.BOGO);
+    promoBogo.setActive(true);
+    promotions.add(promoBogo);
 
     // 32 orders covering all 9 OrderStatus values across the last 30 days
     // Customers 3 (Sopheap), 4 (Dara), 5 (Bopha)
@@ -1888,10 +1941,66 @@ public class DataSeeder implements CommandLineRunner {
       OrderStatus.REFUNDED // 32
     };
 
+    List<List<SeedOrderItemSpec>> orderSpecs = List.of(
+        List.of(new SeedOrderItemSpec(1001L, 1)), // 1: Laptop Pro 15
+        List.of(new SeedOrderItemSpec(1010L, 1)), // 2: iPhone 15 Pro Titanium
+        List.of(new SeedOrderItemSpec(1015L, 1), new SeedOrderItemSpec(1014L, 1)), // 3: Sony Headphones + MagSafe
+        List.of(new SeedOrderItemSpec(1031L, 2), new SeedOrderItemSpec(1033L, 1)), // 4: Angkor Rice 2x + Coffee
+        List.of(new SeedOrderItemSpec(1019L, 2)), // 5: Casual Linen Shirt 2x
+        List.of(new SeedOrderItemSpec(1003L, 1)), // 6: Dell Inspiron 15
+        List.of(new SeedOrderItemSpec(1023L, 1)), // 7: Philips Airfryer
+        List.of(new SeedOrderItemSpec(1028L, 2)), // 8: Anua Heartleaf Toner 2x
+        List.of(new SeedOrderItemSpec(1034L, 3), new SeedOrderItemSpec(1035L, 2)), // 9: Kampot Pepper 3x + Dried Mango 2x
+        List.of(new SeedOrderItemSpec(1011L, 1)), // 10: Samsung Galaxy S24 Ultra
+        List.of(new SeedOrderItemSpec(1020L, 1), new SeedOrderItemSpec(1019L, 1)), // 11: Chino Pants + Linen Shirt
+        List.of(new SeedOrderItemSpec(1022L, 2)), // 12: Floral Chiffon Blouse 2x (BOGO)
+        List.of(new SeedOrderItemSpec(1029L, 1)), // 13: Chanel Chance Eau Tendre
+        List.of(new SeedOrderItemSpec(1013L, 2)), // 14: Anker PowerBank 2x
+        List.of(new SeedOrderItemSpec(1038L, 2), new SeedOrderItemSpec(1039L, 1)), // 15: Atomic Habits 2x + Psychology of Money
+        List.of(new SeedOrderItemSpec(1005L, 1)), // 16: Dell Vostro 14
+        List.of(new SeedOrderItemSpec(1016L, 1)), // 17: JBL Flip 6 Speaker
+        List.of(new SeedOrderItemSpec(1027L, 2)), // 18: COSRX Snail Mucin 2x
+        List.of(new SeedOrderItemSpec(1024L, 1)), // 19: LocknLock Cookware Set
+        List.of(new SeedOrderItemSpec(1008L, 1)), // 20: Asus ZenBook 14
+        List.of(new SeedOrderItemSpec(1021L, 1)), // 21: Silk Wrap Dress
+        List.of(new SeedOrderItemSpec(1033L, 3), new SeedOrderItemSpec(1034L, 2)), // 22: Mondulkiri Coffee 3x + Kampot Pepper 2x
+        List.of(new SeedOrderItemSpec(1012L, 1)), // 23: Xiaomi 14 Pro Leica
+        List.of(new SeedOrderItemSpec(1026L, 1), new SeedOrderItemSpec(1025L, 1)), // 24: Diffuser + Blanket
+        List.of(new SeedOrderItemSpec(1018L, 1)), // 25: DJI Mini 4 Pro Drone
+        List.of(new SeedOrderItemSpec(1028L, 1)), // 26: Anua Heartleaf Toner 250ml (PENDING)
+        List.of(new SeedOrderItemSpec(1036L, 1), new SeedOrderItemSpec(1037L, 1)), // 27: Angkor Empire Book + Tales (PENDING)
+        List.of(new SeedOrderItemSpec(1014L, 1)), // 28: Apple MagSafe Wireless Charger (PENDING)
+        List.of(new SeedOrderItemSpec(1002L, 1)), // 29: Dell Latitude 5520 (CANCELLED)
+        List.of(new SeedOrderItemSpec(1020L, 2)), // 30: Chino Pants 2x (CANCELLED)
+        List.of(new SeedOrderItemSpec(1010L, 1)), // 31: iPhone 15 Pro Titanium (EXPIRED)
+        List.of(new SeedOrderItemSpec(1007L, 1))  // 32: MSI Katana 15 (REFUNDED)
+    );
+
+    long orderItemId = 1L;
+
     for (int i = 1; i <= statuses.length; i++) {
       OrderStatus status = statuses[i - 1];
-      Instant placedAt =
-          now.minus(30 - (i % 28), ChronoUnit.DAYS).minus(i * 37, ChronoUnit.MINUTES);
+
+      // Realistic date distribution across the last 30 days
+      Instant placedAt;
+      if (i <= 25) {
+        placedAt = now.minus(28 - (i - 1), ChronoUnit.DAYS).minus((i * 17) % 60, ChronoUnit.MINUTES);
+      } else if (i == 26) {
+        placedAt = now.minus(2, ChronoUnit.DAYS).minus(45, ChronoUnit.MINUTES);
+      } else if (i == 27) {
+        placedAt = now.minus(1, ChronoUnit.DAYS).minus(30, ChronoUnit.MINUTES);
+      } else if (i == 28) {
+        placedAt = now.minus(2, ChronoUnit.HOURS);
+      } else if (i == 29) {
+        placedAt = now.minus(20, ChronoUnit.DAYS);
+      } else if (i == 30) {
+        placedAt = now.minus(14, ChronoUnit.DAYS);
+      } else if (i == 31) {
+        placedAt = now.minus(3, ChronoUnit.DAYS);
+      } else { // 32
+        placedAt = now.minus(16, ChronoUnit.DAYS);
+      }
+
       String dateStr =
           LocalDate.ofInstant(placedAt, ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE);
       String orderNum = String.format("KM-%s-%06d", dateStr, i);
@@ -1899,10 +2008,64 @@ public class DataSeeder implements CommandLineRunner {
 
       PaymentStatus paymentStatus = resolvePaymentStatus(status);
       String paymentMethod = (i % 4 == 0) ? "COD" : "KHQR";
-      Long productId = 1001L + (i % 40);
-      Long subtotalCents = 2500L * ((i % 5) + 1);
-      Long shippingCents = 150L;
-      Long totalCents = subtotalCents + shippingCents;
+
+      List<SeedOrderItemSpec> specs = orderSpecs.get(i - 1);
+      List<PricingItem> pricingItems = new ArrayList<>();
+      List<OrderItemToInsert> itemsToInsert = new ArrayList<>();
+
+      for (SeedOrderItemSpec spec : specs) {
+        SeedProductLookup prod = catalog.get(spec.productId());
+        if (prod == null) continue;
+
+        Long varId = prod.variantId();
+        // Use variant SKU if variant exists, or exact product SKU
+        String sku = (prod.variantSku() != null && !prod.variantSku().isBlank())
+            ? prod.variantSku()
+            : prod.sku();
+        long unitPrice = (prod.variantPriceCents() != null && prod.variantPriceCents() > 0)
+            ? prod.variantPriceCents()
+            : prod.priceCents();
+        Long flashPrice = prod.flashSalePriceCents();
+        boolean isBogo = (prod.productId() == 1022L);
+        Integer seasonal = (prod.productId() == 1002L || prod.productId() == 1003L) ? 20 : null;
+
+        pricingItems.add(
+            new PricingItem(
+                prod.productId(),
+                varId,
+                unitPrice,
+                spec.quantity(),
+                flashPrice,
+                isBogo,
+                seasonal));
+
+        itemsToInsert.add(
+            new OrderItemToInsert(
+                prod.productId(),
+                varId,
+                prod.name(),
+                sku,
+                unitPrice,
+                spec.quantity(),
+                unitPrice * spec.quantity()));
+      }
+
+      Coupon coupon = null;
+      if (i % 5 == 0) {
+        coupon = new Coupon();
+        coupon.setCode("SAVE5");
+        coupon.setType(CouponType.FIXED);
+        coupon.setValue(500L);
+        coupon.setMinOrderCents(3500L);
+        coupon.setActive(true);
+      }
+
+      PricingResult pricing = pricingService.calculate(pricingItems, promotions, coupon, standardShipping);
+
+      long subtotalCents = pricing.subtotalCents();
+      long discountCents = pricing.discountCents();
+      long shippingCents = pricing.shippingCents();
+      long totalCents = pricing.totalCents();
 
       // 1. Insert order
       jdbcTemplate.update(
@@ -1910,7 +2073,7 @@ public class DataSeeder implements CommandLineRunner {
           INSERT INTO orders (id, order_number, user_id, status, payment_status, payment_method,
                               subtotal_cents, discount_cents, shipping_cents, total_cents,
                               currency, shipping_address, shipping_method_code, placed_at, confirmed_at, shipped_at, delivered_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'USD',
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD',
                   '{"recipientName": "Demo Customer", "phone": "+85512345678", "line1": "Street 2004", "province": "Phnom Penh"}'::jsonb,
                   'STANDARD', ?, ?, ?, ?)
           ON CONFLICT (id) DO NOTHING
@@ -1922,6 +2085,7 @@ public class DataSeeder implements CommandLineRunner {
           paymentStatus.name(),
           paymentMethod,
           subtotalCents,
+          discountCents,
           shippingCents,
           totalCents,
           Timestamp.from(placedAt),
@@ -1938,18 +2102,23 @@ public class DataSeeder implements CommandLineRunner {
               : null);
 
       // 2. Insert order items
-      jdbcTemplate.update(
-          """
-          INSERT INTO order_items (id, order_id, product_id, variant_id, product_name_snapshot, sku_snapshot, unit_price_cents, quantity, line_total_cents)
-          VALUES (?, ?, ?, NULL, 'KhmerMart Quality Item', 'ITEM-SKU-' || ?, ?, 1, ?)
-          ON CONFLICT (id) DO NOTHING
-          """,
-          (long) i,
-          (long) i,
-          productId,
-          productId,
-          subtotalCents,
-          subtotalCents);
+      for (OrderItemToInsert it : itemsToInsert) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO order_items (id, order_id, product_id, variant_id, product_name_snapshot, sku_snapshot, unit_price_cents, quantity, line_total_cents)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            orderItemId++,
+            (long) i,
+            it.productId(),
+            it.variantId(),
+            it.productName(),
+            it.sku(),
+            it.unitPriceCents(),
+            it.quantity(),
+            it.lineTotalCents());
+      }
 
       // 3. Insert payment
       jdbcTemplate.update(
@@ -2012,20 +2181,15 @@ public class DataSeeder implements CommandLineRunner {
       }
     }
 
-    // Seed 8 realistic approved reviews specifically on product 1001 (Laptop Pro 15)
-    // 5x 5-star, 2x 4-star, 1x 3-star => total = 8 reviews, sum = 36, avg = 4.5
+    // Seed 3 realistic approved reviews specifically on product 1001 (Laptop Pro 15)
+    // Ratings: 5, 5, 4 => total = 3 reviews, sum = 14, avg = 4.67
     int reviewId = 1;
-    Long[] prod1001Users = {3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
-    int[] prod1001Ratings = {5, 5, 5, 5, 5, 4, 4, 3};
+    Long[] prod1001Users = {3L, 4L, 5L};
+    int[] prod1001Ratings = {5, 5, 4};
     String[] prod1001Bodies = {
       "Best laptop for developers and creatives. Handles heavy workloads with ease.",
       "Remarkable battery life and vivid display. Highly recommended for work.",
-      "Flawless performance, silent operation, and stunning build quality.",
-      "Fast processing speed and great sound clarity. Worth every dollar.",
-      "Extremely responsive keyboard and trackpad. Best purchase of the year.",
-      "Solid machine with premium feel. A little on the heavier side but great power.",
-      "Great screen and snappy performance. Very satisfied with customer service.",
-      "Good performance overall, though thermals can rise during heavy 3D rendering."
+      "Flawless performance, silent operation, and stunning build quality."
     };
 
     for (int i = 0; i < prod1001Users.length; i++) {

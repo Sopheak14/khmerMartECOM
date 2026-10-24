@@ -58,5 +58,48 @@ Pricing calculations (`PricingServiceImpl`) strictly follow these promotional an
 ### 5.3 Review Verification & Ratings Engine
 - **Verified Purchaser Requirement**: Reviews can only be submitted (`POST /api/products/{id}/reviews`) by users who have completed a `DELIVERED` order containing that product. Unverified purchasers receive HTTP 403 `FORBIDDEN`.
 - **Single Review Constraint**: A user may submit at most one review per product. Subsequent review attempts return HTTP 409 `CONFLICT` directing the user to edit via `PATCH /api/reviews/{id}`.
+
+---
+
+## 6. Financial Revenue Definition & Accounting Invariants
+
+To eliminate discrepancies between administrative Dashboards, Sales Analytics Reports, and Payment Breakdowns, KhmerMart establishes a single authoritative definition of Net Revenue implemented in [`ReportServiceImpl`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/main/java/com/khmermart/service/impl/ReportServiceImpl.java):
+
+### 6.1 The Single Revenue Invariant
+An order contributes to Net Revenue if and only if:
+1. `order.status != 'CANCELLED'`
+2. `order.payment_status IN ('PAID', 'PARTIALLY_REFUNDED')`
+3. The effective settlement timestamp `COALESCE(p.paid_at, o.placed_at)` falls within the filter window converted to Cambodia local time (`Asia/Phnom_Penh`).
+
+**Net Revenue Formula**:
+$$\text{Net Revenue} = \sum_{\text{eligible orders}} \left(\text{order.total\_cents} - \text{COALESCE}(\text{refunded\_cents}, 0)\right)$$
+
+### 6.2 Payment Method Breakdown
+- The breakdown categorizes orders by their primary `payment_method` (`KHQR`, `BANK_TRANSFER`, `COD`).
+- **Counts Orders**: The `count` field reflects the number of paid orders using that method (not individual retry attempts).
+- **Net Amount**: The `amountCents` deducts corresponding refunds issued against that method.
+
+### 6.3 Mathematical Invariant Guarantee
+For any time window `[from, to]` in `Asia/Phnom_Penh`:
+$$\sum \text{salesChart.revenueCents} \equiv \text{Dashboard Revenue} \equiv \sum \text{paymentMethodBreakdown.amountCents} \equiv \text{Sales Report Total}$$
+
+---
+
+## 7. Order State Machine Transition Matrix
+
+Order status transitions strictly follow [`OrderStateMachine.java`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/main/java/com/khmermart/service/OrderStateMachine.java):
+
+| Current Status | Allowed Next Statuses | Trigger / Responsible Actor |
+|:---|:---|:---|
+| `PENDING_PAYMENT` | `CONFIRMED`, `CANCELLED`, `PAYMENT_EXPIRED` | Payment Confirmed (System), Customer Cancellation, Expire Job |
+| `CONFIRMED` | `PROCESSING`, `SHIPPED`, `CANCELLED`, `REFUNDED` | Admin Fulfillment, Customer Support Refund |
+| `PROCESSING` | `SHIPPED`, `CANCELLED`, `REFUNDED` | Dispatch Carrier, Customer Support Refund |
+| `SHIPPED` | `OUT_FOR_DELIVERY`, `DELIVERED` | Logistics Carrier Milestones, Driver Delivery |
+| `OUT_FOR_DELIVERY` | `DELIVERED` | Courier Dropoff (Auto-settles COD to `PAID`) |
+| `DELIVERED` | `REFUNDED` | After-sales Customer Support Return & Refund |
+| `CANCELLED` | *Terminal State* | No further transitions permitted |
+| `PAYMENT_EXPIRED` | *Terminal State* | Stock reservation released |
+| `REFUNDED` | *Terminal State* | Financial return finalized |
+
 - **canReview Flag**: Order detail responses (`GET /api/orders/{orderNumber}`) calculate `items[].canReview: true` strictly when the order is `DELIVERED` AND the user has not yet reviewed that product.
 - **Rating Computation**: Product ratings (`avgRating` and `reviewCount`) are computed strictly from `APPROVED` reviews whenever an admin moderates or approves a review.

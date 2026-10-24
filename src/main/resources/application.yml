@@ -38,7 +38,7 @@ springdoc:
   swagger-ui:
     path: /api/docs
   api-docs:
-    path: /v3/api-docs
+    path: /api/v3/api-docs
 
 management:
   endpoints:

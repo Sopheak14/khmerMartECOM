@@ -637,7 +637,11 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
 
     long initialCount =
         notificationRepository.findAll().stream()
-            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .filter(
+                n ->
+                    "INVENTORY_LOW".equals(n.getType())
+                        && n.getTitle() != null
+                        && n.getTitle().contains("Dedup Alert Product"))
             .count();
 
     // 1st checkout: order 2 items -> available drops 6 -> 4 (<= 5). Alert MUST trigger.
@@ -666,7 +670,11 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
     while (System.currentTimeMillis() < pollDeadline) {
       long count =
           notificationRepository.findAll().stream()
-              .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+              .filter(
+                  n ->
+                      "INVENTORY_LOW".equals(n.getType())
+                          && n.getTitle() != null
+                          && n.getTitle().contains("Dedup Alert Product"))
               .count();
       if (count > initialCount) {
         break;
@@ -676,7 +684,11 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
 
     long afterFirstCheckoutCount =
         notificationRepository.findAll().stream()
-            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .filter(
+                n ->
+                    "INVENTORY_LOW".equals(n.getType())
+                        && n.getTitle() != null
+                        && n.getTitle().contains("Dedup Alert Product"))
             .count();
     assertThat(afterFirstCheckoutCount).isGreaterThan(initialCount);
 
@@ -710,7 +722,11 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
 
     long afterSecondCheckoutCount =
         notificationRepository.findAll().stream()
-            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .filter(
+                n ->
+                    "INVENTORY_LOW".equals(n.getType())
+                        && n.getTitle() != null
+                        && n.getTitle().contains("Dedup Alert Product"))
             .count();
     // Count MUST be strictly equal: no duplicate alert!
     assertThat(afterSecondCheckoutCount).isEqualTo(afterFirstCheckoutCount);

@@ -117,7 +117,7 @@ class BakongApiClientWireMockTest {
                             "description": "Paid order",
                             "createdDateMs": 1729670000000,
                             "acknowledgedDateMs": 1729670001000,
-                            "externalRef": "KM-20261023-0001"
+                            "externalRef": "KM-20261023-000001"
                           }
                         }
                         """)));

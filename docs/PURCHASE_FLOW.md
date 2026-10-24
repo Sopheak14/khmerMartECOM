@@ -1,0 +1,147 @@
+# KhmerMart 12-Step E-Commerce Purchase Flow
+
+This document details the complete end-to-end lifecycle of an order in KhmerMart, corresponding exactly to the integration test scenario verified in [`PurchaseFlowE2ETest`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/test/java/com/khmermart/controller/PurchaseFlowE2ETest.java).
+
+---
+
+## High-Level Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer
+    participant Frontend
+    participant Backend
+    participant DB as PostgreSQL
+    participant Bakong as NBC Bakong
+    actor Admin
+
+    Customer->>Frontend: 1. Login with credentials
+    Frontend->>Backend: POST /api/auth/login
+    Backend-->>Frontend: JWT Access Token + HttpOnly Refresh Cookie
+
+    Customer->>Frontend: 2. Search "Laptop" (Brand: Dell)
+    Frontend->>Backend: GET /api/products?q=Laptop&brand=Dell
+    Backend-->>Frontend: Product cards + Facets
+
+    Customer->>Frontend: 3. View detail of "dell-inspiron-15" (ID 1003)
+    Frontend->>Backend: GET /api/products/dell-inspiron-15
+    Backend-->>Frontend: Full product details + Variants
+
+    Customer->>Frontend: 4. Add to cart (Variant ID 6, qty 1, $850.00)
+    Frontend->>Backend: POST /api/cart/items
+    Backend-->>Frontend: Cart with items & subtotal (85000 cents)
+
+    Customer->>Frontend: 5. Apply coupon "SAVE5"
+    Frontend->>Backend: POST /api/cart/coupon {"code":"SAVE5"}
+    Backend-->>Frontend: Cart recalculated: 17500 cents discount (20% KNY Sale + $5 coupon)
+
+    Customer->>Frontend: 6. Checkout with KHQR + Idempotency-Key
+    Frontend->>Backend: POST /api/checkout (Idempotency-Key: UUID)
+    Backend->>DB: Atomic stock reservation (InventoryRepository.tryReserve)
+    Backend->>DB: Insert Order (PENDING_PAYMENT, KM-YYYYMMDD-NNNNNN) & Payment (PENDING, MD5)
+    Backend-->>Frontend: Order placed (Total: $675.00 / 67500 cents) + KHQR payload
+
+    Customer->>Frontend: 7. Scan & Pay via Bakong App
+    Bakong->>Backend: POST /api/payments/{id}/simulate-paid (or polling)
+    Backend->>DB: Verify settlement, mark Payment PAID
+
+    Backend->>DB: 8. Transition Order -> CONFIRMED, Inventory -> SALE (deductReservedSale)
+    Backend-->>DB: 9. Dispatch Transactional Events (Email, SMS, Push, In-App)
+
+    Admin->>Backend: 10. Admin Ships Order (POST /api/admin/orders/{no}/ship)
+    Backend->>DB: Status -> SHIPPED, Carrier -> KhmerMart Express, Tracking -> KMTRK...
+
+    Admin->>Backend: 11. Courier Delivers (PATCH /api/admin/orders/{no}/status)
+    Backend->>DB: Status -> DELIVERED, set delivered_at = now()
+
+    Customer->>Backend: 12. Submit Verified Review (POST /api/products/1003/reviews)
+    Admin->>Backend: Admin Moderation (PATCH /api/admin/reviews/{id} -> APPROVED)
+    Backend-->>Customer: Review Approved with Admin Reply
+```
+
+---
+
+## Step-by-Step Breakdown
+
+### Step 1: Customer & Admin Authentication
+- **Endpoint**: `POST /api/auth/login`
+- **Request**: `{"email": "customer1@khmermart.local", "password": "Customer@123"}`
+- **Behavior**: Verifies BCrypt password hash. Issues dual tokens:
+  - 15-minute Bearer JWT access token in response body.
+  - 7-day rotating refresh token in `HttpOnly`, `SameSite=Strict` cookie (`km_rt`).
+
+### Step 2: Catalog Search & Filter
+- **Endpoint**: `GET /api/products?q=Laptop&brand=Dell`
+- **Behavior**: Uses PostgreSQL full-text search vector and pg_trgm similarity indexes. Returns matching product cards with real-time stock and price facets.
+
+### Step 3: Product Detail by Slug
+- **Endpoint**: `GET /api/products/dell-inspiron-15`
+- **Behavior**: Fetches complete product entity (ID 1003, "Dell Inspiron 15 Laptop"), all available variants (Variant ID 6, SKU `DELL-INSP-16-512`, price 85,000 cents = $850.00), active promotional discounts (Khmer New Year Mega Sale, 20% discount on orders over 5,000 cents), and category breadcrumbs.
+
+### Step 4: Add to Cart
+- **Endpoint**: `POST /api/cart/items`
+- **Request**: `{"productId": 1003, "variantId": 6, "quantity": 1}`
+- **Behavior**: Merges items into authenticated user cart (or guest session cart). Subtotal: 85,000 cents ($850.00).
+
+### Step 5: Apply Promotional Coupon
+- **Endpoint**: `POST /api/cart/coupon`
+- **Request**: `{"code": "SAVE5"}`
+- **Behavior**: Validates coupon active date window, per-user usage limits, and minimum cart spend. Applies fixed $5.00 (`500 cents`) discount on top of the active 20% seasonal promotion (`17000 cents`), totaling `17500 cents` discount ($175.00 off), leaving net cart subtotal `67500 cents` ($675.00).
+
+### Step 6: Idempotent Checkout with KHQR
+- **Endpoint**: `POST /api/checkout`
+- **Headers**: `Idempotency-Key: <unique-uuid-v4>`
+- **Request**: `{"shippingAddressId": 1, "shippingMethodCode": "STANDARD", "paymentMethod": "KHQR"}`
+- **Behavior**:
+  - `CheckoutServiceImpl` verifies distributed idempotency via `IdempotencyRecordRepository` (Redis + DB) to prevent double-charging.
+  - Atomic stock reservation via `InventoryRepository.tryReserve(inv.getId(), item.getQuantity())`:
+    ```sql
+    UPDATE inventory SET quantity_reserved = quantity_reserved + :qty, updated_at = now()
+    WHERE id = :id AND quantity_on_hand - quantity_reserved >= :qty
+    ```
+  - Creates `orders` row in `PENDING_PAYMENT` status with format `KM-YYYYMMDD-NNNNNN` (e.g. `KM-20261024-000001`).
+  - Order breakdown: Subtotal $850.00 (85000 cents), Discount $175.00 (17500 cents), STANDARD Shipping $0.00 (0 cents, free over $50 threshold), Total $675.00 (67500 cents).
+  - Generates Bakong KHQR EMV payload and QR string, storing 32-character hexadecimal MD5 hash in `payments`.
+
+### Step 7: Payment Settlement
+- **Endpoint**: `POST /api/payments/{id}/simulate-paid` (or automated Bakong polling via `KhqrPollingJob`)
+- **Behavior**: Verifies payment amount matches order total. Transitions `payments.status` to `PAID` with timestamp.
+
+### Step 8: Order Confirmation & Inventory Sale
+- **Behavior**:
+  - Order status transitions strictly from `PENDING_PAYMENT` to `CONFIRMED` via `OrderStateMachine`.
+  - Stock transition: `InventoryRepository.deductReservedSale` decrements `quantity_on_hand` and `quantity_reserved`.
+  - Inventory movement recorded with type `SALE`.
+
+### Step 9: Multi-Channel Notifications
+- **Behavior**: Asynchronous `@TransactionalEventListener(phase = AFTER_COMMIT)` triggers:
+  - Order Confirmation Email to customer.
+  - Payment Receipt Email with invoice link.
+  - Payment Confirmation SMS: `"Your payment of $675.00 was successful"`.
+  - In-App notification stored in `notifications`.
+  - Web Push notification dispatched via VAPID.
+
+### Step 10: Admin Order Fulfillment (Ship)
+- **Endpoint**: `POST /api/admin/orders/{orderNumber}/ship`
+- **Request**: `{"carrier": "KhmerMart Express"}`
+- **Behavior**:
+  - Validates `OrderStatus.CONFIRMED` -> `SHIPPED`.
+  - Generates unique tracking number (e.g., `KM-TRK-0001`).
+  - Dispatches `OrderShippedEvent` sending dispatch tracking email.
+
+### Step 11: Delivery Confirmation
+- **Endpoint**: `PATCH /api/admin/orders/{orderNumber}/status`
+- **Request**: `{"status": "DELIVERED", "note": "Delivered by courier to customer"}`
+- **Behavior**:
+  - Sets `delivered_at = now()`.
+  - Records milestone in `order_status_history`.
+  - Dispatches `OrderDeliveredEvent` sending email containing review call-to-action link.
+
+### Step 12: Customer Review & Backoffice Moderation
+- **Customer Endpoint**: `POST /api/products/{id}/reviews`
+  - Validates verified purchase status (`orders` table contains delivered order for customer).
+  - Creates review in `PENDING` status.
+- **Admin Endpoint**: `PATCH /api/admin/reviews/{id}`
+  - Updates review to `APPROVED` and adds admin reply: `"Thank you for your feedback!"`.
+  - Recomputes average rating and review count on product 1003.
