@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
   VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed"),
   UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication required"),
+  USER_DEACTIVATED(HttpStatus.UNAUTHORIZED, "User account is deactivated"),
   TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Token has expired"),
   FORBIDDEN(HttpStatus.FORBIDDEN, "Access denied"),
   NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),

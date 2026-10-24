@@ -1,3 +1,3 @@
 package com.khmermart.model.response;
 
-public record UnreadCountDto(long unreadCount) {}
+public record UnreadCountDto(long count) {}

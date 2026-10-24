@@ -20,6 +20,8 @@ public interface ProductRepository
 
   boolean existsBySku(String sku);
 
+  boolean existsByCategoryId(Long categoryId);
+
   Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
 
   List<Product> findTop10ByCategoryIdAndActiveTrueOrderBySoldCountDesc(Long categoryId);

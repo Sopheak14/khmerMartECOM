@@ -1,5 +1,6 @@
 package com.khmermart.service;
 
+import com.khmermart.model.enumerate.ReviewStatus;
 import com.khmermart.model.request.AdminReviewUpdateRequest;
 import com.khmermart.model.request.CreateReviewRequest;
 import com.khmermart.model.request.UpdateReviewRequest;
@@ -13,6 +14,8 @@ public interface ReviewService {
   ReviewDto createReview(Long userId, Long productId, CreateReviewRequest request);
 
   Page<ReviewDto> getProductReviews(Long productId, Pageable pageable);
+
+  Page<ReviewDto> getAdminReviews(ReviewStatus status, Pageable pageable);
 
   ReviewDto updateReview(
       Long reviewId, Long userId, UpdateReviewRequest request, boolean isStaffOrAdmin);

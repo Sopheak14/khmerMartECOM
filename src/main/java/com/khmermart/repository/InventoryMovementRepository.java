@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface InventoryMovementRepository extends JpaRepository<InventoryMovement, Long> {
   List<InventoryMovement> findByRefOrderId(Long refOrderId);
+
+  List<InventoryMovement> findByInventoryIdOrderByCreatedAtDesc(Long inventoryId);
 }

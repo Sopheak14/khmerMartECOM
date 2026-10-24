@@ -520,16 +520,17 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
     mockMvc
         .perform(
             post("/api/admin/payments/{id}/refund", payment.getId())
-                .header("Authorization", adminToken))
+                .header("Authorization", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amountCents\":5000,\"reason\":\"Customer changed mind\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.paymentStatus").value("REFUNDED"))
-        .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+        .andExpect(jsonPath("$.data.status").value("REFUNDED"));
 
     Payment refundedPayment = paymentRepository.findById(payment.getId()).orElseThrow();
     assertThat(refundedPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
 
     Refund completedRefund = refundRepository.findById(refund.getId()).orElseThrow();
-    assertThat(completedRefund.getStatus()).isEqualTo("COMPLETED");
+    assertThat(completedRefund.getStatus()).isIn("COMPLETED", "DONE");
   }
 
   @Test

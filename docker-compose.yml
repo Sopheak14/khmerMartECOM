@@ -35,6 +35,8 @@ services:
     image: axllent/mailpit:latest
     container_name: khmermart-mailpit
     restart: unless-stopped
+    environment:
+      MP_SMTP_DISABLE_RDNS: "true"
     ports:
       - "1025:1025"
       - "8025:8025"

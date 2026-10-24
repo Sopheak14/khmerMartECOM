@@ -225,6 +225,18 @@ public class ReviewServiceImpl implements ReviewService {
     return toDto(review);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewDto> getAdminReviews(ReviewStatus status, Pageable pageable) {
+    Page<Review> page;
+    if (status != null) {
+      page = reviewRepository.findByStatus(status, pageable);
+    } else {
+      page = reviewRepository.findAll(pageable);
+    }
+    return page.map(this::toDto);
+  }
+
   private ReviewDto toDto(Review r) {
     AppUser user = appUserRepository.findById(r.getUserId()).orElse(null);
     String fullName = user != null ? user.getFullName() : "Customer";

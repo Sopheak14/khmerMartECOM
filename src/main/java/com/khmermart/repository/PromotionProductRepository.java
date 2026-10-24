@@ -16,4 +16,6 @@ public interface PromotionProductRepository
 
   java.util.Optional<PromotionProduct> findByPromotionIdAndProductId(
       Long promotionId, Long productId);
+
+  void deleteByPromotionId(Long promotionId);
 }

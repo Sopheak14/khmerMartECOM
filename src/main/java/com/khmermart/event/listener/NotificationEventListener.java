@@ -9,12 +9,16 @@ import com.khmermart.event.OrderShippedEvent;
 import com.khmermart.event.PasswordChangedEvent;
 import com.khmermart.event.PaymentPaidEvent;
 import com.khmermart.event.ReviewRepliedEvent;
+import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.enumerate.NotificationChannel;
+import com.khmermart.model.enumerate.Roles;
+import com.khmermart.repository.AppUserRepository;
 import com.khmermart.service.EmailSender;
 import com.khmermart.service.NotificationService;
 import com.khmermart.service.PushSender;
 import com.khmermart.service.SmsSender;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,16 +38,19 @@ public class NotificationEventListener {
   private final EmailSender emailSender;
   private final SmsSender smsSender;
   private final PushSender pushSender;
+  private final AppUserRepository appUserRepository;
 
   public NotificationEventListener(
       NotificationService notificationService,
       EmailSender emailSender,
       SmsSender smsSender,
-      PushSender pushSender) {
+      PushSender pushSender,
+      AppUserRepository appUserRepository) {
     this.notificationService = notificationService;
     this.emailSender = emailSender;
     this.smsSender = smsSender;
     this.pushSender = pushSender;
+    this.appUserRepository = appUserRepository;
   }
 
   @Async("notificationExecutor")
@@ -125,6 +132,22 @@ public class NotificationEventListener {
           "ORDER_PAID",
           "Payment Received - " + event.orderNumber(),
           "Payment confirmation with PDF invoice sent to " + event.email(),
+          "/account/orders/" + event.orderNumber(),
+          null);
+    }
+
+    // 3. SMS
+    if (event.phone() != null && !event.phone().isBlank()) {
+      String formattedAmount =
+          String.format(java.util.Locale.US, "%.2f", event.amountCents() / 100.0);
+      String smsText = "Your payment of $" + formattedAmount + " was successful";
+      smsSender.sendSms(event.phone(), smsText);
+      notificationService.createNotification(
+          event.userId(),
+          NotificationChannel.SMS,
+          "ORDER_PAID",
+          "Payment Received",
+          smsText,
           "/account/orders/" + event.orderNumber(),
           null);
     }
@@ -380,23 +403,22 @@ public class NotificationEventListener {
         event.available(),
         event.threshold());
 
-    // 1. In-App Notification for Admin (userId = 1)
-    notificationService.createNotification(
-        1L,
-        NotificationChannel.IN_APP,
-        "INVENTORY_LOW",
-        "Low Stock Alert: " + event.productName(),
-        "Product "
-            + event.productName()
-            + " ("
-            + event.sku()
-            + ") has only "
-            + event.available()
-            + " units remaining (threshold: "
-            + event.threshold()
-            + ").",
-        "/admin/catalog/products/" + event.productId(),
-        null);
+    List<AppUser> staffAndAdmins =
+        appUserRepository.findByRoleIn(List.of(Roles.ADMIN, Roles.STAFF));
+    String inAppBody =
+        "Only " + event.available() + " left in stock (threshold " + event.threshold() + ")";
+
+    // 1. In-App Notification for all ADMIN and STAFF users
+    for (AppUser recipient : staffAndAdmins) {
+      notificationService.createNotification(
+          recipient.getId(),
+          NotificationChannel.IN_APP,
+          "INVENTORY_LOW",
+          "Low Stock Alert: " + event.productName(),
+          inAppBody,
+          "/admin/products/" + event.productId(),
+          null);
+    }
 
     // 2. Email to Admin
     Map<String, Object> vars = new HashMap<>();
@@ -411,14 +433,16 @@ public class NotificationEventListener {
         "email/low-stock-alert",
         vars);
 
-    notificationService.createNotification(
-        1L,
-        NotificationChannel.EMAIL,
-        "INVENTORY_LOW",
-        "Low Stock Alert: " + event.productName(),
-        "Low stock email sent for " + event.productName(),
-        "/admin/catalog/products/" + event.productId(),
-        null);
+    for (AppUser recipient : staffAndAdmins) {
+      notificationService.createNotification(
+          recipient.getId(),
+          NotificationChannel.EMAIL,
+          "INVENTORY_LOW",
+          "Low Stock Alert: " + event.productName(),
+          "Low stock email sent for " + event.productName(),
+          "/admin/products/" + event.productId(),
+          null);
+    }
   }
 
   @Async("notificationExecutor")

@@ -11,6 +11,14 @@ import org.springframework.data.domain.Pageable;
 public interface OrderService {
   SuccessResponse<List<OrderDto>> getOrders(Long userId, OrderStatus status, Pageable pageable);
 
+  org.springframework.data.domain.Page<OrderDto> getAdminOrders(
+      OrderStatus status,
+      com.khmermart.model.enumerate.PaymentStatus paymentStatus,
+      java.time.Instant from,
+      java.time.Instant to,
+      String query,
+      org.springframework.data.domain.Pageable pageable);
+
   OrderDto getOrderByNumber(Long userId, String orderNumber, boolean isStaffOrAdmin);
 
   OrderDto cancelOrder(Long userId, String orderNumber, String reason);

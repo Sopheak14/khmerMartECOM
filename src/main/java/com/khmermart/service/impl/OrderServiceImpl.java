@@ -29,6 +29,7 @@ import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.enumerate.ShipmentStatus;
 import com.khmermart.model.request.CartItemRequest;
 import com.khmermart.model.response.AddressDto;
+import com.khmermart.model.response.AppUserDto;
 import com.khmermart.model.response.CartDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
@@ -65,6 +66,7 @@ import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -639,6 +641,25 @@ public class OrderServiceImpl implements OrderService {
         order.getStatus() == OrderStatus.DELIVERED
             && itemDtos.stream().anyMatch(OrderItemDto::canReview);
 
+    AppUserDto customer = null;
+    if (order.getUserId() != null) {
+      customer =
+          appUserRepository
+              .findById(order.getUserId())
+              .map(
+                  u ->
+                      new AppUserDto(
+                          u.getId(),
+                          u.getEmail(),
+                          u.getFullName(),
+                          u.getPhone(),
+                          u.getRole(),
+                          u.isActive(),
+                          u.getEmailVerifiedAt() != null,
+                          u.getCreatedAt()))
+              .orElse(null);
+    }
+
     return new OrderDto(
         order.getId(),
         order.getOrderNumber(),
@@ -665,6 +686,43 @@ public class OrderServiceImpl implements OrderService {
         timeline,
         canCancel,
         canReview,
-        "/api/orders/" + order.getOrderNumber() + "/invoice.pdf");
+        "/api/orders/" + order.getOrderNumber() + "/invoice.pdf",
+        customer);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<OrderDto> getAdminOrders(
+      OrderStatus status,
+      PaymentStatus paymentStatus,
+      Instant from,
+      Instant to,
+      String query,
+      Pageable pageable) {
+    Specification<Order> spec = Specification.where(null);
+
+    if (status != null) {
+      spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+    }
+    if (paymentStatus != null) {
+      spec = spec.and((root, q, cb) -> cb.equal(root.get("paymentStatus"), paymentStatus));
+    }
+    if (from != null) {
+      spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("placedAt"), from));
+    }
+    if (to != null) {
+      spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("placedAt"), to));
+    }
+    if (query != null && !query.isBlank()) {
+      String term = "%" + query.trim().toLowerCase() + "%";
+      spec =
+          spec.and(
+              (root, q, cb) ->
+                  cb.or(
+                      cb.like(cb.lower(root.get("orderNumber")), term),
+                      cb.like(cb.lower(root.get("trackingNumber")), term)));
+    }
+
+    return orderRepository.findAll(spec, pageable).map(this::toDto);
   }
 }

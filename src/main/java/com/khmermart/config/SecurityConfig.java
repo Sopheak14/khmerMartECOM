@@ -126,6 +126,10 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .requestMatchers("/api/admin/reports/**")
                     .hasRole("ADMIN")
+                    .requestMatchers("/api/admin/settings/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers("/api/admin/audit-logs/**")
+                    .hasRole("ADMIN")
 
                     // Staff or Admin (🛠)
                     .requestMatchers("/api/admin/**")

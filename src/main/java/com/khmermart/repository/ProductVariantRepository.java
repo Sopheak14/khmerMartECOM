@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
+  List<ProductVariant> findByProductId(Long productId);
+
   List<ProductVariant> findByProductIdAndActiveTrue(Long productId);
 
   List<ProductVariant> findByProductIdInAndActiveTrue(List<Long> productIds);

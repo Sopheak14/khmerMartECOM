@@ -11,7 +11,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.event.InventoryLowEvent;
 import com.khmermart.event.listener.NotificationEventListener;
+import com.khmermart.model.entity.Address;
 import com.khmermart.model.entity.AppUser;
+import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.Notification;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
@@ -27,11 +29,15 @@ import com.khmermart.model.enumerate.Roles;
 import com.khmermart.model.enumerate.ShipmentStatus;
 import com.khmermart.model.request.AddTrackingEventRequest;
 import com.khmermart.model.request.AdminReviewUpdateRequest;
+import com.khmermart.model.request.CartItemRequest;
+import com.khmermart.model.request.CheckoutRequest;
 import com.khmermart.model.request.CreateReviewRequest;
 import com.khmermart.model.request.PushKeysRequest;
 import com.khmermart.model.request.PushSubscriptionRequest;
 import com.khmermart.model.request.UpdateReviewRequest;
+import com.khmermart.repository.AddressRepository;
 import com.khmermart.repository.AppUserRepository;
+import com.khmermart.repository.InventoryRepository;
 import com.khmermart.repository.NotificationRepository;
 import com.khmermart.repository.OrderItemRepository;
 import com.khmermart.repository.OrderRepository;
@@ -67,6 +73,8 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private PushSubscriptionRepository pushSubscriptionRepository;
   @Autowired private AppUserRepository appUserRepository;
+  @Autowired private InventoryRepository inventoryRepository;
+  @Autowired private AddressRepository addressRepository;
   @Autowired private PushSender pushSender;
   @Autowired private NotificationEventListener notificationEventListener;
 
@@ -302,8 +310,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
         .perform(get("/api/notifications/unread-count").header("Authorization", customerToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(
-            jsonPath("$.data.unreadCount").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+        .andExpect(jsonPath("$.data.count").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
 
     // 3. PATCH /api/notifications/{id}/read
     mockMvc
@@ -325,18 +332,18 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
     mockMvc
         .perform(get("/api/notifications/unread-count").header("Authorization", customerToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.unreadCount").value(0));
+        .andExpect(jsonPath("$.data.count").value(0));
   }
 
   @Test
   @DisplayName("4. Web push: subscribe, get VAPID key, test 404/410 eviction")
   void testWebPushAndEviction() throws Exception {
-    // 1. GET /api/push/vapid-key
+    // 1. GET /api/push/vapid-public-key
     mockMvc
-        .perform(get("/api/push/vapid-key"))
+        .perform(get("/api/push/vapid-public-key"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.publicKey").isNotEmpty());
+        .andExpect(jsonPath("$.data.key").isNotEmpty());
 
     // 2. POST /api/push/subscribe
     PushSubscriptionRequest subReq =
@@ -503,8 +510,23 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("9. Low stock alert notification generated for admin when stock drops <= threshold")
+  @DisplayName(
+      "9. Low stock alert notification generated for all ADMIN and STAFF with user-facing body")
   void testLowStockNotification() throws Exception {
+    appUserRepository
+        .findByEmail("staff@khmermart.local")
+        .orElseGet(
+            () ->
+                appUserRepository.save(
+                    AppUser.builder()
+                        .email("staff@khmermart.local")
+                        .passwordHash("$2a$10$dummy")
+                        .fullName("Staff User")
+                        .phone("+85512888888")
+                        .role(Roles.STAFF)
+                        .emailVerifiedAt(Instant.now())
+                        .build()));
+
     long initialCount =
         notificationRepository.findAll().stream()
             .filter(n -> "INVENTORY_LOW".equals(n.getType()))
@@ -514,18 +536,36 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
         new InventoryLowEvent(
             testProduct.getId(), testProduct.getName(), testProduct.getSku(), 2, 5));
 
-    Thread.sleep(300);
+    long deadline1 = System.currentTimeMillis() + 5000;
+    while (System.currentTimeMillis() < deadline1) {
+      long count =
+          notificationRepository.findAll().stream()
+              .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+              .count();
+      if (count > initialCount) {
+        break;
+      }
+      Thread.sleep(100);
+    }
 
-    long newCount =
+    var lowStockNotifications =
         notificationRepository.findAll().stream()
             .filter(n -> "INVENTORY_LOW".equals(n.getType()))
-            .count();
+            .toList();
 
-    assertThat(newCount).isGreaterThan(initialCount);
+    assertThat(lowStockNotifications.size()).isGreaterThan((int) initialCount);
+    var matching =
+        lowStockNotifications.stream()
+            .filter(
+                n ->
+                    n.getBody().equals("Only 2 left in stock (threshold 5)")
+                        && n.getLink().equals("/admin/products/" + testProduct.getId()))
+            .toList();
+    assertThat(matching).isNotEmpty();
   }
 
   @Test
-  @DisplayName("10. Dev email preview: renders HTML email correctly")
+  @DisplayName("10. Dev email preview: renders HTML email correctly including password-changed")
   void testDevEmailPreview() throws Exception {
     mockMvc
         .perform(get("/api/dev/email-preview/order-placed"))
@@ -550,5 +590,129 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
                 .string(org.hamcrest.Matchers.containsString("Order Shipped")));
+
+    mockMvc
+        .perform(get("/api/dev/email-preview/password-changed"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(org.hamcrest.Matchers.containsString("Password Changed")));
+  }
+
+  @Test
+  @DisplayName(
+      "11. Low stock alert deduplication: second checkout below threshold does NOT send another alert")
+  void testLowStockDeduplicationOnSubsequentCheckout() throws Exception {
+    Product lowStockProd =
+        productRepository.save(
+            Product.builder()
+                .sku("DEDUP-SKU-" + UUID.randomUUID())
+                .name("Dedup Alert Product")
+                .slug("dedup-alert-prod-" + UUID.randomUUID())
+                .priceCents(1000L)
+                .build());
+
+    Inventory inv =
+        inventoryRepository.save(
+            Inventory.builder()
+                .productId(lowStockProd.getId())
+                .quantityOnHand(6)
+                .quantityReserved(0)
+                .lowStockThreshold(5)
+                .lowStockAlerted(false)
+                .build());
+
+    Address addr =
+        addressRepository.save(
+            Address.builder()
+                .userId(customerUser.getId())
+                .label("Home")
+                .recipientName("Dara Sok")
+                .phone("+85512345678")
+                .line1("St 2004")
+                .district("Tuol Kouk")
+                .province("Phnom Penh")
+                .isDefault(true)
+                .build());
+
+    long initialCount =
+        notificationRepository.findAll().stream()
+            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .count();
+
+    // 1st checkout: order 2 items -> available drops 6 -> 4 (<= 5). Alert MUST trigger.
+    mockMvc
+        .perform(
+            post("/api/cart/items")
+                .header("Authorization", customerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new CartItemRequest(lowStockProd.getId(), null, 2))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/checkout")
+                .header("Authorization", customerToken)
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new CheckoutRequest(addr.getId(), "STANDARD", PaymentMethod.COD, null))))
+        .andExpect(status().isOk());
+
+    long pollDeadline = System.currentTimeMillis() + 5000;
+    while (System.currentTimeMillis() < pollDeadline) {
+      long count =
+          notificationRepository.findAll().stream()
+              .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+              .count();
+      if (count > initialCount) {
+        break;
+      }
+      Thread.sleep(100);
+    }
+
+    long afterFirstCheckoutCount =
+        notificationRepository.findAll().stream()
+            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .count();
+    assertThat(afterFirstCheckoutCount).isGreaterThan(initialCount);
+
+    Inventory updatedInv = inventoryRepository.findById(inv.getId()).orElseThrow();
+    assertThat(updatedInv.isLowStockAlerted()).isTrue();
+
+    // 2nd checkout: order 1 more item -> available drops 4 -> 3 (already <= 5). Alert must NOT
+    // trigger!
+    mockMvc
+        .perform(
+            post("/api/cart/items")
+                .header("Authorization", customerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new CartItemRequest(lowStockProd.getId(), null, 1))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/checkout")
+                .header("Authorization", customerToken)
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new CheckoutRequest(addr.getId(), "STANDARD", PaymentMethod.COD, null))))
+        .andExpect(status().isOk());
+
+    Thread.sleep(600);
+
+    long afterSecondCheckoutCount =
+        notificationRepository.findAll().stream()
+            .filter(n -> "INVENTORY_LOW".equals(n.getType()))
+            .count();
+    // Count MUST be strictly equal: no duplicate alert!
+    assertThat(afterSecondCheckoutCount).isEqualTo(afterFirstCheckoutCount);
   }
 }

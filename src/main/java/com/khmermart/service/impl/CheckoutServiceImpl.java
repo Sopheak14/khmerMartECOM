@@ -559,7 +559,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
       int availableAfter = availableBefore - item.getQuantity();
       int threshold = inv.getLowStockThreshold();
-      if (availableBefore > threshold && availableAfter <= threshold) {
+      if (!inv.isLowStockAlerted() && availableBefore > threshold && availableAfter <= threshold) {
         Product prod = productRepository.findById(item.getProductId()).orElse(null);
         String prodName = prod != null ? prod.getName() : "Product #" + item.getProductId();
         String sku = prod != null ? prod.getSku() : "";

@@ -145,7 +145,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     if (!user.isActive()) {
-      throw new CustomException(ErrorCode.FORBIDDEN, MessageConstant.ACCOUNT_DISABLED);
+      throw new CustomException(ErrorCode.USER_DEACTIVATED, "User account is deactivated");
     }
 
     loginRateLimiter.reset(rateLimitKey);
@@ -196,7 +196,7 @@ public class AuthServiceImpl implements AuthService {
                 () -> new CustomException(ErrorCode.UNAUTHORIZED, MessageConstant.USER_NOT_FOUND));
 
     if (!user.isActive()) {
-      throw new CustomException(ErrorCode.FORBIDDEN, MessageConstant.ACCOUNT_DISABLED);
+      throw new CustomException(ErrorCode.USER_DEACTIVATED, "User account is deactivated");
     }
 
     // Issue new token in the SAME family
