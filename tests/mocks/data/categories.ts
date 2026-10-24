@@ -1,0 +1,68 @@
+import { CategoryDTO } from "@/types/api";
+
+export const mockCategories: CategoryDTO[] = [
+  {
+    id: 1,
+    name: "Laptops & Computers",
+    nameKm: "កុំព្យូទ័រ និងគ្រឿងបន្លាស់",
+    slug: "laptops-computers",
+    imageUrl: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&auto=format&fit=crop&q=60",
+    productCount: 15,
+  },
+  {
+    id: 2,
+    name: "Smartphones & Tablets",
+    nameKm: "ទូរស័ព្ទ និងថេប្លេត",
+    slug: "smartphones-tablets",
+    imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop&q=60",
+    productCount: 12,
+  },
+  {
+    id: 3,
+    name: "Electronics & Audio",
+    nameKm: "គ្រឿងអេឡិចត្រូនិក និងសំឡេង",
+    slug: "electronics-audio",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60",
+    productCount: 8,
+  },
+  {
+    id: 4,
+    name: "Home Appliances",
+    nameKm: "គ្រឿងបរិក្ខារប្រើប្រាស់ក្នុងផ្ទះ",
+    slug: "home-appliances",
+    imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=500&auto=format&fit=crop&q=60",
+    productCount: 6,
+  },
+  {
+    id: 5,
+    name: "Fashion & Accessories",
+    nameKm: "សម្លៀកបំពាក់ និងគ្រឿងតុបតែង",
+    slug: "fashion-accessories",
+    imageUrl: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=500&auto=format&fit=crop&q=60",
+    productCount: 5,
+  },
+  {
+    id: 6,
+    name: "Beauty & Health",
+    nameKm: "សម្រស់ និងសុខភាព",
+    slug: "beauty-health",
+    imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60",
+    productCount: 4,
+  },
+  {
+    id: 7,
+    name: "Groceries & Food",
+    nameKm: "គ្រឿងទេស និងអាហារ",
+    slug: "groceries-food",
+    imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=60",
+    productCount: 10,
+  },
+  {
+    id: 8,
+    name: "Books & Stationery",
+    nameKm: "សៀវភៅ និងសម្ភារៈសិក្សា",
+    slug: "books-stationery",
+    imageUrl: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=500&auto=format&fit=crop&q=60",
+    productCount: 7,
+  },
+];

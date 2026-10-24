@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 6% 97%;
+    --foreground: 222 47% 11%;
+    --surface: 0 0% 100%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* KHQR Primary Red: #C8102E */
+    --primary: 350 85% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Deep Navy: #1F3A5F */
+    --secondary: 215 51% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Angkor Gold Accent: #F2A900 */
+    --accent: 42 100% 47%;
+    --accent-foreground: 222 47% 11%;
+
+    --muted: 220 9% 46%;
+    --muted-foreground: 220 9% 46%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 350 85% 42%;
+
+    --radius: 10px;
+  }
+
+  .dark {
+    --background: 220 34% 7%;
+    --foreground: 210 20% 96%;
+    --surface: 222 47% 11%;
+
+    --card: 222 47% 11%;
+    --card-foreground: 210 20% 96%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 20% 96%;
+
+    --primary: 350 85% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 51% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 42 100% 50%;
+    --accent-foreground: 222 47% 11%;
+
+    --muted: 218 11% 65%;
+    --muted-foreground: 218 11% 65%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 350 85% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Khmer typography line-height requirement >= 1.6 */
+  html[lang="km"] body {
+    line-height: 1.7;
+  }
+}
+
+/* Tabular figures for money */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
