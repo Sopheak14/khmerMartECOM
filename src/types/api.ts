@@ -429,3 +429,63 @@ export interface ProductListResponse {
   facets?: ProductFacets;
   meta: PaginationMeta;
 }
+
+export type InventoryMovementType = 'RESERVE' | 'SALE' | 'RETURN' | 'RESTOCK' | 'ADJUST' | 'RELEASE';
+
+export interface InventoryDTO {
+  id: number;
+  productId: number;
+  productName: string;
+  sku: string;
+  variantId?: number;
+  quantityOnHand: number;
+  quantityReserved: number;
+  available: number;
+  lowStockThreshold: number;
+  lowStockAlerted: boolean;
+}
+
+export interface InventoryMovementDTO {
+  id: number;
+  inventoryId: number;
+  type: InventoryMovementType;
+  quantity: number;
+  reason?: string;
+  refOrderId?: number;
+  actorId?: number;
+  createdAt: string;
+}
+
+export interface AdminPaymentDTO {
+  id: number;
+  orderId: number;
+  orderNumber: string;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  amountCents: number;
+  currency: string;
+  amountKhr?: number;
+  khqrMd5?: string;
+  bakongHash?: string;
+  fromAccountId?: string;
+  toAccountId?: string;
+  failureReason?: string;
+  paidAt?: string;
+  rawResponse?: any;
+  createdAt: string;
+}
+
+export interface ReconciliationMismatchDTO {
+  type: string;
+  orderId?: number;
+  orderNumber?: string;
+  paymentId?: number;
+  description: string;
+}
+
+export interface ReconciliationReportDTO {
+  status: string;
+  mismatchCount: number;
+  mismatches: ReconciliationMismatchDTO[];
+  generatedAt: string;
+}
