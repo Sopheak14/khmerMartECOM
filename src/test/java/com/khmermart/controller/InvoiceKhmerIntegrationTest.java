@@ -139,7 +139,8 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsByteArray();
 
-    File paidPdfFile = new File("docs/invoice-paid-sample.pdf");
+    new File("target").mkdirs();
+    File paidPdfFile = new File("target/test-invoice-paid.pdf");
     try (FileOutputStream fos = new FileOutputStream(paidPdfFile)) {
       fos.write(pdfBytes);
     }
@@ -194,16 +195,12 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
     // Render page 1 to PNG via pdftoppm -png -r 100
     Process ppmProc =
         new ProcessBuilder(
-                "pdftoppm", "-png", "-r", "100", paidPdfFile.getAbsolutePath(), "docs/invoice-khmer-tmp")
+                "pdftoppm", "-png", "-r", "100", paidPdfFile.getAbsolutePath(), "target/test-invoice-khmer-tmp")
             .start();
     ppmProc.waitFor();
 
-    File generatedPng = new File("docs/invoice-khmer-tmp-1.png");
-    File targetPng = new File("docs/invoice-khmer-sample.png");
-    if (generatedPng.exists()) {
-      Files.move(generatedPng.toPath(), targetPng.toPath(), StandardCopyOption.REPLACE_EXISTING);
-    }
-    assertThat(targetPng).exists();
+    File generatedPng = new File("target/test-invoice-khmer-tmp-1.png");
+    assertThat(generatedPng).exists();
   }
 
   @Test
@@ -288,7 +285,7 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsByteArray();
 
-    File refundPdfFile = new File("docs/invoice-refunded-sample.pdf");
+    File refundPdfFile = new File("target/test-invoice-refunded.pdf");
     try (FileOutputStream fos = new FileOutputStream(refundPdfFile)) {
       fos.write(pdfBytes);
     }
