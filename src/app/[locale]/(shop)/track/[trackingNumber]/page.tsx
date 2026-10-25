@@ -153,7 +153,7 @@ export default function TrackingDetailPage() {
 
       {/* Main Tracking Card */}
       <div
-        className="bg-surface border border-border rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs"
+        className="bg-surface border border-border rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs overflow-hidden"
         data-testid="tracking-detail-card"
       >
         {/* Top Header Information */}
@@ -164,7 +164,7 @@ export default function TrackingDetailPage() {
             </span>
             <h1
               data-testid="tracking-number-value"
-              className="text-xl sm:text-2xl font-black text-foreground font-mono tracking-tight"
+              className="text-xl sm:text-2xl font-black text-foreground font-mono tracking-tight break-all"
             >
               {tracking.trackingNumber}
             </h1>

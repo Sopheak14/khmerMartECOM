@@ -65,17 +65,17 @@ export function Header() {
 
       {/* Main Navigation Bar */}
       <div className="bg-surface border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-9 h-9 rounded-btn bg-primary flex items-center justify-center text-primary-foreground font-black text-lg shadow-sm">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-btn bg-primary flex items-center justify-center text-primary-foreground font-black text-base sm:text-lg shadow-sm">
               K
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-lg tracking-tight text-foreground leading-none">
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-foreground leading-none">
                 Khmer<span className="text-primary">Mart</span>
               </span>
-              <span className="text-[10px] text-muted font-medium tracking-wide">
+              <span className="text-[10px] text-muted font-medium tracking-wide hidden xs:block sm:block">
                 កម្ពុជា · CAMBODIA
               </span>
             </div>
@@ -87,7 +87,7 @@ export function Header() {
           </div>
 
           {/* Right Action Icons */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             {/* Language Switcher */}
             <LocaleSwitcher />
 

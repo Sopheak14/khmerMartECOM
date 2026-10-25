@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, APIRequestContext } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
 
@@ -173,6 +173,14 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // Verify unread badge is now gone (or 0)
     await expect(page.locator('[data-testid="notification-bell-badge"]')).toHaveCount(0);
 
+    // Verify GET /notifications/unread-count returns 0 from backend API
+    const unreadCountRes = await request.get('http://localhost:4000/api/notifications/unread-count', {
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+    expect(unreadCountRes.ok()).toBe(true);
+    const unreadCountJson = await unreadCountRes.json();
+    expect(unreadCountJson.data?.count).toBe(0);
+
     // -------------------------------------------------------------
     // Step 7: (Admin via API) Ship Order & Add Tracking Event
     // -------------------------------------------------------------
@@ -248,7 +256,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // -------------------------------------------------------------
     // Step 9: Unknown Tracking Number -> Not Found UI
     // -------------------------------------------------------------
-    await page.goto('/en/track/UNKNOWN-TRACK-999999');
+    await page.goto('/en/track/XX-NOT-REAL');
     await page.waitForLoadState('networkidle');
     const notFoundEl = page.locator('[data-testid="tracking-not-found"]');
     await expect(notFoundEl).toBeVisible();
@@ -470,4 +478,300 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     const pushToggle = page.locator('[data-testid="web-push-toggle"]');
     await expect(pushToggle).toBeVisible();
   });
+
+  // =========================================================================
+  // Phase 6 Test Gaps: Dedicated Targeted E2E Tests
+  // =========================================================================
+
+  test('a: "Mark all as read" -> GET /notifications/unread-count returns 0 and bell badge disappears', async ({
+    page,
+    request,
+  }) => {
+    // 1. Create delivered order with real tracking number and paid notification
+    const { user } = await createDeliveredOrderWithTracking(request);
+
+    // 2. Login via UI
+    await loginViaUI(page, user.email, user.password, 'en');
+
+    // 3. Bell badge shows unread count >= 1 and API returns count >= 1
+    const unreadBadge = page.locator('[data-testid="notification-bell-badge"]');
+    await expect(unreadBadge).toBeVisible({ timeout: 10000 });
+    const countBefore = Number((await unreadBadge.innerText()).trim());
+    expect(countBefore).toBeGreaterThanOrEqual(1);
+
+    const apiUnreadBefore = await request.get('http://localhost:4000/api/notifications/unread-count', {
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+    expect(apiUnreadBefore.ok()).toBe(true);
+    const jsonBefore = await apiUnreadBefore.json();
+    expect(jsonBefore.data?.count).toBeGreaterThanOrEqual(1);
+
+    // 4. Navigate to notifications page and click "Mark all as read"
+    await page.goto('/en/account/notifications');
+    await page.waitForLoadState('networkidle');
+
+    const markAllBtn = page.locator('[data-testid="mark-all-read-btn"]');
+    await expect(markAllBtn).toBeVisible();
+    await markAllBtn.click();
+
+    // 5. Bell badge disappears
+    await expect(page.locator('[data-testid="notification-bell-badge"]')).toHaveCount(0);
+
+    // 6. GET /notifications/unread-count returns 0
+    const apiUnreadAfter = await request.get('http://localhost:4000/api/notifications/unread-count', {
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+    expect(apiUnreadAfter.ok()).toBe(true);
+    const jsonAfter = await apiUnreadAfter.json();
+    expect(jsonAfter.data?.count).toBe(0);
+  });
+
+  test('b: Unknown tracking number (/track/XX-NOT-REAL) -> friendly not-found UI, no console error', async ({
+    page,
+  }) => {
+    // English
+    await page.goto('/en/track/XX-NOT-REAL');
+    await page.waitForLoadState('networkidle');
+
+    const notFoundElEn = page.locator('[data-testid="tracking-not-found"]');
+    await expect(notFoundElEn).toBeVisible();
+    await expect(notFoundElEn).toContainText('Tracking number not found');
+    await expect(notFoundElEn).toContainText('XX-NOT-REAL');
+    await expect(page.locator('[data-testid="back-to-track-btn"]')).toBeVisible();
+
+    // Khmer
+    await page.goto('/km/track/XX-NOT-REAL');
+    await page.waitForLoadState('networkidle');
+
+    const notFoundElKm = page.locator('[data-testid="tracking-not-found"]');
+    await expect(notFoundElKm).toBeVisible();
+    await expect(notFoundElKm).toContainText('រកមិនឃើញលេខតាមដានទេ');
+    await expect(notFoundElKm).toContainText('XX-NOT-REAL');
+    await expect(page.locator('[data-testid="back-to-track-btn"]')).toBeVisible();
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('c: Zero console errors AND zero untranslated keys on /account/notifications, /track/{real number}, and the review dialog', async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(60000);
+    const checkNoUntranslatedKeys = async (contextName: string) => {
+      const rawKeyRegex = /^[a-z]+\.[a-zA-Z.]+$/;
+      const allText = await page.evaluate(() => {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const nodes: string[] = [];
+        while (walker.nextNode()) {
+          const val = walker.currentNode.nodeValue?.trim();
+          if (val) nodes.push(val);
+        }
+        return nodes;
+      });
+      const untranslated = allText.filter((t) => rawKeyRegex.test(t));
+      expect(untranslated, `Untranslated keys found on ${contextName}`).toEqual([]);
+    };
+
+    // 1. Create delivered order with tracking
+    const { user, orderNumber, trackingNumber } = await createDeliveredOrderWithTracking(request);
+    await loginViaUI(page, user.email, user.password, 'en');
+
+    // 2. Check /en/account/notifications and /km/account/notifications
+    await page.goto('/en/account/notifications');
+    await page.waitForLoadState('networkidle');
+    await checkNoUntranslatedKeys('/en/account/notifications');
+
+    await page.goto('/km/account/notifications');
+    await page.waitForLoadState('networkidle');
+    await checkNoUntranslatedKeys('/km/account/notifications');
+
+    // 3. Check /en/track/{real number} and /km/track/{real number}
+    await page.goto(`/en/track/${trackingNumber}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="tracking-detail-card"]')).toBeVisible();
+    await checkNoUntranslatedKeys(`/en/track/${trackingNumber}`);
+
+    await page.goto(`/km/track/${trackingNumber}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="tracking-detail-card"]')).toBeVisible();
+    await checkNoUntranslatedKeys(`/km/track/${trackingNumber}`);
+
+    // 4. Check review dialog in English
+    await page.goto(`/en/orders/${orderNumber}`);
+    await page.waitForLoadState('networkidle');
+    const writeReviewBtnEn = page.locator('[data-testid="write-review-btn-1031"]');
+    await expect(writeReviewBtnEn).toBeVisible();
+    await writeReviewBtnEn.click();
+
+    const dialogEn = page.locator('[data-testid="review-dialog"]');
+    await expect(dialogEn).toBeVisible();
+    await checkNoUntranslatedKeys('review dialog (EN)');
+    await page.locator('[aria-label="Close dialog"]').click();
+    await expect(dialogEn).toBeHidden();
+
+    // 5. Check review dialog in Khmer
+    await page.goto(`/km/orders/${orderNumber}`);
+    await page.waitForLoadState('networkidle');
+    const writeReviewBtnKm = page.locator('[data-testid="write-review-btn-1031"]');
+    await expect(writeReviewBtnKm).toBeVisible();
+    await writeReviewBtnKm.click();
+
+    const dialogKm = page.locator('[data-testid="review-dialog"]');
+    await expect(dialogKm).toBeVisible();
+    await checkNoUntranslatedKeys('review dialog (KM)');
+    await page.locator('[aria-label="Close dialog"]').click();
+    await expect(dialogKm).toBeHidden();
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('d: /km/track/{real number} at 390x844 shows Khmer status names and no horizontal scroll (document.documentElement.scrollWidth <= 390)', async ({
+    page,
+    request,
+  }) => {
+    // 1. Create delivered order with tracking number and timeline events
+    const { trackingNumber } = await createDeliveredOrderWithTracking(request);
+
+    // 2. Set viewport to mobile 390x844
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // 3. Navigate to /km/track/{trackingNumber}
+    await page.goto(`/km/track/${trackingNumber}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="tracking-detail-card"]')).toBeVisible();
+
+    // 4. Verify Khmer status names are displayed
+    const statusBadge = page.locator('[data-testid="tracking-status-badge"]');
+    await expect(statusBadge).toBeVisible();
+    await expect(statusBadge).toContainText('បានប្រគល់ជោគជ័យ');
+
+    // Also check event status in timeline
+    const timeline = page.locator('[data-testid="tracking-events-timeline"]');
+    await expect(timeline).toBeVisible();
+    await expect(timeline).toContainText('បានប្រគល់ជោគជ័យ');
+
+    // 5. Verify no horizontal scroll
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth, `Expected scrollWidth (${scrollWidth}) <= 390`).toBeLessThanOrEqual(390);
+
+    expect(consoleErrors).toEqual([]);
+  });
 });
+
+async function createDeliveredOrderWithTracking(request: APIRequestContext) {
+  // 1. Admin login
+  const adminLogin = await request.post('http://localhost:4000/api/auth/login', {
+    data: { email: 'admin@khmermart.local', password: 'Admin@12345' },
+  });
+  const adminJson = await adminLogin.json();
+  const adminToken = adminJson.data.accessToken;
+
+  // 2. User register
+  const user = await createThrowawayUser(request);
+
+  // 3. User address
+  const addrRes = await request.post('http://localhost:4000/api/users/me/addresses', {
+    headers: { Authorization: `Bearer ${user.token}` },
+    data: {
+      recipientName: user.fullName,
+      phone: user.phone,
+      line1: 'Building 99, St 2004',
+      district: 'Sen Sok',
+      province: 'Phnom Penh',
+      postalCode: '12000',
+      label: 'Home',
+      isDefault: true,
+    },
+  });
+  const addressId = (await addrRes.json()).data.id;
+
+  // 4. Cart item (Product 1031, Variant 14, Qty 1)
+  await request.post('http://localhost:4000/api/cart/items', {
+    headers: { Authorization: `Bearer ${user.token}` },
+    data: { productId: 1031, variantId: 14, quantity: 1 },
+  });
+
+  // 5. Checkout
+  const checkoutRes = await request.post('http://localhost:4000/api/checkout', {
+    headers: {
+      Authorization: `Bearer ${user.token}`,
+      'Idempotency-Key': `idem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    },
+    data: {
+      addressId,
+      shippingMethodCode: 'STANDARD',
+      paymentMethod: 'KHQR',
+    },
+  });
+  const checkoutJson = await checkoutRes.json();
+  const orderNumber = checkoutJson.data.order.orderNumber;
+
+  // 6. Generate KHQR and simulate payment
+  const payRes = await request.post(`http://localhost:4000/api/payments/khqr/${orderNumber}`, {
+    headers: { Authorization: `Bearer ${user.token}` },
+  });
+  const paymentId = (await payRes.json()).data.paymentId;
+
+  await request.post(`http://localhost:4000/api/payments/${paymentId}/simulate-paid`, {
+    headers: { Authorization: `Bearer ${user.token}` },
+  });
+
+  // 7. Admin ship
+  const shipRes = await request.post(`http://localhost:4000/api/admin/orders/${orderNumber}/ship`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    data: { carrier: 'KhmerMart Express' },
+  });
+  const trackingNumber = (await shipRes.json()).data.trackingNumber;
+
+  // 8. Admin tracking event IN_TRANSIT
+  const transitRes = await request.post(`http://localhost:4000/api/admin/orders/${orderNumber}/tracking-events`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    data: {
+      status: 'IN_TRANSIT',
+      location: 'Phnom Penh Sorting Facility',
+      note: 'Package in transit',
+    },
+  });
+  expect(transitRes.ok()).toBe(true);
+
+  // 9. Admin tracking event OUT_FOR_DELIVERY
+  const outRes = await request.post(`http://localhost:4000/api/admin/orders/${orderNumber}/tracking-events`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    data: {
+      status: 'OUT_FOR_DELIVERY',
+      location: 'Tuol Kouk Delivery Hub',
+      note: 'Out for final delivery with courier',
+    },
+  });
+  expect(outRes.ok()).toBe(true);
+
+  // 10. Admin tracking event DELIVERED
+  const delRes = await request.post(`http://localhost:4000/api/admin/orders/${orderNumber}/tracking-events`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    data: {
+      status: 'DELIVERED',
+      location: 'Customer Address',
+      note: 'Package delivered to customer',
+    },
+  });
+  expect(delRes.ok()).toBe(true);
+
+  return {
+    user,
+    adminToken,
+    orderNumber,
+    trackingNumber,
+  };
+}

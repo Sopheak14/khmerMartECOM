@@ -25,10 +25,11 @@ export function LocaleSwitcher() {
       onClick={toggleLocale}
       disabled={isPending}
       aria-label="Switch language"
-      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-btn border border-border/80 bg-surface/50 hover:bg-surface text-foreground transition-all duration-150"
+      className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-btn border border-border/80 bg-surface/50 hover:bg-surface text-foreground transition-all duration-150"
     >
-      <Globe className="w-3.5 h-3.5 text-primary" />
-      <span>{locale === 'en' ? 'ខ្មែរ (KM)' : 'English (EN)'}</span>
+      <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+      <span className="hidden sm:inline">{locale === 'en' ? 'ខ្មែរ (KM)' : 'English (EN)'}</span>
+      <span className="sm:hidden font-bold">{locale === 'en' ? 'KM' : 'EN'}</span>
     </button>
   );
 }

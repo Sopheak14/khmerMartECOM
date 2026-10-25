@@ -65,6 +65,7 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     await page.fill('#login-password', 'Customer@123');
     await page.click('button[type="submit"]');
     await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState('networkidle');
 
     // Click account menu and Logout
     await page.click('[data-testid="account-menu-button"]');
