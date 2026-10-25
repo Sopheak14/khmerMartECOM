@@ -63,30 +63,57 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
     );
   }, [product.variants, selectedAttributes]);
 
-  const isFlashSaleActive = Boolean(product.salePriceCents && product.flashSaleEndsAt);
+  // Determine if currently selected variant (or base product) is actively on flash sale
+  const isVariantOnSale = useMemo(() => {
+    if (!product.flashSaleEndsAt) return false;
+    if (activeVariant) {
+      return Boolean(activeVariant.salePriceCents);
+    }
+    return Boolean(product.salePriceCents);
+  }, [product.flashSaleEndsAt, activeVariant, product.salePriceCents]);
 
   // Variant or base regular price
   const regularPriceCents = activeVariant ? activeVariant.priceCents : product.priceCents;
 
   // Determine current effective price:
-  // If flash sale is active, backend applies product.salePriceCents across variants (Item 5)
-  // The product page shows the real price the cart will charge:
+  // Shows salePriceCents only if variant has salePriceCents (or base product when no variant selected)
   const effectivePriceCents = useMemo(() => {
-    if (isFlashSaleActive && product.salePriceCents) {
+    if (activeVariant) {
+      if (activeVariant.salePriceCents && product.flashSaleEndsAt) {
+        return activeVariant.salePriceCents;
+      }
+      return activeVariant.priceCents;
+    }
+    if (product.salePriceCents && product.flashSaleEndsAt) {
       return product.salePriceCents;
     }
-    return regularPriceCents;
-  }, [isFlashSaleActive, product.salePriceCents, regularPriceCents]);
+    return product.priceCents;
+  }, [activeVariant, product.flashSaleEndsAt, product.salePriceCents, product.priceCents]);
 
-  // Unified "was" price logic: regular price of the shown variant/base
+  // Unified "was" price logic:
+  // Selected variant shows salePriceCents with priceCents struck through only if that variant has salePriceCents;
+  // otherwise no strike-through.
   const originalPriceCents = useMemo(() => {
-    if (isFlashSaleActive && product.salePriceCents && effectivePriceCents === product.salePriceCents) {
-      return regularPriceCents;
+    if (activeVariant) {
+      if (activeVariant.salePriceCents && product.flashSaleEndsAt) {
+        return activeVariant.priceCents;
+      }
+      return undefined;
     }
-    return activeVariant?.priceCents && product.compareAtCents
+    if (product.salePriceCents && product.flashSaleEndsAt) {
+      return product.priceCents;
+    }
+    return product.compareAtCents && product.compareAtCents > regularPriceCents
       ? product.compareAtCents
-      : (product.compareAtCents && product.compareAtCents > regularPriceCents ? product.compareAtCents : undefined);
-  }, [isFlashSaleActive, product.salePriceCents, effectivePriceCents, regularPriceCents, activeVariant, product.compareAtCents]);
+      : undefined;
+  }, [activeVariant, product.flashSaleEndsAt, product.salePriceCents, product.priceCents, product.compareAtCents, regularPriceCents]);
+
+  // Filter out FLASH_SALE badge when selected variant is not on sale
+  const visibleBadges = useMemo(() => {
+    if (!product.badges) return [];
+    if (!isVariantOnSale) return product.badges.filter((b) => b !== 'FLASH_SALE');
+    return product.badges;
+  }, [product.badges, isVariantOnSale]);
 
   const isFullCombinationSelected =
     !hasVariants ||
@@ -209,10 +236,11 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
             <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-btn">
               {product.brand}
             </span>
-            <div className="flex items-center gap-1.5">
-              {product.badges?.map((badge) => (
+            <div className="flex items-center gap-1.5" data-testid="product-badges">
+              {visibleBadges.map((badge) => (
                 <span
                   key={badge}
+                  data-testid={`badge-${badge.toLowerCase()}`}
                   className="text-[10px] font-bold uppercase tracking-wider bg-accent text-accent-foreground px-2 py-0.5 rounded-full"
                 >
                   {badge.replace('_', ' ')}
@@ -251,6 +279,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
             originalPriceCents={originalPriceCents}
             flashSaleEndsAt={product.flashSaleEndsAt}
             khrRate={khrRate}
+            isOnSale={isVariantOnSale}
           />
 
           {/* Variant Selector */}

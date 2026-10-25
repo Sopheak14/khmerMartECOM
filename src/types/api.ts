@@ -111,6 +111,7 @@ export interface VariantDTO {
   attributes: Record<string, string>;
   priceCents: number;
   available: number;
+  salePriceCents?: number;
 }
 
 export interface ProductCardDTO {

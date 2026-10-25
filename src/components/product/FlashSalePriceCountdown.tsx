@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { formatUsd, formatKhr } from '@/lib/money';
 import { Flame, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface FlashSalePriceCountdownProps {
   priceCents: number;
   originalPriceCents?: number;
   flashSaleEndsAt?: string;
   khrRate: number;
+  isOnSale?: boolean;
 }
 
 export function FlashSalePriceCountdown({
@@ -17,6 +19,7 @@ export function FlashSalePriceCountdown({
   originalPriceCents,
   flashSaleEndsAt,
   khrRate,
+  isOnSale = true,
 }: FlashSalePriceCountdownProps) {
   const t = useTranslations('product');
   const [mounted, setMounted] = useState(false);
@@ -54,17 +57,23 @@ export function FlashSalePriceCountdown({
     return () => clearInterval(interval);
   }, [flashSaleEndsAt]);
 
-  const hasDiscount = originalPriceCents && originalPriceCents > priceCents;
+  const hasDiscount = Boolean(isOnSale && originalPriceCents && originalPriceCents > priceCents);
 
   return (
     <div className="space-y-3" data-testid="price-and-countdown">
       {/* Price display */}
       <div className="flex items-baseline gap-3 flex-wrap">
-        <span className="text-3xl sm:text-4xl font-black text-primary tracking-tight" data-testid="product-price">
+        <span
+          className={cn(
+            'text-3xl sm:text-4xl font-black tracking-tight',
+            hasDiscount ? 'text-primary' : 'text-foreground'
+          )}
+          data-testid="product-price"
+        >
           {formatUsd(priceCents)}
         </span>
 
-        {hasDiscount && (
+        {hasDiscount && originalPriceCents && (
           <span
             className="text-lg sm:text-xl text-muted line-through font-medium"
             data-testid="original-price"
@@ -78,8 +87,8 @@ export function FlashSalePriceCountdown({
         </span>
       </div>
 
-      {/* Flash Sale Banner & Countdown (Client-side rendered after mount to prevent hydration mismatch) */}
-      {mounted && flashSaleEndsAt && timeLeft && !timeLeft.expired && (
+      {/* Flash Sale Banner & Countdown (Hidden when variant is not on sale) */}
+      {isOnSale && mounted && flashSaleEndsAt && timeLeft && !timeLeft.expired && (
         <div
           data-testid="flash-sale-countdown-box"
           className="p-3 bg-red-500/10 border border-red-500/20 rounded-card flex items-center justify-between flex-wrap gap-2 text-red-600 dark:text-red-400"

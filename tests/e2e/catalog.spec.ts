@@ -236,8 +236,9 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     await expect(originalPrice).toHaveText('$999.00');
     await expect(page.locator('[data-testid="khr-price"]')).toBeVisible();
 
-    // Countdown timer
+    // Countdown timer & Flash Sale badge visible
     await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
+    await expect(page.locator('[data-testid="badge-flash_sale"]')).toBeVisible();
 
     // 3. Variant selection:
     // Select 32GB RAM
@@ -251,9 +252,12 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     // Select 1TB Storage
     await page.click('[data-testid="variant-chip-storage-1TB"]');
 
-    // Price charges real cart flash sale price ($899.00) with variant regular price ($1,299.00) struck out
-    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$899.00');
-    await expect(page.locator('[data-testid="original-price"]')).toHaveText('$1,299.00');
+    // 32GB/1TB is not on flash sale: shows normal price $1,299.00 with no strike-through,
+    // and hides the flash-sale countdown and badge
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
+    await expect(page.locator('[data-testid="original-price"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="badge-flash_sale"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="stock-status"]')).toContainText('10 available');
 
     // 4. Quantity selector (max = available)
@@ -350,6 +354,68 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
         page.off('pageerror', pageErrorListener);
       }
     }
+  });
+
+  test('8: Flash sale variant pricing E2E: select 32GB/1TB -> page $1,299.00 -> add to cart -> CartDTO total 129900 (assert UI == API); select 16GB/512GB -> $899.00 -> cart 89900', async ({ page, context }) => {
+    // 1. Fresh guest cart session for 32GB / 1TB
+    await context.clearCookies();
+    await page.goto('/en/products/laptop-pro-15');
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
+
+    const addBtn = page.locator('[data-testid="add-to-cart-button"]');
+    await expect(addBtn).toBeDisabled();
+
+    // Select 32GB / Space Gray / 1TB
+    await page.click('[data-testid="variant-chip-ram-32GB"]');
+    await page.click('[data-testid="variant-chip-color-Space Gray"]');
+    await page.click('[data-testid="variant-chip-storage-1TB"]');
+
+    // Page shows $1,299.00 with no strike-through
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
+    await expect(page.locator('[data-testid="original-price"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).not.toBeVisible();
+    await expect(addBtn).toBeEnabled();
+
+    // Add to cart and assert CartDTO total 129900 and UI matches API
+    const [cartRes32] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
+      addBtn.click(),
+    ]);
+    const cart32 = await cartRes32.json();
+    expect(cart32.success).toBe(true);
+    expect(cart32.data.totalCents).toBe(129900);
+
+    const drawer = page.locator('[data-testid="cart-drawer"]');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText('$1,299.00');
+
+    // 2. Clear cart session to test 16GB / 512GB
+    await context.clearCookies();
+    await page.goto('/en/products/laptop-pro-15');
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
+
+    // Select 16GB / Space Gray / 512GB
+    await page.click('[data-testid="variant-chip-ram-16GB"]');
+    await page.click('[data-testid="variant-chip-color-Space Gray"]');
+    await page.click('[data-testid="variant-chip-storage-512GB"]');
+
+    // Page shows $899.00 with $999.00 struck through
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$899.00');
+    await expect(page.locator('[data-testid="original-price"]')).toHaveText('$999.00');
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
+    await expect(addBtn).toBeEnabled();
+
+    // Add to cart and assert CartDTO total 89900 and UI matches API
+    const [cartRes16] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
+      addBtn.click(),
+    ]);
+    const cart16 = await cartRes16.json();
+    expect(cart16.success).toBe(true);
+    expect(cart16.data.totalCents).toBe(89900);
+
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText('$899.00');
   });
 
 });
