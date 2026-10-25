@@ -27,10 +27,10 @@ import com.khmermart.repository.PromotionRepository;
 import com.khmermart.repository.ReviewRepository;
 import com.khmermart.service.CategoryService;
 import com.khmermart.service.ProductService;
-import java.math.BigDecimal;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -192,6 +192,42 @@ public class ProductServiceImpl implements ProductService {
               .sum();
     }
 
+    // 5. Flash sale check
+    Instant now = Instant.now();
+    Instant flashSaleEndsAt = null;
+    Long salePriceCents = null;
+    Map<Long, Long> variantSalePrices = new HashMap<>();
+
+    Optional<Promotion> flashPromo =
+        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
+    if (flashPromo.isPresent()) {
+      List<PromotionProduct> pps =
+          promotionProductRepository.findByPromotionIdAndProductId(
+              flashPromo.get().getId(), productId);
+      Long noVariantSalePrice = null;
+      for (PromotionProduct pp : pps) {
+        if (pp.getVariantId() != null) {
+          variantSalePrices.put(pp.getVariantId(), pp.getSalePriceCents());
+        } else {
+          noVariantSalePrice = pp.getSalePriceCents();
+        }
+      }
+
+      if (!variants.isEmpty()) {
+        List<Long> activeSalePrices =
+            variantSalePrices.values().stream().filter(java.util.Objects::nonNull).toList();
+        if (!activeSalePrices.isEmpty()) {
+          salePriceCents = Collections.min(activeSalePrices);
+          flashSaleEndsAt = flashPromo.get().getEndsAt();
+        }
+      } else {
+        if (noVariantSalePrice != null) {
+          salePriceCents = noVariantSalePrice;
+          flashSaleEndsAt = flashPromo.get().getEndsAt();
+        }
+      }
+    }
+
     List<VariantDto> variantDtos =
         variants.stream()
             .map(
@@ -201,7 +237,8 @@ public class ProductServiceImpl implements ProductService {
                         v.getSku(),
                         v.getAttributes(),
                         v.getPriceCents() != null ? v.getPriceCents() : product.getPriceCents(),
-                        variantAvailableMap.getOrDefault(v.getId(), 0)))
+                        variantAvailableMap.getOrDefault(v.getId(), 0),
+                        variantSalePrices.get(v.getId())))
             .toList();
 
     // 3. Variant Options aggregation
@@ -226,22 +263,6 @@ public class ProductServiceImpl implements ProductService {
       Long count = (Long) row[1];
       if (rating != null) {
         ratingBreakdown.put(String.valueOf(rating), count);
-      }
-    }
-
-    // 5. Flash sale check
-    Instant now = Instant.now();
-    Instant flashSaleEndsAt = null;
-    Long salePriceCents = null;
-    Optional<Promotion> flashPromo =
-        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
-    if (flashPromo.isPresent()) {
-      Optional<PromotionProduct> pp =
-          promotionProductRepository.findById(
-              new PromotionProduct.PromotionProductId(flashPromo.get().getId(), productId));
-      if (pp.isPresent()) {
-        flashSaleEndsAt = flashPromo.get().getEndsAt();
-        salePriceCents = pp.get().getSalePriceCents();
       }
     }
 
@@ -468,11 +489,23 @@ public class ProductServiceImpl implements ProductService {
     Map<Long, Long> flashSalePrices = new HashMap<>();
     Optional<Promotion> flashPromo =
         promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
-    if (flashPromo.isPresent()) {
+    if (flashPromo.isPresent() && !products.isEmpty()) {
+      List<Long> pIds = products.stream().map(Product::getId).toList();
+      java.util.Set<Long> productIdsWithVariants =
+          productVariantRepository.findByProductIdInAndActiveTrue(pIds).stream()
+              .map(ProductVariant::getProductId)
+              .collect(Collectors.toSet());
+
       List<PromotionProduct> pps =
           promotionProductRepository.findByPromotionId(flashPromo.get().getId());
       for (PromotionProduct pp : pps) {
-        flashSalePrices.put(pp.getProductId(), pp.getSalePriceCents());
+        if (pp.getSalePriceCents() == null) continue;
+        boolean hasVariants = productIdsWithVariants.contains(pp.getProductId());
+        if (hasVariants && pp.getVariantId() != null) {
+          flashSalePrices.merge(pp.getProductId(), pp.getSalePriceCents(), Math::min);
+        } else if (!hasVariants && pp.getVariantId() == null) {
+          flashSalePrices.merge(pp.getProductId(), pp.getSalePriceCents(), Math::min);
+        }
       }
     }
 

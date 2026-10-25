@@ -231,10 +231,16 @@ public class CheckoutServiceImpl implements CheckoutService {
       Product product = productRepository.findById(item.getProductId()).orElse(null);
       if (product == null) continue;
 
-      ProductVariant variant = null;
-      if (item.getVariantId() != null) {
-        variant = variantRepository.findById(item.getVariantId()).orElse(null);
-      }
+      final ProductVariant variant =
+          item.getVariantId() != null
+              ? variantRepository
+                  .findById(item.getVariantId())
+                  .filter(ProductVariant::isActive)
+                  .orElseThrow(
+                      () ->
+                          new CustomException(
+                              ErrorCode.OUT_OF_STOCK, "Product variant is no longer available"))
+              : null;
 
       Long currentUnitPrice =
           (variant != null && variant.getPriceCents() != null)
@@ -253,11 +259,23 @@ public class CheckoutServiceImpl implements CheckoutService {
 
       Long flashSalePrice = null;
       if (flashSalePromo.isPresent()) {
-        Optional<PromotionProduct> pp =
-            promotionProductRepository.findByPromotionIdAndProductId(
-                flashSalePromo.get().getId(), product.getId());
-        if (pp.isPresent()) {
-          flashSalePrice = pp.get().getSalePriceCents();
+        Long promoId = flashSalePromo.get().getId();
+        if (variant != null) {
+          flashSalePrice =
+              promotionProductRepository
+                  .findByPromotionIdAndProductIdAndVariantId(
+                      promoId, product.getId(), variant.getId())
+                  .map(PromotionProduct::getSalePriceCents)
+                  .orElse(null);
+        } else {
+          boolean hasVariants = variantRepository.existsByProductId(product.getId());
+          if (!hasVariants) {
+            flashSalePrice =
+                promotionProductRepository
+                    .findByPromotionIdAndProductIdAndVariantIdIsNull(promoId, product.getId())
+                    .map(PromotionProduct::getSalePriceCents)
+                    .orElse(null);
+          }
         }
       }
 
@@ -291,7 +309,11 @@ public class CheckoutServiceImpl implements CheckoutService {
         bogoEligible =
             promotionProductRepository
                 .findByPromotionIdAndProductId(bogoPromo.get().getId(), product.getId())
-                .isPresent();
+                .stream()
+                .anyMatch(
+                    pp ->
+                        pp.getVariantId() == null
+                            || (variant != null && pp.getVariantId().equals(variant.getId())));
       }
 
       Integer seasonalPercent = null;
@@ -299,10 +321,12 @@ public class CheckoutServiceImpl implements CheckoutService {
         boolean seasonalEligible =
             promotionProductRepository
                 .findByPromotionIdAndProductId(seasonalPromo.get().getId(), product.getId())
-                .isPresent();
-        if (seasonalEligible) {
-          seasonalPercent = seasonalPromo.get().getDiscountPercent();
-        }
+                .stream()
+                .anyMatch(
+                    pp ->
+                        pp.getVariantId() == null
+                            || (variant != null && pp.getVariantId().equals(variant.getId())));
+        seasonalPercent = seasonalEligible ? seasonalPromo.get().getDiscountPercent() : 0;
       }
 
       pricingItems.add(
@@ -454,17 +478,16 @@ public class CheckoutServiceImpl implements CheckoutService {
                       new CustomException(
                           ErrorCode.OUT_OF_STOCK, "Product is no longer available"));
 
-      ProductVariant variant = null;
-      if (item.getVariantId() != null) {
-        variant =
-            variantRepository
-                .findById(item.getVariantId())
-                .filter(ProductVariant::isActive)
-                .orElseThrow(
-                    () ->
-                        new CustomException(
-                            ErrorCode.OUT_OF_STOCK, "Product variant is no longer available"));
-      }
+      final ProductVariant variant =
+          item.getVariantId() != null
+              ? variantRepository
+                  .findById(item.getVariantId())
+                  .filter(ProductVariant::isActive)
+                  .orElseThrow(
+                      () ->
+                          new CustomException(
+                              ErrorCode.OUT_OF_STOCK, "Product variant is no longer available"))
+              : null;
 
       Long currentUnitPrice =
           (variant != null && variant.getPriceCents() != null)
@@ -486,11 +509,23 @@ public class CheckoutServiceImpl implements CheckoutService {
 
       Long flashSalePrice = null;
       if (flashSalePromo.isPresent()) {
-        Optional<PromotionProduct> pp =
-            promotionProductRepository.findByPromotionIdAndProductId(
-                flashSalePromo.get().getId(), product.getId());
-        if (pp.isPresent()) {
-          flashSalePrice = pp.get().getSalePriceCents();
+        Long promoId = flashSalePromo.get().getId();
+        if (variant != null) {
+          flashSalePrice =
+              promotionProductRepository
+                  .findByPromotionIdAndProductIdAndVariantId(
+                      promoId, product.getId(), variant.getId())
+                  .map(PromotionProduct::getSalePriceCents)
+                  .orElse(null);
+        } else {
+          boolean hasVariants = variantRepository.existsByProductId(product.getId());
+          if (!hasVariants) {
+            flashSalePrice =
+                promotionProductRepository
+                    .findByPromotionIdAndProductIdAndVariantIdIsNull(promoId, product.getId())
+                    .map(PromotionProduct::getSalePriceCents)
+                    .orElse(null);
+          }
         }
       }
 
@@ -499,7 +534,11 @@ public class CheckoutServiceImpl implements CheckoutService {
         bogoEligible =
             promotionProductRepository
                 .findByPromotionIdAndProductId(bogoPromo.get().getId(), product.getId())
-                .isPresent();
+                .stream()
+                .anyMatch(
+                    pp ->
+                        pp.getVariantId() == null
+                            || (variant != null && pp.getVariantId().equals(variant.getId())));
       }
 
       Integer seasonalPercent = null;
@@ -507,10 +546,12 @@ public class CheckoutServiceImpl implements CheckoutService {
         boolean seasonalEligible =
             promotionProductRepository
                 .findByPromotionIdAndProductId(seasonalPromo.get().getId(), product.getId())
-                .isPresent();
-        if (seasonalEligible) {
-          seasonalPercent = seasonalPromo.get().getDiscountPercent();
-        }
+                .stream()
+                .anyMatch(
+                    pp ->
+                        pp.getVariantId() == null
+                            || (variant != null && pp.getVariantId().equals(variant.getId())));
+        seasonalPercent = seasonalEligible ? seasonalPromo.get().getDiscountPercent() : 0;
       }
 
       pricingItems.add(

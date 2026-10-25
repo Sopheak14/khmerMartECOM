@@ -10,6 +10,7 @@ import com.khmermart.model.response.SearchSuggestDto;
 import com.khmermart.repository.CategoryRepository;
 import com.khmermart.repository.ProductImageRepository;
 import com.khmermart.repository.ProductRepository;
+import com.khmermart.repository.ProductVariantRepository;
 import com.khmermart.repository.PromotionProductRepository;
 import com.khmermart.repository.PromotionRepository;
 import com.khmermart.service.SearchService;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SearchServiceImpl implements SearchService {
 
   private final ProductRepository productRepository;
+  private final ProductVariantRepository productVariantRepository;
   private final ProductImageRepository productImageRepository;
   private final CategoryRepository categoryRepository;
   private final PromotionRepository promotionRepository;
@@ -37,11 +39,13 @@ public class SearchServiceImpl implements SearchService {
 
   public SearchServiceImpl(
       ProductRepository productRepository,
+      ProductVariantRepository productVariantRepository,
       ProductImageRepository productImageRepository,
       CategoryRepository categoryRepository,
       PromotionRepository promotionRepository,
       PromotionProductRepository promotionProductRepository) {
     this.productRepository = productRepository;
+    this.productVariantRepository = productVariantRepository;
     this.productImageRepository = productImageRepository;
     this.categoryRepository = categoryRepository;
     this.promotionRepository = promotionRepository;
@@ -90,11 +94,19 @@ public class SearchServiceImpl implements SearchService {
     Optional<Promotion> flashPromo =
         promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
     if (flashPromo.isPresent() && !prodIds.isEmpty()) {
+      java.util.Set<Long> productIdsWithVariants =
+          productVariantRepository.findByProductIdInAndActiveTrue(prodIds).stream()
+              .map(com.khmermart.model.entity.ProductVariant::getProductId)
+              .collect(java.util.stream.Collectors.toSet());
       List<PromotionProduct> promoProducts =
           promotionProductRepository.findByPromotionId(flashPromo.get().getId());
       for (PromotionProduct pp : promoProducts) {
-        if (prodIds.contains(pp.getProductId())) {
-          flashSalePrices.put(pp.getProductId(), pp.getSalePriceCents());
+        if (!prodIds.contains(pp.getProductId()) || pp.getSalePriceCents() == null) continue;
+        boolean hasVariants = productIdsWithVariants.contains(pp.getProductId());
+        if (hasVariants && pp.getVariantId() != null) {
+          flashSalePrices.merge(pp.getProductId(), pp.getSalePriceCents(), Math::min);
+        } else if (!hasVariants && pp.getVariantId() == null) {
+          flashSalePrices.merge(pp.getProductId(), pp.getSalePriceCents(), Math::min);
         }
       }
     }
@@ -122,7 +134,10 @@ public class SearchServiceImpl implements SearchService {
                         || (c.getNameKm() != null
                             && c.getNameKm().toLowerCase().contains(q.trim().toLowerCase())))
             .limit(4)
-            .map(c -> new SearchSuggestDto.CategorySuggestItem(c.getSlug(), c.getName(), c.getNameKm()))
+            .map(
+                c ->
+                    new SearchSuggestDto.CategorySuggestItem(
+                        c.getSlug(), c.getName(), c.getNameKm()))
             .toList();
 
     return new SearchSuggestDto(productItems, categoryItems);

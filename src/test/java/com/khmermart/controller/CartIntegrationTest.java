@@ -205,4 +205,91 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     assertThat(clearedCookie).isNotNull();
     assertThat(clearedCookie).contains("Max-Age=0");
   }
+
+  @Test
+  @DisplayName(
+      "5. Per-variant flash sale: variant 3 in cart -> total 129900 (no flash discount); variant 1 -> total 89900; mixed -> only variant 1 discounted")
+  void testPerVariantFlashSalePricingInCart() throws Exception {
+    // A. Variant 3 in cart -> no flash discount, total 129900
+    HttpHeaders v3Headers = new HttpHeaders();
+    v3Headers.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-v3");
+
+    CartItemRequest reqV3 = new CartItemRequest(1001L, 3L, 1);
+    ResponseEntity<String> resV3 =
+        restTemplate.exchange(
+            "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV3, v3Headers), String.class);
+    assertThat(resV3.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode cartV3 = objectMapper.readTree(resV3.getBody()).get("data");
+
+    assertThat(cartV3.get("subtotalCents").asLong()).isEqualTo(129900L);
+    assertThat(cartV3.get("discountCents").asLong()).isEqualTo(0L);
+    assertThat(cartV3.get("totalCents").asLong()).isEqualTo(129900L);
+    assertThat(cartV3.get("promotionDiscounts").size()).isEqualTo(0);
+
+    // B. Variant 1 in cart -> flash discount applied, total 89900
+    HttpHeaders v1Headers = new HttpHeaders();
+    v1Headers.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-v1");
+
+    CartItemRequest reqV1 = new CartItemRequest(1001L, 1L, 1);
+    ResponseEntity<String> resV1 =
+        restTemplate.exchange(
+            "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV1, v1Headers), String.class);
+    assertThat(resV1.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode cartV1 = objectMapper.readTree(resV1.getBody()).get("data");
+
+    assertThat(cartV1.get("subtotalCents").asLong()).isEqualTo(99900L);
+    assertThat(cartV1.get("discountCents").asLong()).isEqualTo(10000L);
+    assertThat(cartV1.get("totalCents").asLong()).isEqualTo(89900L);
+    assertThat(cartV1.get("promotionDiscounts").size()).isEqualTo(1);
+    assertThat(cartV1.get("promotionDiscounts").get(0).get("label").asText())
+        .isEqualTo("Flash Sale Discount");
+
+    // C. Mixed cart (Variant 1 + Variant 3) -> only Variant 1 discounted
+    HttpHeaders mixedHeaders = new HttpHeaders();
+    mixedHeaders.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-mixed");
+
+    restTemplate.exchange(
+        "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV1, mixedHeaders), String.class);
+    ResponseEntity<String> resMixed =
+        restTemplate.exchange(
+            "/api/cart/items",
+            HttpMethod.POST,
+            new HttpEntity<>(reqV3, mixedHeaders),
+            String.class);
+    assertThat(resMixed.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode cartMixed = objectMapper.readTree(resMixed.getBody()).get("data");
+
+    assertThat(cartMixed.get("subtotalCents").asLong()).isEqualTo(99900L + 129900L); // 229800
+    assertThat(cartMixed.get("discountCents").asLong()).isEqualTo(10000L); // only variant 1
+    assertThat(cartMixed.get("totalCents").asLong()).isEqualTo(219800L);
+    assertThat(cartMixed.get("promotionDiscounts").size()).isEqualTo(1);
+    assertThat(cartMixed.get("promotionDiscounts").get(0).get("amountCents").asLong())
+        .isEqualTo(10000L);
+  }
+
+  @Test
+  @DisplayName(
+      "6. GET /api/products/1001 -> variants[0..1].salePriceCents = 89900, variants[2..3] have no salePriceCents")
+  void testProduct1001VariantSalePrices() throws Exception {
+    ResponseEntity<String> response = restTemplate.getForEntity("/api/products/1001", String.class);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode json = objectMapper.readTree(response.getBody());
+    assertThat(json.get("success").asBoolean()).isTrue();
+    JsonNode p = json.get("data");
+
+    JsonNode variants = p.get("variants");
+    assertThat(variants.size()).isEqualTo(4);
+
+    // Variants 0 and 1 on flash sale
+    assertThat(variants.get(0).get("salePriceCents").asLong()).isEqualTo(89900L);
+    assertThat(variants.get(1).get("salePriceCents").asLong()).isEqualTo(89900L);
+
+    // Variants 2 and 3 NOT on flash sale (salePriceCents absent/omitted)
+    assertThat(variants.get(2).has("salePriceCents")).isFalse();
+    assertThat(variants.get(3).has("salePriceCents")).isFalse();
+
+    // Product-level salePriceCents is the lowest active variant sale price
+    assertThat(p.get("salePriceCents").asLong()).isEqualTo(89900L);
+  }
 }

@@ -247,4 +247,60 @@ class PricingServiceImplTest {
     assertThat(result.discountCents()).isEqualTo(10500L); // 10000 (flash) + 500 (coupon)
     assertThat(result.totalCents()).isEqualTo(89400L); // 89900 - 500
   }
+
+  @Test
+  @DisplayName("10. Variant 3 in cart -> no flash discount, total 129900")
+  void testVariant3NoFlashDiscount() {
+    // Laptop Pro 15 Variant 3: price 129900c, not on flash sale (flashSalePrice = null)
+    List<PricingItem> items = List.of(new PricingItem(1001L, 3L, 129900L, 1, null, false, null));
+
+    Promotion flashSale =
+        Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
+
+    PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(129900L);
+    assertThat(result.discountCents()).isEqualTo(0L);
+    assertThat(result.totalCents()).isEqualTo(129900L);
+    assertThat(result.promotionDiscounts()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("11. Variant 1 in cart -> flash discount applies, total 89900")
+  void testVariant1FlashDiscount() {
+    // Laptop Pro 15 Variant 1: price 99900c, flash sale price 89900c
+    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+
+    Promotion flashSale =
+        Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
+
+    PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(99900L);
+    assertThat(result.discountCents()).isEqualTo(10000L);
+    assertThat(result.totalCents()).isEqualTo(89900L);
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
+  }
+
+  @Test
+  @DisplayName("12. Mixed cart (Variant 1 + Variant 3) -> only Variant 1 is discounted")
+  void testMixedCartOnlyVariant1Discounted() {
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null),
+            new PricingItem(1001L, 3L, 129900L, 1, null, false, null));
+
+    Promotion flashSale =
+        Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
+
+    PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(99900L + 129900L); // 229800
+    assertThat(result.discountCents()).isEqualTo(10000L); // only variant 1 discount
+    assertThat(result.totalCents()).isEqualTo(219800L);
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(10000L);
+  }
 }

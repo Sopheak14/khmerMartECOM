@@ -26,6 +26,18 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `GET /api/products/{idOrSlug}`: Full product detail with variants and active promotions.
 - `GET /api/search/suggestions`: Fast typeahead autocomplete suggestions.
 
+### 2.1 Pricing & Promotion Contract
+- **`VariantDTO`**:
+  - `id`: `Long`
+  - `sku`: `String`
+  - `attributes`: `Map<String, String>`
+  - `priceCents`: `Long`
+  - `available`: `int`
+  - `salePriceCents`: `Long` (additive, optional; present only when that specific variant is on an active flash sale; omitted when not on sale).
+- **`ProductCardDTO` & `ProductDetailDTO`**:
+  - `salePriceCents`: `Long` (lowest active variant sale price, or product sale price when the product has no variants).
+
+
 ---
 
 ## 3. Cart & Checkout

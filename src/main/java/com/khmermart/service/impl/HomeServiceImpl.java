@@ -62,7 +62,8 @@ public class HomeServiceImpl implements HomeService {
       Promotion promo = flashPromoOpt.get();
       List<PromotionProduct> promoProducts =
           promotionProductRepository.findByPromotionId(promo.getId());
-      List<Long> productIds = promoProducts.stream().map(PromotionProduct::getProductId).toList();
+      List<Long> productIds =
+          promoProducts.stream().map(PromotionProduct::getProductId).distinct().toList();
       List<ProductCardDto> products =
           productIds.isEmpty()
               ? Collections.emptyList()

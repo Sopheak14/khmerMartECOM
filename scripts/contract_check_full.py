@@ -6,6 +6,12 @@ Usage (backend must be running):
     python3 contract_check_full.py                      # default http://localhost:4000/api/v3/api-docs
     python3 contract_check_full.py http://host:4000/api/v3/api-docs
 
+Notes:
+    - Contract addition (additive, optional):
+        - VariantDTO.salePriceCents: present only when that variant is on an active flash sale.
+        - ProductCardDTO/ProductDetailDTO.salePriceCents: lowest active variant sale price (or product sale price when no variants).
+    - Flyway migration V3: promotion_products gets nullable variant_id; flash sale prices are per variant.
+
 Compares METHOD + PATH against the live OpenAPI spec (springdoc).
 Path parameter names are ignored ({id} == {paymentId}); the /api prefix is optional.
 Exit code 0 = all present, 1 = something missing.

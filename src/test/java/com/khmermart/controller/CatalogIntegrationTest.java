@@ -112,6 +112,11 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     JsonNode variants = p.get("variants");
     assertThat(variants.size()).isEqualTo(4);
     assertThat(p.get("available").asInt()).isEqualTo(50);
+    assertThat(variants.get(0).get("salePriceCents").asLong()).isEqualTo(89900L);
+    assertThat(variants.get(1).get("salePriceCents").asLong()).isEqualTo(89900L);
+    assertThat(variants.get(2).has("salePriceCents")).isFalse();
+    assertThat(variants.get(3).has("salePriceCents")).isFalse();
+    assertThat(p.get("salePriceCents").asLong()).isEqualTo(89900L);
 
     // Variant Options: color, ram, storage
     JsonNode options = p.get("variantOptions");

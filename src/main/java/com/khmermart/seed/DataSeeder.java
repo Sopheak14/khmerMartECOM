@@ -639,11 +639,12 @@ public class DataSeeder implements CommandLineRunner {
         Timestamp.from(now.minus(1, ChronoUnit.DAYS)),
         Timestamp.from(now.plus(3, ChronoUnit.DAYS)));
 
-    // 4 products in flash sale
-    insertPromotionProduct(1L, 1001L, 89900L); // Laptop Pro 15
-    insertPromotionProduct(1L, 1010L, 91900L); // iPhone 15 Pro
-    insertPromotionProduct(1L, 1015L, 29900L); // Sony WH-1000XM5
-    insertPromotionProduct(1L, 1031L, 990L); // Angkor Jasmine Rice 5kg
+    // 4 products in flash sale (Laptop Pro 15 variants 1 & 2 on sale; variants 3 & 4 not on sale)
+    insertPromotionProduct(1L, 1001L, 1L, 89900L); // Laptop Pro 15 (variant 1)
+    insertPromotionProduct(1L, 1001L, 2L, 89900L); // Laptop Pro 15 (variant 2)
+    insertPromotionProduct(1L, 1010L, 10L, 91900L); // iPhone 15 Pro (variant 10)
+    insertPromotionProduct(1L, 1015L, null, 29900L); // Sony WH-1000XM5 (no variants)
+    insertPromotionProduct(1L, 1031L, 14L, 990L); // Angkor Jasmine Rice 5kg (variant 14)
 
     // 2. SEASONAL: Khmer New Year Mega Sale
     jdbcTemplate.update(
@@ -685,14 +686,19 @@ public class DataSeeder implements CommandLineRunner {
   }
 
   private void insertPromotionProduct(Long promoId, Long prodId, Long salePrice) {
+    insertPromotionProduct(promoId, prodId, null, salePrice);
+  }
+
+  private void insertPromotionProduct(Long promoId, Long prodId, Long variantId, Long salePrice) {
     jdbcTemplate.update(
         """
-        INSERT INTO promotion_products (promotion_id, product_id, sale_price_cents)
-        VALUES (?, ?, ?)
-        ON CONFLICT (promotion_id, product_id) DO UPDATE SET sale_price_cents = EXCLUDED.sale_price_cents
+        INSERT INTO promotion_products (promotion_id, product_id, variant_id, sale_price_cents)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (promotion_id, product_id, variant_id) DO UPDATE SET sale_price_cents = EXCLUDED.sale_price_cents
         """,
         promoId,
         prodId,
+        variantId,
         salePrice);
   }
 
@@ -1866,6 +1872,7 @@ public class DataSeeder implements CommandLineRunner {
           SELECT id, sku, price_cents FROM product_variants WHERE product_id = p.id ORDER BY id ASC LIMIT 1
         ) pv ON true
         LEFT JOIN promotion_products pp ON pp.product_id = p.id AND pp.promotion_id = 1
+          AND (pp.variant_id IS NULL OR pp.variant_id = pv.id)
         """,
         rs -> {
           long pId = rs.getLong("id");
@@ -1878,8 +1885,7 @@ public class DataSeeder implements CommandLineRunner {
           Long flashPrice = rs.getObject("flash_price") != null ? rs.getLong("flash_price") : null;
           catalog.put(
               pId,
-              new SeedProductLookup(
-                  pId, name, sku, priceCents, vId, vSku, vPrice, flashPrice));
+              new SeedProductLookup(pId, name, sku, priceCents, vId, vSku, vPrice, flashPrice));
         });
 
     // Configure standard shipping method and active promotion entities for PricingService
@@ -1943,40 +1949,58 @@ public class DataSeeder implements CommandLineRunner {
       OrderStatus.REFUNDED // 32
     };
 
-    List<List<SeedOrderItemSpec>> orderSpecs = List.of(
-        List.of(new SeedOrderItemSpec(1001L, 1)), // 1: Laptop Pro 15
-        List.of(new SeedOrderItemSpec(1010L, 1)), // 2: iPhone 15 Pro Titanium
-        List.of(new SeedOrderItemSpec(1015L, 1), new SeedOrderItemSpec(1014L, 1)), // 3: Sony Headphones + MagSafe
-        List.of(new SeedOrderItemSpec(1031L, 2), new SeedOrderItemSpec(1033L, 1)), // 4: Angkor Rice 2x + Coffee
-        List.of(new SeedOrderItemSpec(1019L, 2)), // 5: Casual Linen Shirt 2x
-        List.of(new SeedOrderItemSpec(1003L, 1)), // 6: Dell Inspiron 15
-        List.of(new SeedOrderItemSpec(1023L, 1)), // 7: Philips Airfryer
-        List.of(new SeedOrderItemSpec(1028L, 2)), // 8: Anua Heartleaf Toner 2x
-        List.of(new SeedOrderItemSpec(1034L, 3), new SeedOrderItemSpec(1035L, 2)), // 9: Kampot Pepper 3x + Dried Mango 2x
-        List.of(new SeedOrderItemSpec(1011L, 1)), // 10: Samsung Galaxy S24 Ultra
-        List.of(new SeedOrderItemSpec(1020L, 1), new SeedOrderItemSpec(1019L, 1)), // 11: Chino Pants + Linen Shirt
-        List.of(new SeedOrderItemSpec(1022L, 2)), // 12: Floral Chiffon Blouse 2x (BOGO)
-        List.of(new SeedOrderItemSpec(1029L, 1)), // 13: Chanel Chance Eau Tendre
-        List.of(new SeedOrderItemSpec(1013L, 2)), // 14: Anker PowerBank 2x
-        List.of(new SeedOrderItemSpec(1038L, 2), new SeedOrderItemSpec(1039L, 1)), // 15: Atomic Habits 2x + Psychology of Money
-        List.of(new SeedOrderItemSpec(1005L, 1)), // 16: Dell Vostro 14
-        List.of(new SeedOrderItemSpec(1016L, 1)), // 17: JBL Flip 6 Speaker
-        List.of(new SeedOrderItemSpec(1027L, 2)), // 18: COSRX Snail Mucin 2x
-        List.of(new SeedOrderItemSpec(1024L, 1)), // 19: LocknLock Cookware Set
-        List.of(new SeedOrderItemSpec(1008L, 1)), // 20: Asus ZenBook 14
-        List.of(new SeedOrderItemSpec(1021L, 1)), // 21: Silk Wrap Dress
-        List.of(new SeedOrderItemSpec(1033L, 3), new SeedOrderItemSpec(1034L, 2)), // 22: Mondulkiri Coffee 3x + Kampot Pepper 2x
-        List.of(new SeedOrderItemSpec(1012L, 1)), // 23: Xiaomi 14 Pro Leica
-        List.of(new SeedOrderItemSpec(1026L, 1), new SeedOrderItemSpec(1025L, 1)), // 24: Diffuser + Blanket
-        List.of(new SeedOrderItemSpec(1018L, 1)), // 25: DJI Mini 4 Pro Drone
-        List.of(new SeedOrderItemSpec(1028L, 1)), // 26: Anua Heartleaf Toner 250ml (PENDING)
-        List.of(new SeedOrderItemSpec(1036L, 1), new SeedOrderItemSpec(1037L, 1)), // 27: Angkor Empire Book + Tales (PENDING)
-        List.of(new SeedOrderItemSpec(1014L, 1)), // 28: Apple MagSafe Wireless Charger (PENDING)
-        List.of(new SeedOrderItemSpec(1002L, 1)), // 29: Dell Latitude 5520 (CANCELLED)
-        List.of(new SeedOrderItemSpec(1020L, 2)), // 30: Chino Pants 2x (CANCELLED)
-        List.of(new SeedOrderItemSpec(1010L, 1)), // 31: iPhone 15 Pro Titanium (EXPIRED)
-        List.of(new SeedOrderItemSpec(1007L, 1))  // 32: MSI Katana 15 (REFUNDED)
-    );
+    List<List<SeedOrderItemSpec>> orderSpecs =
+        List.of(
+            List.of(new SeedOrderItemSpec(1001L, 1)), // 1: Laptop Pro 15
+            List.of(new SeedOrderItemSpec(1010L, 1)), // 2: iPhone 15 Pro Titanium
+            List.of(
+                new SeedOrderItemSpec(1015L, 1),
+                new SeedOrderItemSpec(1014L, 1)), // 3: Sony Headphones + MagSafe
+            List.of(
+                new SeedOrderItemSpec(1031L, 2),
+                new SeedOrderItemSpec(1033L, 1)), // 4: Angkor Rice 2x + Coffee
+            List.of(new SeedOrderItemSpec(1019L, 2)), // 5: Casual Linen Shirt 2x
+            List.of(new SeedOrderItemSpec(1003L, 1)), // 6: Dell Inspiron 15
+            List.of(new SeedOrderItemSpec(1023L, 1)), // 7: Philips Airfryer
+            List.of(new SeedOrderItemSpec(1028L, 2)), // 8: Anua Heartleaf Toner 2x
+            List.of(
+                new SeedOrderItemSpec(1034L, 3),
+                new SeedOrderItemSpec(1035L, 2)), // 9: Kampot Pepper 3x + Dried Mango 2x
+            List.of(new SeedOrderItemSpec(1011L, 1)), // 10: Samsung Galaxy S24 Ultra
+            List.of(
+                new SeedOrderItemSpec(1020L, 1),
+                new SeedOrderItemSpec(1019L, 1)), // 11: Chino Pants + Linen Shirt
+            List.of(new SeedOrderItemSpec(1022L, 2)), // 12: Floral Chiffon Blouse 2x (BOGO)
+            List.of(new SeedOrderItemSpec(1029L, 1)), // 13: Chanel Chance Eau Tendre
+            List.of(new SeedOrderItemSpec(1013L, 2)), // 14: Anker PowerBank 2x
+            List.of(
+                new SeedOrderItemSpec(1038L, 2),
+                new SeedOrderItemSpec(1039L, 1)), // 15: Atomic Habits 2x + Psychology of Money
+            List.of(new SeedOrderItemSpec(1005L, 1)), // 16: Dell Vostro 14
+            List.of(new SeedOrderItemSpec(1016L, 1)), // 17: JBL Flip 6 Speaker
+            List.of(new SeedOrderItemSpec(1027L, 2)), // 18: COSRX Snail Mucin 2x
+            List.of(new SeedOrderItemSpec(1024L, 1)), // 19: LocknLock Cookware Set
+            List.of(new SeedOrderItemSpec(1008L, 1)), // 20: Asus ZenBook 14
+            List.of(new SeedOrderItemSpec(1021L, 1)), // 21: Silk Wrap Dress
+            List.of(
+                new SeedOrderItemSpec(1033L, 3),
+                new SeedOrderItemSpec(1034L, 2)), // 22: Mondulkiri Coffee 3x + Kampot Pepper 2x
+            List.of(new SeedOrderItemSpec(1012L, 1)), // 23: Xiaomi 14 Pro Leica
+            List.of(
+                new SeedOrderItemSpec(1026L, 1),
+                new SeedOrderItemSpec(1025L, 1)), // 24: Diffuser + Blanket
+            List.of(new SeedOrderItemSpec(1018L, 1)), // 25: DJI Mini 4 Pro Drone
+            List.of(new SeedOrderItemSpec(1028L, 1)), // 26: Anua Heartleaf Toner 250ml (PENDING)
+            List.of(
+                new SeedOrderItemSpec(1036L, 1),
+                new SeedOrderItemSpec(1037L, 1)), // 27: Angkor Empire Book + Tales (PENDING)
+            List.of(
+                new SeedOrderItemSpec(1014L, 1)), // 28: Apple MagSafe Wireless Charger (PENDING)
+            List.of(new SeedOrderItemSpec(1002L, 1)), // 29: Dell Latitude 5520 (CANCELLED)
+            List.of(new SeedOrderItemSpec(1020L, 2)), // 30: Chino Pants 2x (CANCELLED)
+            List.of(new SeedOrderItemSpec(1010L, 1)), // 31: iPhone 15 Pro Titanium (EXPIRED)
+            List.of(new SeedOrderItemSpec(1007L, 1)) // 32: MSI Katana 15 (REFUNDED)
+            );
 
     long orderItemId = 1L;
 
@@ -1986,7 +2010,8 @@ public class DataSeeder implements CommandLineRunner {
       // Realistic date distribution across the last 30 days
       Instant placedAt;
       if (i <= 25) {
-        placedAt = now.minus(28 - (i - 1), ChronoUnit.DAYS).minus((i * 17) % 60, ChronoUnit.MINUTES);
+        placedAt =
+            now.minus(28 - (i - 1), ChronoUnit.DAYS).minus((i * 17) % 60, ChronoUnit.MINUTES);
       } else if (i == 26) {
         placedAt = now.minus(2, ChronoUnit.DAYS).minus(45, ChronoUnit.MINUTES);
       } else if (i == 27) {
@@ -2021,25 +2046,21 @@ public class DataSeeder implements CommandLineRunner {
 
         Long varId = prod.variantId();
         // Use variant SKU if variant exists, or exact product SKU
-        String sku = (prod.variantSku() != null && !prod.variantSku().isBlank())
-            ? prod.variantSku()
-            : prod.sku();
-        long unitPrice = (prod.variantPriceCents() != null && prod.variantPriceCents() > 0)
-            ? prod.variantPriceCents()
-            : prod.priceCents();
+        String sku =
+            (prod.variantSku() != null && !prod.variantSku().isBlank())
+                ? prod.variantSku()
+                : prod.sku();
+        long unitPrice =
+            (prod.variantPriceCents() != null && prod.variantPriceCents() > 0)
+                ? prod.variantPriceCents()
+                : prod.priceCents();
         Long flashPrice = prod.flashSalePriceCents();
         boolean isBogo = (prod.productId() == 1022L);
         Integer seasonal = (prod.productId() == 1002L || prod.productId() == 1003L) ? 20 : null;
 
         pricingItems.add(
             new PricingItem(
-                prod.productId(),
-                varId,
-                unitPrice,
-                spec.quantity(),
-                flashPrice,
-                isBogo,
-                seasonal));
+                prod.productId(), varId, unitPrice, spec.quantity(), flashPrice, isBogo, seasonal));
 
         itemsToInsert.add(
             new OrderItemToInsert(
@@ -2062,7 +2083,8 @@ public class DataSeeder implements CommandLineRunner {
         coupon.setActive(true);
       }
 
-      PricingResult pricing = pricingService.calculate(pricingItems, promotions, coupon, standardShipping);
+      PricingResult pricing =
+          pricingService.calculate(pricingItems, promotions, coupon, standardShipping);
 
       long subtotalCents = pricing.subtotalCents();
       long discountCents = pricing.discountCents();
@@ -2275,6 +2297,7 @@ public class DataSeeder implements CommandLineRunner {
       "tracking_events",
       "reviews",
       "promotions",
+      "promotion_products",
       "coupons"
     };
 

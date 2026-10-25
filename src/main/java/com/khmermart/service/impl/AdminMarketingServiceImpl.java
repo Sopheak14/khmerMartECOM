@@ -355,6 +355,7 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
     List<Long> productIds =
         promotionProductRepository.findByPromotionId(p.getId()).stream()
             .map(PromotionProduct::getProductId)
+            .distinct()
             .toList();
 
     return new AdminPromotionDto(
