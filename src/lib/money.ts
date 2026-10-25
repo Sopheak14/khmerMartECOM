@@ -1,3 +1,11 @@
+/**
+ * Convert standard dollars to cents (rounded integer)
+ */
+export function toCents(dollars: number): number {
+  if (isNaN(dollars)) return 0;
+  return Math.round(dollars * 100);
+}
+
 // Currency & Money formatting utilities for KhmerMart
 
 export const DEFAULT_KHR_RATE = 4100;

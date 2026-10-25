@@ -58,10 +58,13 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
   // Find matching variant based on currently selected attributes
   const activeVariant: VariantDTO | undefined = useMemo(() => {
     if (!product.variants || product.variants.length === 0) return undefined;
+    if (requiredAttrKeys.length > 0 && !requiredAttrKeys.every((k) => selectedAttributes[k])) {
+      return undefined;
+    }
     return product.variants.find((v) =>
       Object.entries(selectedAttributes).every(([k, val]) => v.attributes[k] === val)
     );
-  }, [product.variants, selectedAttributes]);
+  }, [product.variants, selectedAttributes, requiredAttrKeys]);
 
   // Determine if currently selected variant (or base product) is actively on flash sale
   const isVariantOnSale = useMemo(() => {

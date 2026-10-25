@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { ImageDTO } from '@/types/api';
+import { getImageUrl } from '@/lib/images';
 
 interface ProductGalleryProps {
   images: ImageDTO[];
@@ -22,7 +23,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
       {/* Main Image */}
       <div className="relative aspect-square w-full rounded-card overflow-hidden bg-muted/20 border border-border shadow-xs">
         <Image
-          src={currentImage.url}
+          src={getImageUrl(currentImage.url)}
           alt={productName}
           fill
           priority
@@ -47,7 +48,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
               }`}
             >
               <Image
-                src={img.url}
+                src={getImageUrl(img.url)}
                 alt={`${productName} thumbnail ${idx + 1}`}
                 fill
                 sizes="80px"

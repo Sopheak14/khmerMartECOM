@@ -54,3 +54,26 @@
   ```
   `item.flashSalePriceCents()` is populated from `product.getSalePriceCents()` (89900), assuming base price $999.00 ($100 discount). But for $1,299.00 variants, this calculates `129900 - 89900 = 40000` ($400 discount), effectively charging the base sale price $899.00.
 - **Frontend Action Taken:** Frontend strictly preserves backend integrity without modifying `../back_end`. The product detail page reflects the true price charged by the cart ($899.00) and displays the variant regular price ($1,299.00) struck out as the "was" price.
+
+## 4. Admin Promotion Request Support for Per-Variant Flash Sales
+- **Observation:** `AdminPromotionRequest.java` currently only accepts `List<Long> productIds`:
+  ```java
+  public record AdminPromotionRequest(
+      @NotBlank(message = "Promotion name is required") String name,
+      String nameKm,
+      @NotNull(message = "Promotion type is required") PromotionType type,
+      Integer discountPercent,
+      Long thresholdCents,
+      @NotNull(message = "startsAt is required") Instant startsAt,
+      @NotNull(message = "endsAt is required") Instant endsAt,
+      Boolean active,
+      List<Long> productIds) {}
+  ```
+  The entity `PromotionProduct` has a `variantId` column, but `AdminMarketingServiceImpl` assigns `variantId: null` because `AdminPromotionRequest` cannot accept variant IDs or per-variant sale prices.
+- **Request:** Update `AdminPromotionRequest` to accept structured product/variant mappings:
+  ```java
+  public record PromotionItemRequest(Long productId, Long variantId, Long salePriceCents) {}
+  ```
+  allowing `List<PromotionItemRequest> items` so the admin can specify individual variants and their promotional prices.
+- **Frontend Action Taken:** As per instruction, the UI was built with a product picker for all products, ready to bind variant IDs once the backend DTO is updated.
+

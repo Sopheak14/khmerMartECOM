@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Image from 'next/image';
+import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShoppingBag, X, Plus, Minus, Trash2, ArrowRight } from 'lucide-react';
@@ -146,7 +147,7 @@ export function CartDrawer() {
                   <div className="relative w-16 h-16 rounded-md overflow-hidden bg-muted/20 shrink-0">
                     {item.imageUrl ? (
                       <Image
-                        src={item.imageUrl}
+                        src={getImageUrl(item.imageUrl)}
                         alt={name}
                         fill
                         className="object-cover"

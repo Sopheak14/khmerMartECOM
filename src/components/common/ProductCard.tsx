@@ -8,6 +8,7 @@ import { Price } from '@/components/common/Price';
 import { ProductCardDTO } from '@/types/api';
 import { Star } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { getImageUrl } from '@/lib/images';
 
 export interface ProductCardProps {
   product: ProductCardDTO;
@@ -56,7 +57,7 @@ export function ProductCard({ product, khrRate = 4100, locale = 'en' }: ProductC
         <Link href={`/products/${product.slug}`} className="block relative aspect-square w-full rounded-btn overflow-hidden bg-muted/10 group-hover:opacity-95 transition-opacity">
           {product.imageUrl ? (
             <Image
-              src={product.imageUrl}
+              src={getImageUrl(product.imageUrl)}
               alt={name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

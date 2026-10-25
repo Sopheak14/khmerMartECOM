@@ -323,6 +323,9 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     for (const route of routes) {
       const consoleErrors: string[] = [];
       const pageErrors: string[] = [];
+      const pageErrorListener = (err: Error) => {
+        pageErrors.push(err.message);
+      };
 
       const consoleListener = (msg: any) => {
         // Chromium logs expected unauthenticated silent refresh network 401s as a resource warning
@@ -331,10 +334,6 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
           consoleErrors.push(msg.text());
         }
       };
-      const pageErrorListener = (err: Error) => {
-        pageErrors.push(err.message);
-      };
-
       page.on('console', consoleListener);
       page.on('pageerror', pageErrorListener);
 

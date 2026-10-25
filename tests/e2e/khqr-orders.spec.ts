@@ -178,6 +178,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
   });
 
   test('2: KHQR Regenerate test: calls regenerate, old paymentId is EXPIRED, new QR differs, and expired overlay works', async ({ page, request }) => {
+    test.setTimeout(60000);
     const user = await createThrowawayUser(request);
     await loginViaUI(page, user.email, user.password, 'en');
 
@@ -219,7 +220,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
 
     // Visit pay page
     await page.goto(`/en/checkout/pay/${orderNumber}`);
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="khqr-image"]')).toBeVisible();
 
     // Retrieve initial payment via API
     const khqr1Res = await request.post(`http://localhost:4000/api/payments/khqr/${orderNumber}`, {

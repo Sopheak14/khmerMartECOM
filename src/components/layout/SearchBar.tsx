@@ -7,6 +7,7 @@ import { Search, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { formatUsd } from '@/lib/money';
 import Image from 'next/image';
+import { getImageUrl } from '@/lib/images';
 
 interface SuggestItem {
   type: 'category' | 'product';
@@ -231,7 +232,7 @@ export function SearchBar() {
                       <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0 bg-muted/20">
                         {p.imageUrl ? (
                           <Image
-                            src={p.imageUrl}
+                            src={getImageUrl(p.imageUrl)}
                             alt={displayName}
                             fill
                             className="object-cover"

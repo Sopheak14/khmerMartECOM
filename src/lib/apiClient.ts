@@ -205,3 +205,24 @@ async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
     facets: (envelope as any).facets,
   };
 }
+
+apiClient.get = function <T>(path: string, options?: Omit<RequestOptions, "method">): Promise<ApiResponse<T>> {
+  return apiClient<T>(path, { ...options, method: "GET" });
+};
+
+apiClient.post = function <T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
+  return apiClient<T>(path, { ...options, method: "POST", body });
+};
+
+apiClient.put = function <T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
+  return apiClient<T>(path, { ...options, method: "PUT", body });
+};
+
+apiClient.patch = function <T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
+  return apiClient<T>(path, { ...options, method: "PATCH", body });
+};
+
+apiClient.delete = function <T>(path: string, options?: Omit<RequestOptions, "method">): Promise<ApiResponse<T>> {
+  return apiClient<T>(path, { ...options, method: "DELETE" });
+};
+

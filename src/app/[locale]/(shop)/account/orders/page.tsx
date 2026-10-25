@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@/navigation';
@@ -218,7 +219,7 @@ export default function AccountOrdersPage() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="relative w-10 h-10 rounded bg-muted/10 overflow-hidden shrink-0 border border-border">
                             {item.imageUrl ? (
-                              <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
+                              <Image src={getImageUrl(item.imageUrl)} alt={item.name} fill className="object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-[10px] text-muted">
                                 Item

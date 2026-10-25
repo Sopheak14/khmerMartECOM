@@ -48,6 +48,7 @@ export interface PaginationMeta {
   limit: number;
   total: number;
   totalPages: number;
+  totalElements?: number;
 }
 
 export interface ApiErrorResponse {
@@ -97,12 +98,15 @@ export interface CategoryDTO {
   parentId?: number | null;
   children?: CategoryDTO[];
   productCount: number;
+  sortOrder?: number;
 }
 
 export interface ImageDTO {
   id: number;
   url: string;
   sortOrder: number;
+  productId?: number;
+  isPrimary?: boolean;
 }
 
 export interface VariantDTO {
@@ -112,6 +116,7 @@ export interface VariantDTO {
   priceCents: number;
   available: number;
   salePriceCents?: number;
+  stockOnHand?: number;
 }
 
 export interface ProductCardDTO {
@@ -130,10 +135,13 @@ export interface ProductCardDTO {
   available: number;
   inStock: boolean;
   badges: string[];
+  active?: boolean;
 }
 
 export interface ProductDetailDTO extends ProductCardDTO {
   description: string;
+  descriptionKm?: string | null;
+  categoryId?: number;
   category: CategoryDTO;
   images: ImageDTO[];
   variants: VariantDTO[];
@@ -147,6 +155,7 @@ export interface ProductDetailDTO extends ProductCardDTO {
   };
   flashSaleEndsAt?: string;
   related: ProductCardDTO[];
+  active?: boolean;
 }
 
 export type CartItemIssue = 'OUT_OF_STOCK' | 'PRICE_CHANGED' | 'QTY_REDUCED';
@@ -488,4 +497,165 @@ export interface ReconciliationReportDTO {
   mismatchCount: number;
   mismatches: ReconciliationMismatchDTO[];
   generatedAt: string;
+}
+
+export interface AdminVariantRequest {
+  sku?: string;
+  attributes?: Record<string, string>;
+  priceCents?: number;
+  stock?: number;
+}
+
+export interface AdminProductCreateRequest {
+  name: string;
+  nameKm?: string;
+  sku?: string;
+  slug?: string;
+  description?: string;
+  brand?: string;
+  priceCents: number;
+  compareAtCents?: number;
+  categoryId?: number;
+  active?: boolean;
+  initialStock?: number;
+  variants?: AdminVariantRequest[];
+}
+
+export interface AdminProductUpdateRequest {
+  name?: string;
+  nameKm?: string;
+  sku?: string;
+  slug?: string;
+  description?: string;
+  brand?: string;
+  priceCents?: number;
+  compareAtCents?: number;
+  categoryId?: number;
+  active?: boolean;
+  variants?: AdminVariantRequest[];
+}
+
+export interface ProductImageDTO {
+  id: number;
+  productId?: number;
+  url: string;
+  sortOrder: number;
+  isPrimary?: boolean;
+  createdAt?: string;
+}
+
+export interface CsvRowError {
+  row: number;
+  message: string;
+}
+
+export interface CsvImportResultDTO {
+  imported: number;
+  errors: CsvRowError[];
+}
+
+export interface CategoryRequest {
+  name: string;
+  nameKm?: string;
+  slug?: string;
+  parentId?: number | null;
+  imageUrl?: string;
+  sortOrder?: number;
+}
+
+export interface AdminCouponDTO {
+  id: number;
+  code: string;
+  type: CouponType;
+  value: number;
+  description?: string;
+  minOrderCents?: number;
+  maxDiscountCents?: number;
+  maxUses?: number;
+  usedCount: number;
+  startsAt?: string;
+  endsAt?: string;
+  active: boolean;
+}
+
+export interface AdminCouponRequest {
+  code: string;
+  type: CouponType;
+  value: number;
+  description?: string;
+  minOrderCents?: number;
+  maxDiscountCents?: number;
+  maxUses?: number;
+  startsAt?: string;
+  endsAt?: string;
+  active?: boolean;
+}
+
+export interface AdminPromotionDTO {
+  id: number;
+  name: string;
+  nameKm?: string;
+  type: PromotionType;
+  discountPercent?: number;
+  thresholdCents?: number;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  productIds?: number[];
+}
+
+export interface AdminPromotionRequest {
+  name: string;
+  nameKm?: string;
+  type: PromotionType;
+  discountPercent?: number;
+  thresholdCents?: number;
+  startsAt: string;
+  endsAt: string;
+  active?: boolean;
+  productIds?: number[];
+}
+
+export interface AdminReviewUpdateRequest {
+  status: ReviewStatus;
+  adminReply?: string;
+}
+
+export interface AdminUserUpdateRequest {
+  role?: string;
+  isActive?: boolean;
+}
+
+export interface SalesGroupDTO {
+  groupKey: string;
+  ordersCount: number;
+  unitsSold: number;
+  revenueCents: number;
+  revenueUsd: string;
+}
+
+export interface AdminSettingsDTO {
+  storeName: string;
+  khrRate: number;
+  khqrMode: string;
+  shippingMethods: ShippingMethodDTO[];
+}
+
+export interface AdminSettingsUpdateRequest {
+  storeName?: string;
+  khrRate?: number;
+  khqrMode?: string;
+  shippingMethods?: ShippingMethodDTO[];
+}
+
+export interface AuditLogDTO {
+  id: number;
+  actorId?: number;
+  action: string;
+  entity: string;
+  entityId?: string;
+  beforeJson?: any;
+  afterJson?: any;
+  ip?: string;
+  createdAt: string;
 }
