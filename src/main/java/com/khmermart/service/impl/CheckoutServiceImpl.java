@@ -40,6 +40,7 @@ import com.khmermart.model.response.CheckoutResponseDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
+import com.khmermart.model.response.PromotionDiscountDto;
 import com.khmermart.model.response.ShippingMethodDto;
 import com.khmermart.repository.AddressRepository;
 import com.khmermart.repository.AppUserRepository;
@@ -73,6 +74,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -664,6 +666,36 @@ public class CheckoutServiceImpl implements CheckoutService {
       addressJson = "{}";
     }
 
+    String discountBreakdownJson = null;
+    try {
+      List<Map<String, Object>> promoList = new ArrayList<>();
+      if (pricing.promotionDiscounts() != null) {
+        for (PromotionDiscountDto p : pricing.promotionDiscounts()) {
+          promoList.add(Map.of("label", p.label(), "amountCents", p.amountCents()));
+        }
+      }
+      long promoSum =
+          pricing.promotionDiscounts() != null
+              ? pricing.promotionDiscounts().stream()
+                  .mapToLong(PromotionDiscountDto::amountCents)
+                  .sum()
+              : 0L;
+      long couponAmountCents = Math.max(0L, pricing.discountCents() - promoSum);
+
+      Map<String, Object> couponMap = null;
+      if (coupon != null && couponAmountCents > 0) {
+        couponMap = Map.of("code", coupon.getCode(), "amountCents", couponAmountCents);
+      }
+
+      Map<String, Object> breakdown = new HashMap<>();
+      breakdown.put("promotions", promoList);
+      if (couponMap != null) {
+        breakdown.put("coupon", couponMap);
+      }
+      discountBreakdownJson = objectMapper.writeValueAsString(breakdown);
+    } catch (Exception ignored) {
+    }
+
     Order order =
         Order.builder()
             .orderNumber(orderNumber)
@@ -677,6 +709,7 @@ public class CheckoutServiceImpl implements CheckoutService {
             .totalCents(pricing.totalCents())
             .currency("USD")
             .couponCode(coupon != null ? coupon.getCode() : null)
+            .discountBreakdown(discountBreakdownJson)
             .shippingAddress(addressJson)
             .shippingMethodCode(shippingMethod.getCode())
             .notes(request.notes())

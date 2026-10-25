@@ -61,6 +61,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
@@ -209,7 +210,6 @@ public class OrderServiceImpl implements OrderService {
     order.setStatus(OrderStatus.CANCELLED);
     order.setCancelledAt(now);
     order.setCancelReason(reason != null ? reason : "Cancelled by customer");
-    order = orderRepository.save(order);
 
     OrderStatusHistory history =
         OrderStatusHistory.builder()
@@ -222,79 +222,8 @@ public class OrderServiceImpl implements OrderService {
             .build();
     orderStatusHistoryRepository.save(history);
 
-    // Release stock
-    List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
-    for (OrderItem item : items) {
-      Inventory inv =
-          item.getVariantId() != null
-              ? inventoryRepository
-                  .findByProductIdAndVariantId(item.getProductId(), item.getVariantId())
-                  .orElse(null)
-              : inventoryRepository
-                  .findByProductIdAndVariantIdIsNull(item.getProductId())
-                  .orElse(null);
-
-      if (inv != null) {
-        InventoryMovementType movementType;
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-          inv.setQuantityOnHand(inv.getQuantityOnHand() + item.getQuantity());
-          movementType = InventoryMovementType.RETURN;
-        } else {
-          inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
-          movementType = InventoryMovementType.RELEASE;
-        }
-        inventoryRepository.save(inv);
-
-        InventoryMovement movement =
-            InventoryMovement.builder()
-                .inventoryId(inv.getId())
-                .type(movementType)
-                .quantity(item.getQuantity())
-                .reason("Order cancelled: " + order.getOrderNumber())
-                .actorId(userId)
-                .refOrderId(order.getId())
-                .createdAt(now)
-                .build();
-        movementRepository.save(movement);
-      }
-    }
-
-    // Release coupon
-    if (order.getCouponCode() != null) {
-      couponRedemptionRepository
-          .findByOrderId(order.getId())
-          .ifPresent(
-              r -> {
-                r.setStatus(CouponRedemptionStatus.RELEASED);
-                couponRedemptionRepository.save(r);
-              });
-
-      couponRepository
-          .findByCode(order.getCouponCode())
-          .ifPresent(
-              c -> {
-                c.setUsedCount(Math.max(0, c.getUsedCount() - 1));
-                couponRepository.save(c);
-              });
-    }
-
-    // If paid, create manual refund record
-    if (order.getPaymentStatus() == PaymentStatus.PAID) {
-      Payment payment =
-          paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
-      if (payment != null) {
-        Refund refund =
-            Refund.builder()
-                .paymentId(payment.getId())
-                .amountCents(payment.getAmountCents())
-                .reason(reason != null ? reason : "Order cancelled")
-                .status("PENDING")
-                .actorId(userId)
-                .createdAt(now)
-                .build();
-        refundRepository.save(refund);
-      }
-    }
+    handleOrderCancellation(order, fromStatus, reason, userId, now);
+    order = orderRepository.save(order);
 
     AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
     eventPublisher.publishEvent(
@@ -543,6 +472,7 @@ public class OrderServiceImpl implements OrderService {
     } else if (newStatus == OrderStatus.CANCELLED) {
       order.setCancelledAt(now);
       order.setCancelReason(note);
+      handleOrderCancellation(order, fromStatus, note, actorId, now);
     }
     order = orderRepository.save(order);
 
@@ -558,6 +488,103 @@ public class OrderServiceImpl implements OrderService {
     orderStatusHistoryRepository.save(history);
 
     return toDto(order);
+  }
+
+  private void handleOrderCancellation(
+      Order order, OrderStatus fromStatus, String reason, Long actorId, Instant now) {
+    // Release stock
+    List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+    for (OrderItem item : items) {
+      Inventory inv =
+          item.getVariantId() != null
+              ? inventoryRepository
+                  .findByProductIdAndVariantId(item.getProductId(), item.getVariantId())
+                  .orElse(null)
+              : inventoryRepository
+                  .findByProductIdAndVariantIdIsNull(item.getProductId())
+                  .orElse(null);
+
+      if (inv != null) {
+        InventoryMovementType movementType;
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+          inv.setQuantityOnHand(inv.getQuantityOnHand() + item.getQuantity());
+          movementType = InventoryMovementType.RETURN;
+        } else {
+          inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
+          movementType = InventoryMovementType.RELEASE;
+        }
+        inventoryRepository.save(inv);
+
+        InventoryMovement movement =
+            InventoryMovement.builder()
+                .inventoryId(inv.getId())
+                .type(movementType)
+                .quantity(item.getQuantity())
+                .reason("Order cancelled: " + order.getOrderNumber())
+                .actorId(actorId)
+                .refOrderId(order.getId())
+                .createdAt(now)
+                .build();
+        movementRepository.save(movement);
+      }
+    }
+
+    // Release coupon
+    if (order.getCouponCode() != null) {
+      couponRedemptionRepository
+          .findByOrderId(order.getId())
+          .ifPresent(
+              r -> {
+                r.setStatus(CouponRedemptionStatus.RELEASED);
+                couponRedemptionRepository.save(r);
+              });
+
+      couponRepository
+          .findByCode(order.getCouponCode())
+          .ifPresent(
+              c -> {
+                c.setUsedCount(Math.max(0, c.getUsedCount() - 1));
+                couponRepository.save(c);
+              });
+    }
+
+    // If paid, create completed refund record and update payment & order status to REFUNDED
+    if (order.getPaymentStatus() == PaymentStatus.PAID) {
+      Payment payment =
+          paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+      if (payment != null) {
+        Refund refund =
+            Refund.builder()
+                .paymentId(payment.getId())
+                .amountCents(payment.getAmountCents())
+                .reason(reason != null ? reason : "Order cancelled")
+                .status("COMPLETED")
+                .reference("REFUND-" + UUID.randomUUID().toString().substring(0, 8))
+                .actorId(actorId)
+                .createdAt(now)
+                .build();
+        refundRepository.save(refund);
+
+        payment.setStatus(PaymentStatus.REFUNDED);
+        paymentRepository.save(payment);
+
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+
+        OrderStatusHistory refundHistory =
+            OrderStatusHistory.builder()
+                .orderId(order.getId())
+                .fromStatus(OrderStatus.CANCELLED.name())
+                .toStatus(OrderStatus.CANCELLED.name())
+                .note(
+                    "Payment refunded: $"
+                        + String.format(Locale.US, "%.2f", payment.getAmountCents() / 100.0)
+                        + (reason != null ? " (" + reason + ")" : ""))
+                .actorId(actorId)
+                .createdAt(now)
+                .build();
+        orderStatusHistoryRepository.save(refundHistory);
+      }
+    }
   }
 
   @Override

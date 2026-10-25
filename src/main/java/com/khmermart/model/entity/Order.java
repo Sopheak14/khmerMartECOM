@@ -74,6 +74,10 @@ public class Order {
   private String couponCode;
 
   @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "discount_breakdown", columnDefinition = "jsonb")
+  private String discountBreakdown;
+
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "shipping_address", columnDefinition = "jsonb", nullable = false)
   private String shippingAddress;
 

@@ -15,6 +15,7 @@ import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
+import com.khmermart.model.entity.OrderStatusHistory;
 import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.Refund;
@@ -30,6 +31,7 @@ import com.khmermart.repository.InventoryMovementRepository;
 import com.khmermart.repository.InventoryRepository;
 import com.khmermart.repository.OrderItemRepository;
 import com.khmermart.repository.OrderRepository;
+import com.khmermart.repository.OrderStatusHistoryRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.repository.RefundRepository;
@@ -54,6 +56,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private OrderRepository orderRepository;
   @Autowired private OrderItemRepository orderItemRepository;
+  @Autowired private OrderStatusHistoryRepository orderStatusHistoryRepository;
   @Autowired private PaymentRepository paymentRepository;
   @Autowired private InventoryRepository inventoryRepository;
   @Autowired private InventoryMovementRepository movementRepository;
@@ -426,7 +429,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "Cancelling a PAID order: returns stock via movement RETURN (quantity_on_hand + 1), creates PENDING Refund, and admin refund marks payment REFUNDED")
+      "Cancelling a PAID order: returns stock via movement RETURN (quantity_on_hand + 1), creates COMPLETED Refund, marks payment and order REFUNDED, and logs timeline note")
   void testCancelPaidOrderFlow() throws Exception {
     Product product =
         productRepository.save(
@@ -496,7 +499,8 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Customer changed mind\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+        .andExpect(jsonPath("$.data.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.data.paymentStatus").value("REFUNDED"));
 
     // Verify inventory: quantity_on_hand incremented by 1 (10 -> 11), quantity_reserved remains 0
     Inventory updatedInv = inventoryRepository.findById(inv.getId()).orElseThrow();
@@ -508,29 +512,26 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
     assertThat(movements)
         .anyMatch(m -> m.getType() == InventoryMovementType.RETURN && m.getQuantity() == 1);
 
-    // Verify Refund record created with status PENDING
+    // Verify Refund record created with status COMPLETED
     List<Refund> refunds = refundRepository.findByPaymentId(payment.getId());
     assertThat(refunds).hasSize(1);
     Refund refund = refunds.get(0);
-    assertThat(refund.getStatus()).isEqualTo("PENDING");
+    assertThat(refund.getStatus()).isEqualTo("COMPLETED");
     assertThat(refund.getAmountCents()).isEqualTo(5000L);
     assertThat(refund.getReason()).contains("Customer changed mind");
-
-    // Admin processes refund
-    mockMvc
-        .perform(
-            post("/api/admin/payments/{id}/refund", payment.getId())
-                .header("Authorization", adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"amountCents\":5000,\"reason\":\"Customer changed mind\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("REFUNDED"));
 
     Payment refundedPayment = paymentRepository.findById(payment.getId()).orElseThrow();
     assertThat(refundedPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
 
-    Refund completedRefund = refundRepository.findById(refund.getId()).orElseThrow();
-    assertThat(completedRefund.getStatus()).isIn("COMPLETED", "DONE");
+    Order updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
+    assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    assertThat(updatedOrder.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+
+    // Verify timeline note in order history
+    List<OrderStatusHistory> histories =
+        orderStatusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
+    assertThat(histories)
+        .anyMatch(h -> h.getNote() != null && h.getNote().contains("Payment refunded"));
   }
 
   @Test

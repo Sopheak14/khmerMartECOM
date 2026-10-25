@@ -8,6 +8,7 @@ import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.model.enumerate.Roles;
+import com.khmermart.model.response.PromotionDiscountDto;
 import com.khmermart.repository.AppUserRepository;
 import com.khmermart.service.PricingItem;
 import com.khmermart.service.PricingResult;
@@ -43,6 +44,7 @@ public class DataSeeder implements CommandLineRunner {
   private final JdbcTemplate jdbcTemplate;
   private final com.khmermart.service.ReviewService reviewService;
   private final PricingService pricingService;
+  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
   @Value("${app.seed.reset:false}")
   private boolean seedReset;
@@ -2091,15 +2093,47 @@ public class DataSeeder implements CommandLineRunner {
       long shippingCents = pricing.shippingCents();
       long totalCents = pricing.totalCents();
 
+      String discountBreakdownJson = null;
+      if (discountCents > 0) {
+        try {
+          List<Map<String, Object>> promoList = new ArrayList<>();
+          if (pricing.promotionDiscounts() != null) {
+            for (PromotionDiscountDto p : pricing.promotionDiscounts()) {
+              promoList.add(Map.of("label", p.label(), "amountCents", p.amountCents()));
+            }
+          }
+          long promoSum =
+              pricing.promotionDiscounts() != null
+                  ? pricing.promotionDiscounts().stream()
+                      .mapToLong(PromotionDiscountDto::amountCents)
+                      .sum()
+                  : 0L;
+          long couponAmountCents = Math.max(0L, discountCents - promoSum);
+
+          Map<String, Object> couponMap = null;
+          if (coupon != null && couponAmountCents > 0) {
+            couponMap = Map.of("code", coupon.getCode(), "amountCents", couponAmountCents);
+          }
+
+          Map<String, Object> breakdown = new HashMap<>();
+          breakdown.put("promotions", promoList);
+          if (couponMap != null) {
+            breakdown.put("coupon", couponMap);
+          }
+          discountBreakdownJson = objectMapper.writeValueAsString(breakdown);
+        } catch (Exception ignored) {
+        }
+      }
+
       // 1. Insert order
       jdbcTemplate.update(
           """
           INSERT INTO orders (id, order_number, user_id, status, payment_status, payment_method,
                               subtotal_cents, discount_cents, shipping_cents, total_cents,
-                              currency, shipping_address, shipping_method_code, placed_at, confirmed_at, shipped_at, delivered_at)
+                              currency, shipping_address, shipping_method_code, placed_at, confirmed_at, shipped_at, delivered_at, discount_breakdown)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD',
                   '{"recipientName": "Demo Customer", "phone": "+85512345678", "line1": "Street 2004", "province": "Phnom Penh"}'::jsonb,
-                  'STANDARD', ?, ?, ?, ?)
+                  'STANDARD', ?, ?, ?, ?, ?::jsonb)
           ON CONFLICT (id) DO NOTHING
           """,
           (long) i,
@@ -2123,7 +2157,8 @@ public class DataSeeder implements CommandLineRunner {
               : null,
           (status == OrderStatus.DELIVERED)
               ? Timestamp.from(placedAt.plus(2, ChronoUnit.DAYS))
-              : null);
+              : null,
+          discountBreakdownJson);
 
       // 2. Insert order items
       for (OrderItemToInsert it : itemsToInsert) {
