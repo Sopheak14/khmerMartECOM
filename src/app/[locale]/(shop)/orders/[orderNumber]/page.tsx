@@ -28,12 +28,15 @@ import {
   AlertCircle,
   FileText,
   Calendar,
+  Star,
 } from 'lucide-react';
+import { ReviewDialog } from '@/components/product/ReviewDialog';
 import { toast } from 'sonner';
 
 export default function OrderDetailPage() {
   const t = useTranslations('orders');
   const common = useTranslations('common');
+  const reviewsT = useTranslations('reviews');
   const locale = useLocale();
   const router = useRouter();
   const params = useParams();
@@ -45,6 +48,8 @@ export default function OrderDetailPage() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [reviewItem, setReviewItem] = useState<{ productId: number; productName: string } | null>(null);
+  const [reviewedProductIds, setReviewedProductIds] = useState<Set<number>>(new Set());
 
   const {
     data: order,
@@ -314,13 +319,41 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <span className="font-bold text-foreground text-sm">
-                    {formatUsd(item.lineTotalCents)}
-                  </span>
-                  <span className="block text-[11px] text-muted">
-                    {formatKhr(item.lineTotalCents)}
-                  </span>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="text-right">
+                    <span className="font-bold text-foreground text-sm">
+                      {formatUsd(item.lineTotalCents)}
+                    </span>
+                    <span className="block text-[11px] text-muted">
+                      {formatKhr(item.lineTotalCents)}
+                    </span>
+                  </div>
+
+                  {(item.canReview || (order.status === 'DELIVERED' && order.canReview)) &&
+                  !reviewedProductIds.has(item.productId) ? (
+                    <button
+                      type="button"
+                      data-testid={`write-review-btn-${item.productId}`}
+                      onClick={() =>
+                        setReviewItem({
+                          productId: item.productId,
+                          productName: item.name,
+                        })
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-primary/20" />
+                      <span>{reviewsT('writeReview')}</span>
+                    </button>
+                  ) : reviewedProductIds.has(item.productId) ? (
+                    <span
+                      data-testid={`reviewed-btn-${item.productId}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-semibold bg-green-500/10 text-green-700 dark:text-green-400"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{reviewsT('reviewed')}</span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -476,15 +509,17 @@ export default function OrderDetailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Track Shipment Button (link only, Phase 6 page) */}
-            <Link
-              href={`/tracking/${order.trackingNumber || orderNumber}`}
-              data-testid="track-shipment-btn"
-              className="px-4 py-2.5 rounded-btn border border-border bg-surface hover:bg-muted/10 font-bold text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              <span>{t('trackShipment')}</span>
-            </Link>
+            {/* Track Shipment Button (links to /track/[trackingNumber] when order has trackingNumber) */}
+            {order.trackingNumber && (
+              <Link
+                href={`/track/${order.trackingNumber}`}
+                data-testid="track-shipment-btn"
+                className="px-4 py-2.5 rounded-btn border border-border bg-surface hover:bg-muted/10 font-bold text-xs text-foreground transition-colors flex items-center gap-1.5"
+              >
+                <Navigation className="w-3.5 h-3.5 text-primary" />
+                <span>{t('trackShipment')}</span>
+              </Link>
+            )}
 
             {/* Download Invoice Button */}
             <button
@@ -567,6 +602,22 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Review Dialog */}
+      {reviewItem && (
+        <ReviewDialog
+          isOpen={Boolean(reviewItem)}
+          productId={reviewItem.productId}
+          productName={reviewItem.productName}
+          onClose={() => setReviewItem(null)}
+          onSuccess={(newReview) => {
+            setReviewedProductIds((prev) => new Set(prev).add(reviewItem.productId));
+            refetch();
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.products.reviews(reviewItem.productId),
+            });
+          }}
+        />
       )}
     </div>
   );

@@ -166,7 +166,8 @@
     "saving": "Saving...",
     "currentPassword": "Current Password",
     "changePassword": "Change Password",
-    "passwordRequirements": "Must be at least 8 characters with letters and numbers"
+    "passwordRequirements": "Must be at least 8 characters with letters and numbers",
+    "notificationsTab": "Notifications"
   },
   "address": {
     "title": "Saved Addresses",
@@ -499,5 +500,86 @@
       "PAYMENT_EXPIRED": "Payment Expired",
       "REFUNDED": "Refunded"
     }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unreadCount": "Unread ({count})",
+    "markAllAsRead": "Mark all as read",
+    "allCaughtUp": "You're all caught up",
+    "noNotifications": "No notifications yet",
+    "viewAll": "View all",
+    "justNow": "just now",
+    "minutesAgo": "{count} minutes ago",
+    "hoursAgo": "{count} hours ago",
+    "daysAgo": "{count} days ago",
+    "ORDER_PLACED_title": "Order Placed",
+    "ORDER_PLACED_body": "Your order has been placed successfully.",
+    "ORDER_PAID_title": "Payment Received",
+    "ORDER_PAID_body": "Payment for order was confirmed.",
+    "ORDER_SHIPPED_title": "Order Shipped",
+    "ORDER_SHIPPED_body": "Your order has been shipped.",
+    "ORDER_DELIVERED_title": "Order Delivered",
+    "ORDER_DELIVERED_body": "Your order has been delivered.",
+    "ORDER_CANCELLED_title": "Order Cancelled",
+    "ORDER_CANCELLED_body": "Your order has been cancelled.",
+    "INVENTORY_LOW_title": "Low Stock Alert",
+    "INVENTORY_LOW_body": "Item is running low on stock."
+  },
+  "track": {
+    "title": "Track Shipment",
+    "subtitle": "Enter your tracking number to see the current shipment status",
+    "placeholder": "e.g. KMTRK12345678",
+    "trackButton": "Track",
+    "trackingNumber": "Tracking Number",
+    "carrier": "Carrier",
+    "currentStatus": "Current Status",
+    "estimatedDelivery": "Estimated Delivery",
+    "timeline": "Tracking History",
+    "notFoundTitle": "Tracking number not found",
+    "notFoundDesc": "We couldn't find any shipment matching this tracking number. Please verify your tracking number and try again.",
+    "backToTrack": "Track another package",
+    "status": {
+      "PREPARING": "Preparing",
+      "DISPATCHED": "Dispatched",
+      "IN_TRANSIT": "In Transit",
+      "OUT_FOR_DELIVERY": "Out for Delivery",
+      "DELIVERED": "Delivered",
+      "FAILED": "Delivery Failed"
+    }
+  },
+  "reviews": {
+    "writeReview": "Write review",
+    "editReview": "Edit review",
+    "reviewed": "Reviewed",
+    "rating": "Rating",
+    "starRating": "Star Rating",
+    "reviewTitle": "Title",
+    "reviewTitlePlaceholder": "Summarize your review",
+    "reviewBody": "Comment",
+    "reviewBodyPlaceholder": "What did you like or dislike?",
+    "submitReview": "Submit Review",
+    "submitting": "Submitting...",
+    "cancel": "Cancel",
+    "successMessage": "Thank you for your review!",
+    "duplicateError": "Use PATCH /api/reviews/{id} to edit",
+    "sortBy": "Sort by",
+    "sortNewest": "Newest",
+    "sortHighest": "Highest Rating",
+    "sortLowest": "Lowest Rating",
+    "allRatings": "All Ratings",
+    "page": "Page {current} of {total}",
+    "prev": "Previous",
+    "next": "Next",
+    "verifiedPurchase": "Verified purchase"
+  },
+  "push": {
+    "title": "Web Push Notifications",
+    "description": "Receive real-time order and shipment updates on this device.",
+    "enabled": "Push notifications enabled",
+    "disabled": "Push notifications disabled",
+    "enable": "Enable",
+    "unsupported": "Web push notifications are not supported in your browser.",
+    "permissionDenied": "Notification permission was denied. Please allow notifications in your browser settings.",
+    "subscribeSuccess": "Web push notifications enabled successfully!"
   }
 }

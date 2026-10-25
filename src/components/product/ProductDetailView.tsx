@@ -414,7 +414,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
           ratingBreakdown={product.ratingBreakdown}
         />
 
-        <ReviewsList reviews={reviews} />
+        <ReviewsList productId={product.id} reviews={reviews} />
       </div>
 
       {/* Related Products Grid */}

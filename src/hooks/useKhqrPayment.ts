@@ -64,6 +64,9 @@ export function useKhqrPayment({ orderNumber, currency = 'USD', onPaid }: UseKhq
 
         if (statusDto.status === 'PAID') {
           onPaidRef.current?.(statusDto);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('khmermart:notification-refresh'));
+          }
         }
       }
     },
