@@ -261,6 +261,7 @@ export interface OrderDTO {
   shippingMethod: ShippingMethodDTO;
   trackingNumber?: string | null;
   carrier?: string | null;
+  paymentDeadline?: string | null;
   placedAt: string;
   confirmedAt?: string | null;
   shippedAt?: string | null;
@@ -269,6 +270,7 @@ export interface OrderDTO {
   cancelReason?: string | null;
   timeline: OrderTimelineEvent[];
   canCancel: boolean;
+  canReview?: boolean;
   invoiceUrl?: string;
   customer?: UserDTO;
 }

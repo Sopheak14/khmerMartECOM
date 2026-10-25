@@ -5,7 +5,7 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { usePathname, useRouter } from '@/navigation';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/navigation';
-import { User, MapPin, Shield, Loader2 } from 'lucide-react';
+import { User, MapPin, Shield, Package, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function AccountLayout({
@@ -36,6 +36,7 @@ export default function AccountLayout({
 
   const tabs = [
     { href: '/account', label: t('profileTab'), icon: User, exact: true },
+    { href: '/account/orders', label: t('ordersTab'), icon: Package },
     { href: '/account/addresses', label: t('addressesTab'), icon: MapPin },
     { href: '/account/security', label: t('securityTab'), icon: Shield },
   ];

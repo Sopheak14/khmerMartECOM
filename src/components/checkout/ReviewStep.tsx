@@ -68,6 +68,8 @@ export function ReviewStep({
       const orderNumber = data.order.orderNumber;
       if (data.next === 'KHQR_PAYMENT' || selectedPaymentMethod === 'KHQR') {
         router.push(`/checkout/pay/${orderNumber}`);
+      } else if (data.next === 'BANK_TRANSFER_SLIP' || selectedPaymentMethod === 'BANK_TRANSFER') {
+        router.push(`/checkout/bank-transfer/${orderNumber}`);
       } else {
         router.push(`/orders/${orderNumber}/success`);
       }
