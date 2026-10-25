@@ -3,10 +3,12 @@
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { queryKeys } from '@/lib/queryKeys';
 import { UserDTO } from '@/types/api';
 import { toast } from 'sonner';
 
@@ -14,6 +16,7 @@ export default function RegisterPage() {
   const t = useTranslations('auth');
   const errT = useTranslations('errors');
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { setAuth } = useAuthStore();
 
   const [fullName, setFullName] = useState('');
@@ -53,6 +56,12 @@ export default function RegisterPage() {
       if (res.data?.accessToken) {
         setAuth(res.data.accessToken, res.data.user);
         toast.success(t('createAccount'));
+        try {
+          await apiClient('/cart/merge', { method: 'POST' });
+        } catch {
+          // ignore
+        }
+        queryClient.invalidateQueries({ queryKey: queryKeys.cart.current });
         router.push('/');
       }
     } catch (err: any) {

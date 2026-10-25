@@ -2,8 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@/navigation';
-import { ProductDetailDTO, ReviewDTO, VariantDTO } from '@/types/api';
+import { ProductDetailDTO, ReviewDTO, VariantDTO, CartDTO } from '@/types/api';
+import { apiClient } from '@/lib/apiClient';
+import { queryKeys } from '@/lib/queryKeys';
+import { useCartDrawerStore } from '@/lib/store/useCartDrawerStore';
+import { toast } from 'sonner';
 import { ProductGallery } from './ProductGallery';
 import { FlashSalePriceCountdown } from './FlashSalePriceCountdown';
 import { VariantSelector } from './VariantSelector';
@@ -31,20 +36,24 @@ interface ProductDetailViewProps {
 export function ProductDetailView({ product, reviews = [], khrRate }: ProductDetailViewProps) {
   const t = useTranslations('product');
   const locale = useLocale();
+  const queryClient = useQueryClient();
+  const openCartDrawer = useCartDrawerStore((state) => state.open);
 
-  // Initial selected variant: default to first variant if exists
-  const initialSelectedAttributes: Record<string, string> = useMemo(() => {
-    if (product.variants && product.variants.length > 0) {
-      return { ...product.variants[0].attributes };
-    }
-    return {};
-  }, [product.variants]);
+  // User must choose a variant first; button disabled until a full combination is selected
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [quantity, setQuantity] = useState(1);
 
-  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>(
-    initialSelectedAttributes
+  const hasVariants = Boolean(
+    product.variants &&
+      product.variants.length > 0 &&
+      product.variantOptions &&
+      Object.keys(product.variantOptions).length > 0
   );
 
-  const [quantity, setQuantity] = useState(1);
+  const requiredAttrKeys = useMemo(
+    () => Object.keys(product.variantOptions || {}),
+    [product.variantOptions]
+  );
 
   // Find matching variant based on currently selected attributes
   const activeVariant: VariantDTO | undefined = useMemo(() => {
@@ -54,56 +63,84 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
     );
   }, [product.variants, selectedAttributes]);
 
-  // Determine current effective price and available quantity
-  // If flash sale is active on base product and no higher-tier variant is explicitly selected with higher price:
-  // Note: selecting 32GB/1TB changes price to $1,299.00 and stock to 10
-  const effectivePriceCents = useMemo(() => {
-    if (activeVariant) {
-      // If base product has flash sale and variant is default tier (e.g. 16GB/512GB), show sale price
-      if (
-        product.salePriceCents &&
-        product.flashSaleEndsAt &&
-        activeVariant.priceCents <= product.priceCents
-      ) {
-        return product.salePriceCents;
-      }
-      return activeVariant.priceCents;
-    }
-    return product.salePriceCents || product.priceCents;
-  }, [activeVariant, product.salePriceCents, product.flashSaleEndsAt, product.priceCents]);
+  const isFlashSaleActive = Boolean(product.salePriceCents && product.flashSaleEndsAt);
 
-  const originalPriceCents = useMemo(() => {
-    if (
-      product.salePriceCents &&
-      product.flashSaleEndsAt &&
-      effectivePriceCents === product.salePriceCents
-    ) {
-      return product.priceCents;
+  // Variant or base regular price
+  const regularPriceCents = activeVariant ? activeVariant.priceCents : product.priceCents;
+
+  // Determine current effective price:
+  // If flash sale is active, backend applies product.salePriceCents across variants (Item 5)
+  // The product page shows the real price the cart will charge:
+  const effectivePriceCents = useMemo(() => {
+    if (isFlashSaleActive && product.salePriceCents) {
+      return product.salePriceCents;
     }
-    return product.compareAtCents;
-  }, [product.salePriceCents, product.flashSaleEndsAt, product.priceCents, product.compareAtCents, effectivePriceCents]);
+    return regularPriceCents;
+  }, [isFlashSaleActive, product.salePriceCents, regularPriceCents]);
+
+  // Unified "was" price logic: regular price of the shown variant/base
+  const originalPriceCents = useMemo(() => {
+    if (isFlashSaleActive && product.salePriceCents && effectivePriceCents === product.salePriceCents) {
+      return regularPriceCents;
+    }
+    return activeVariant?.priceCents && product.compareAtCents
+      ? product.compareAtCents
+      : (product.compareAtCents && product.compareAtCents > regularPriceCents ? product.compareAtCents : undefined);
+  }, [isFlashSaleActive, product.salePriceCents, effectivePriceCents, regularPriceCents, activeVariant, product.compareAtCents]);
+
+  const isFullCombinationSelected =
+    !hasVariants ||
+    (requiredAttrKeys.length > 0 &&
+      requiredAttrKeys.every((k) => Boolean(selectedAttributes[k])) &&
+      activeVariant != null);
+
+  const addToCartMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient<CartDTO>('/cart/items', {
+        method: 'POST',
+        body: {
+          productId: product.id,
+          variantId: activeVariant?.id,
+          quantity,
+        },
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.cart.current, data);
+      openCartDrawer();
+      toast.success(t('addedToCart'));
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to add item to cart');
+    },
+  });
 
   const maxAvailable = activeVariant ? activeVariant.available : product.available;
   const inStock = maxAvailable > 0;
 
   const handleSelectAttribute = (attrName: string, val: string) => {
-    const next = { ...selectedAttributes, [attrName]: val };
+    setSelectedAttributes((prev) => {
+      const next = { ...prev, [attrName]: val };
+      const canCoexist = product.variants?.some((v) =>
+        Object.entries(next).every(([k, vVal]) => v.attributes[k] === vVal)
+      );
 
-    // If this direct selection doesn't form a valid variant, find the first variant that matches this new val
-    const exactMatch = product.variants?.some((v) =>
-      Object.entries(next).every(([k, vVal]) => v.attributes[k] === vVal)
-    );
-
-    if (!exactMatch && product.variants) {
-      const fallbackVariant = product.variants.find((v) => v.attributes[attrName] === val);
-      if (fallbackVariant) {
-        setSelectedAttributes({ ...fallbackVariant.attributes });
-        setQuantity(1);
-        return;
+      if (!canCoexist && product.variants) {
+        const cleaned: Record<string, string> = { [attrName]: val };
+        for (const [k, vVal] of Object.entries(prev)) {
+          if (k === attrName) continue;
+          const compatible = product.variants.some(
+            (v) => v.attributes[attrName] === val && v.attributes[k] === vVal
+          );
+          if (compatible) {
+            cleaned[k] = vVal;
+          }
+        }
+        return cleaned;
       }
-    }
-
-    setSelectedAttributes(next);
+      return next;
+    });
     setQuantity(1);
   };
 
@@ -281,21 +318,31 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
                 </button>
               </div>
 
-              {/* Add to Cart Disabled Placeholder */}
+              {/* Add to Cart Button */}
               <button
                 type="button"
                 data-testid="add-to-cart-button"
-                disabled
-                aria-disabled="true"
-                className="flex-1 h-11 px-6 rounded-btn bg-primary/40 text-primary-foreground text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed opacity-75 shadow-xs"
+                disabled={!isFullCombinationSelected || !inStock || addToCartMutation.isPending}
+                aria-disabled={!isFullCombinationSelected || !inStock || addToCartMutation.isPending}
+                onClick={() => addToCartMutation.mutate()}
+                className={`flex-1 h-11 px-6 rounded-btn text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xs ${
+                  isFullCombinationSelected && inStock && !addToCartMutation.isPending
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-md'
+                    : 'bg-muted/40 text-muted cursor-not-allowed opacity-75'
+                }`}
               >
                 <ShoppingCart className="w-4 h-4" />
-                <span>{t('addToCartDisabled')}</span>
+                <span>
+                  {addToCartMutation.isPending
+                    ? t('addingToCart')
+                    : !isFullCombinationSelected
+                    ? t('chooseVariantFirst')
+                    : !inStock
+                    ? t('outOfStock')
+                    : t('addToCart')}
+                </span>
               </button>
             </div>
-            <p className="text-[11px] text-muted text-center sm:text-left italic">
-              {t('phaseNotice')}
-            </p>
           </div>
 
           {/* Trust Guarantees */}

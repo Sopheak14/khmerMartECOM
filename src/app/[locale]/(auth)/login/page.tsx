@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
 import { useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { UserDTO } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { UserDTO, CartDTO } from '@/types/api';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -16,6 +18,7 @@ export default function LoginPage() {
   const errT = useTranslations('errors');
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const nextUrl = searchParams.get('next') || '/';
 
   const { setAuth } = useAuthStore();
@@ -40,6 +43,20 @@ export default function LoginPage() {
         setAuth(res.data.accessToken, res.data.user);
         toast.success(t('signIn'));
         
+        // Merge guest cart into user cart
+        try {
+          const mergeRes = await apiClient<CartDTO>('/cart/merge', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${res.data.accessToken}` },
+          });
+          if (mergeRes.data) {
+            queryClient.setQueryData(queryKeys.cart.current, mergeRes.data);
+          }
+        } catch {
+          // ignore
+        }
+        queryClient.invalidateQueries({ queryKey: queryKeys.cart.current });
+
         // Handle redirect to nextUrl properly (stripping locale if needed)
         const target = nextUrl.replace(/^\/(en|km)/, '') || '/';
         router.push(target);

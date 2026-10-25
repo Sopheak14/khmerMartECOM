@@ -21,11 +21,18 @@ export function Price({
   showKhr = true,
   className,
 }: PriceProps) {
-  const currentPrice = salePriceCents !== undefined && salePriceCents !== null ? salePriceCents : cents;
-  const hasDiscount = (compareAtCents && compareAtCents > currentPrice) ||
-    (salePriceCents !== undefined && salePriceCents !== null && salePriceCents < cents);
+  // If salePriceCents is active and lower than regular price (cents)
+  const isSaleActive = salePriceCents !== undefined && salePriceCents !== null && salePriceCents < cents;
+  const currentPrice = isSaleActive ? salePriceCents! : cents;
 
-  const originalPrice = compareAtCents || (salePriceCents ? cents : null);
+  // Struck price ("was" price):
+  // 1. When on sale, "was" price is the regular price (cents) of the base/shown variant
+  // 2. When not on sale, "was" price is compareAtCents (if higher than cents)
+  const originalPrice = isSaleActive
+    ? cents
+    : (compareAtCents && compareAtCents > cents ? compareAtCents : null);
+
+  const hasDiscount = Boolean(originalPrice && originalPrice > currentPrice);
 
   const sizeClasses = {
     sm: 'text-sm',

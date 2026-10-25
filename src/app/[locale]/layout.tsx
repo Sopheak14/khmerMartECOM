@@ -6,6 +6,7 @@ import { kantumruy, inter } from '../fonts';
 import '../globals.css';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Toaster } from 'sonner';
 import { locales } from '@/i18n/request';
 
@@ -39,6 +40,7 @@ export default async function RootLayout({
           <QueryProvider>
             <AuthProvider>
               {children}
+              <CartDrawer />
               <Toaster position="top-right" richColors closeButton />
             </AuthProvider>
           </QueryProvider>

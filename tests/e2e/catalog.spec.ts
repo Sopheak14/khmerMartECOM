@@ -242,14 +242,19 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     // 3. Variant selection:
     // Select 32GB RAM
     await page.click('[data-testid="variant-chip-ram-32GB"]');
-
-    // Price changes to $1,299.00 and stock updates
-    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
-    await expect(page.locator('[data-testid="stock-status"]')).toContainText('10 available');
+    await page.click('[data-testid="variant-chip-color-Space Gray"]');
 
     // Verify unavailable combination is disabled (512GB is unavailable with 32GB)
     const chip512 = page.locator('[data-testid="variant-chip-storage-512GB"]');
     await expect(chip512).toBeDisabled();
+
+    // Select 1TB Storage
+    await page.click('[data-testid="variant-chip-storage-1TB"]');
+
+    // Price charges real cart flash sale price ($899.00) with variant regular price ($1,299.00) struck out
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$899.00');
+    await expect(page.locator('[data-testid="original-price"]')).toHaveText('$1,299.00');
+    await expect(page.locator('[data-testid="stock-status"]')).toContainText('10 available');
 
     // 4. Quantity selector (max = available)
     const qtyMinus = page.locator('[data-testid="qty-minus-btn"]');
@@ -262,9 +267,9 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     await qtyMinus.click();
     await expect(qtyDisplay).toHaveText('1');
 
-    // 5. Add to Cart button is a disabled placeholder
+    // 5. Add to Cart button is enabled once full combination is selected
     const addToCartBtn = page.locator('[data-testid="add-to-cart-button"]');
-    await expect(addToCartBtn).toBeDisabled();
+    await expect(addToCartBtn).toBeEnabled();
     await expect(addToCartBtn).toContainText('Add to Cart');
 
     // 6. Rating summary with 5->1 bars matching ratingBreakdown

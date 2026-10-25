@@ -101,6 +101,25 @@ export async function apiClient<T>(
     reqHeaders["Content-Type"] = "application/json";
   }
 
+  // If request requires auth and session is not yet initialized in browser, wait briefly for AuthProvider
+  if (process.env.NODE_ENV !== "test" && auth && typeof window !== "undefined" && !useAuthStore.getState().isInitialized) {
+    await new Promise<void>((resolve) => {
+      if (useAuthStore.getState().isInitialized) return resolve();
+      const unsub = useAuthStore.subscribe((state) => {
+        if (state.isInitialized) {
+          unsub();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        try {
+          unsub();
+        } catch {}
+        resolve();
+      }, 1500);
+    });
+  }
+
   const token = useAuthStore.getState().token;
   if (auth && token && !reqHeaders["Authorization"]) {
     reqHeaders["Authorization"] = `Bearer ${token}`;

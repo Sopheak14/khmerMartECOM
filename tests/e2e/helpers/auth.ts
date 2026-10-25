@@ -48,8 +48,15 @@ export async function createThrowawayUser(
 
 export async function loginViaUI(page: Page, email: string, password: string, locale: 'en' | 'km' = 'en') {
   await page.goto(`/${locale}/login`);
-  await page.fill('#login-email', email);
-  await page.fill('#login-password', password);
+  await page.waitForLoadState('networkidle');
+  const emailInput = page.locator('#login-email');
+  await expect(emailInput).toBeVisible();
+  await emailInput.fill(email);
+  const passwordInput = page.locator('#login-password');
+  await passwordInput.fill(password);
+  if ((await emailInput.inputValue()) !== email) {
+    await emailInput.fill(email);
+  }
   await page.click('button[type="submit"]');
-  await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('[data-testid="account-menu-button"]')).toBeVisible({ timeout: 10000 });
 }

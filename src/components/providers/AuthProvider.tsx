@@ -4,9 +4,12 @@ import { ReactNode, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { apiClient } from '@/lib/apiClient';
 import { UserDTO } from '@/types/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { setAuth, clearAuth, setInitialized } = useAuthStore();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let isMounted = true;
@@ -20,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (isMounted && res.data?.accessToken) {
           setAuth(res.data.accessToken, res.data.user);
+          queryClient.invalidateQueries({ queryKey: queryKeys.cart.current });
         } else if (isMounted) {
           clearAuth();
         }
@@ -39,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [setAuth, clearAuth, setInitialized]);
+  }, [setAuth, clearAuth, setInitialized, queryClient]);
 
   return <>{children}</>;
 }

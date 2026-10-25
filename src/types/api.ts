@@ -83,6 +83,7 @@ export interface AddressDTO {
   line2?: string;
   district: string;
   province: string;
+  provinceKm?: string;
   postalCode?: string;
   isDefault: boolean;
 }
@@ -216,6 +217,11 @@ export interface CheckoutPreviewDTO {
   shippingMethod: ShippingMethodDTO;
   address: AddressDTO;
   availablePaymentMethods: PaymentMethod[];
+}
+
+export interface CheckoutResponseDTO {
+  order: OrderDTO;
+  next: string;
 }
 
 export interface OrderItemDTO {
