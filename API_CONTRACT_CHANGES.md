@@ -22,3 +22,8 @@
   - `AdminPromotionRequest.items`: `[{ productId, variantId?, salePriceCents? }]`. `productIds` remains accepted (deprecated) and maps to items without `variantId`; `items` wins if both are sent.
   - `AdminPromotionDto.items`: `[{ productId, productName, variantId?, sku?, attributes?, priceCents, salePriceCents? }]`; `productIds` is kept.
 - **Validation** (`400 VALIDATION_ERROR`, `error.details` keyed `items[i].variantId` / `items[i].salePriceCents` / ...): variant must belong to the product; a `FLASH_SALE` item for a product with variants must name a `variantId`; `salePriceCents` must be > 0 and < the variant's (or product's) `priceCents`.
+
+## 5. Multiple Active Flash Sales
+- **Change**: Several `FLASH_SALE` promotions can now be active at the same time (previously a second active one broke product pricing). Product/search/home/cart/checkout use all of them; `PublicSettingsDto.flashSale` and `HomeDto.flashSale` headline the soonest-ending one (home lists products from all).
+- **Pricing rule**: each cart line gets at most one automatic promotion; among flash sales covering that variant (or product without variants) the lowest sale price wins.
+- **Admin guard** (additive error): creating/updating an active `FLASH_SALE` whose items overlap in time with another active `FLASH_SALE` on the same variant (or product without variants) returns `409 CONFLICT` with `error.details["items[i]"]` naming the variant and the other promotion.

@@ -99,6 +99,7 @@ public class CheckoutServiceImpl implements CheckoutService {
   private final CouponRedemptionRepository couponRedemptionRepository;
   private final PromotionRepository promotionRepository;
   private final PromotionProductRepository promotionProductRepository;
+  private final FlashSalePriceResolver flashSalePriceResolver;
   private final OrderRepository orderRepository;
   private final OrderItemRepository orderItemRepository;
   private final OrderStatusHistoryRepository orderStatusHistoryRepository;
@@ -127,6 +128,7 @@ public class CheckoutServiceImpl implements CheckoutService {
       CouponRedemptionRepository couponRedemptionRepository,
       PromotionRepository promotionRepository,
       PromotionProductRepository promotionProductRepository,
+      FlashSalePriceResolver flashSalePriceResolver,
       OrderRepository orderRepository,
       OrderItemRepository orderItemRepository,
       OrderStatusHistoryRepository orderStatusHistoryRepository,
@@ -153,6 +155,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     this.couponRedemptionRepository = couponRedemptionRepository;
     this.promotionRepository = promotionRepository;
     this.promotionProductRepository = promotionProductRepository;
+    this.flashSalePriceResolver = flashSalePriceResolver;
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -220,9 +223,6 @@ public class CheckoutServiceImpl implements CheckoutService {
                 p -> p.isActive() && !now.isBefore(p.getStartsAt()) && !now.isAfter(p.getEndsAt()))
             .toList();
 
-    Optional<Promotion> flashSalePromo =
-        activePromotions.stream().filter(p -> p.getType() == PromotionType.FLASH_SALE).findFirst();
-
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
 
@@ -259,27 +259,9 @@ public class CheckoutServiceImpl implements CheckoutService {
       int available =
           (inv != null) ? Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved()) : 0;
 
-      Long flashSalePrice = null;
-      if (flashSalePromo.isPresent()) {
-        Long promoId = flashSalePromo.get().getId();
-        if (variant != null) {
-          flashSalePrice =
-              promotionProductRepository
-                  .findByPromotionIdAndProductIdAndVariantId(
-                      promoId, product.getId(), variant.getId())
-                  .map(PromotionProduct::getSalePriceCents)
-                  .orElse(null);
-        } else {
-          boolean hasVariants = variantRepository.existsByProductId(product.getId());
-          if (!hasVariants) {
-            flashSalePrice =
-                promotionProductRepository
-                    .findByPromotionIdAndProductIdAndVariantIdIsNull(promoId, product.getId())
-                    .map(PromotionProduct::getSalePriceCents)
-                    .orElse(null);
-          }
-        }
-      }
+      Long flashSalePrice =
+          flashSalePriceResolver.resolve(
+              activePromotions, product.getId(), variant != null ? variant.getId() : null);
 
       String imageUrl =
           imageRepository.findByProductIdOrderBySortOrderAsc(product.getId()).stream()
@@ -461,9 +443,6 @@ public class CheckoutServiceImpl implements CheckoutService {
                 p -> p.isActive() && !now.isBefore(p.getStartsAt()) && !now.isAfter(p.getEndsAt()))
             .toList();
 
-    Optional<Promotion> flashSalePromo =
-        activePromotions.stream().filter(p -> p.getType() == PromotionType.FLASH_SALE).findFirst();
-
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
 
@@ -509,27 +488,9 @@ public class CheckoutServiceImpl implements CheckoutService {
                 currentUnitPrice));
       }
 
-      Long flashSalePrice = null;
-      if (flashSalePromo.isPresent()) {
-        Long promoId = flashSalePromo.get().getId();
-        if (variant != null) {
-          flashSalePrice =
-              promotionProductRepository
-                  .findByPromotionIdAndProductIdAndVariantId(
-                      promoId, product.getId(), variant.getId())
-                  .map(PromotionProduct::getSalePriceCents)
-                  .orElse(null);
-        } else {
-          boolean hasVariants = variantRepository.existsByProductId(product.getId());
-          if (!hasVariants) {
-            flashSalePrice =
-                promotionProductRepository
-                    .findByPromotionIdAndProductIdAndVariantIdIsNull(promoId, product.getId())
-                    .map(PromotionProduct::getSalePriceCents)
-                    .orElse(null);
-          }
-        }
-      }
+      Long flashSalePrice =
+          flashSalePriceResolver.resolve(
+              activePromotions, product.getId(), variant != null ? variant.getId() : null);
 
       boolean bogoEligible = false;
       if (bogoPromo.isPresent()) {

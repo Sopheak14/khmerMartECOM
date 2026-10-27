@@ -91,15 +91,16 @@ public class SearchServiceImpl implements SearchService {
     // Resolve active flash sale prices if applicable
     Instant now = Instant.now();
     Map<Long, Long> flashSalePrices = new HashMap<>();
-    Optional<Promotion> flashPromo =
-        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
-    if (flashPromo.isPresent() && !prodIds.isEmpty()) {
+    List<Promotion> flashPromos = promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
+    if (!flashPromos.isEmpty() && !prodIds.isEmpty()) {
       java.util.Set<Long> productIdsWithVariants =
           productVariantRepository.findByProductIdInAndActiveTrue(prodIds).stream()
               .map(com.khmermart.model.entity.ProductVariant::getProductId)
               .collect(java.util.stream.Collectors.toSet());
       List<PromotionProduct> promoProducts =
-          promotionProductRepository.findByPromotionId(flashPromo.get().getId());
+          flashPromos.stream()
+              .flatMap(fp -> promotionProductRepository.findByPromotionId(fp.getId()).stream())
+              .toList();
       for (PromotionProduct pp : promoProducts) {
         if (!prodIds.contains(pp.getProductId()) || pp.getSalePriceCents() == null) continue;
         boolean hasVariants = productIdsWithVariants.contains(pp.getProductId());

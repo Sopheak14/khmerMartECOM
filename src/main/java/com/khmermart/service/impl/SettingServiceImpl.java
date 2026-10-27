@@ -64,7 +64,7 @@ public class SettingServiceImpl implements SettingService {
     // Check seasonal banner
     PublicSettingsDto.SeasonalBannerDto seasonalBanner = null;
     Optional<Promotion> seasonalOpt =
-        promotionRepository.findFirstActiveByType(PromotionType.SEASONAL, now);
+        promotionRepository.findActiveByType(PromotionType.SEASONAL, now).stream().findFirst();
     if (seasonalOpt.isPresent()) {
       Promotion s = seasonalOpt.get();
       seasonalBanner =
@@ -75,7 +75,7 @@ public class SettingServiceImpl implements SettingService {
     // Check flash sale
     PublicSettingsDto.FlashSaleInfoDto flashSale = null;
     Optional<Promotion> flashOpt =
-        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
+        promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now).stream().findFirst();
     if (flashOpt.isPresent()) {
       Promotion f = flashOpt.get();
       flashSale = new PublicSettingsDto.FlashSaleInfoDto(f.getId(), f.getName(), f.getEndsAt());

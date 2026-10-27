@@ -55,6 +55,7 @@ public class CartServiceImpl implements CartService {
   private final CouponRedemptionRepository couponRedemptionRepository;
   private final PromotionRepository promotionRepository;
   private final PromotionProductRepository promotionProductRepository;
+  private final FlashSalePriceResolver flashSalePriceResolver;
   private final ShippingMethodRepository shippingMethodRepository;
   private final PricingService pricingService;
   private final ObjectMapper objectMapper;
@@ -70,6 +71,7 @@ public class CartServiceImpl implements CartService {
       CouponRedemptionRepository couponRedemptionRepository,
       PromotionRepository promotionRepository,
       PromotionProductRepository promotionProductRepository,
+      FlashSalePriceResolver flashSalePriceResolver,
       ShippingMethodRepository shippingMethodRepository,
       PricingService pricingService,
       ObjectMapper objectMapper) {
@@ -83,6 +85,7 @@ public class CartServiceImpl implements CartService {
     this.couponRedemptionRepository = couponRedemptionRepository;
     this.promotionRepository = promotionRepository;
     this.promotionProductRepository = promotionProductRepository;
+    this.flashSalePriceResolver = flashSalePriceResolver;
     this.shippingMethodRepository = shippingMethodRepository;
     this.pricingService = pricingService;
     this.objectMapper = objectMapper;
@@ -126,9 +129,6 @@ public class CartServiceImpl implements CartService {
                 p -> p.isActive() && !now.isBefore(p.getStartsAt()) && !now.isAfter(p.getEndsAt()))
             .toList();
 
-    Optional<Promotion> flashSalePromo =
-        activePromotions.stream().filter(p -> p.getType() == PromotionType.FLASH_SALE).findFirst();
-
     Optional<Promotion> bogoPromo =
         activePromotions.stream().filter(p -> p.getType() == PromotionType.BOGO).findFirst();
 
@@ -171,27 +171,9 @@ public class CartServiceImpl implements CartService {
         issues.add("PRICE_CHANGED");
       }
 
-      Long flashSalePrice = null;
-      if (flashSalePromo.isPresent()) {
-        Long promoId = flashSalePromo.get().getId();
-        if (variant != null) {
-          flashSalePrice =
-              promotionProductRepository
-                  .findByPromotionIdAndProductIdAndVariantId(
-                      promoId, product.getId(), variant.getId())
-                  .map(PromotionProduct::getSalePriceCents)
-                  .orElse(null);
-        } else {
-          boolean hasVariants = variantRepository.existsByProductId(product.getId());
-          if (!hasVariants) {
-            flashSalePrice =
-                promotionProductRepository
-                    .findByPromotionIdAndProductIdAndVariantIdIsNull(promoId, product.getId())
-                    .map(PromotionProduct::getSalePriceCents)
-                    .orElse(null);
-          }
-        }
-      }
+      Long flashSalePrice =
+          flashSalePriceResolver.resolve(
+              activePromotions, product.getId(), variant != null ? variant.getId() : null);
 
       String imageUrl =
           imageRepository.findByProductIdOrderBySortOrderAsc(product.getId()).stream()

@@ -936,7 +936,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
   void testPerVariantPromotionItems() throws Exception {
     Instant now = Instant.now();
 
-    // Seeded flash sale (id 1) is the only active FLASH_SALE allowed: capture its items, pause it.
+    // Seeded flash sale (id 1) stays active throughout; the new one coexists with it.
     JsonNode seeded =
         objectMapper
             .readTree(
@@ -947,15 +947,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                     .getResponse()
                     .getContentAsString())
             .path("data");
-    List<PromotionItemRequest> items = new java.util.ArrayList<>();
-    for (JsonNode it : seeded.path("items")) {
-      items.add(
-          new PromotionItemRequest(
-              it.path("productId").asLong(),
-              it.hasNonNull("variantId") ? it.path("variantId").asLong() : null,
-              it.hasNonNull("salePriceCents") ? it.path("salePriceCents").asLong() : null));
-    }
-    assertThat(items).hasSize(5);
+    assertThat(seeded.path("items")).hasSize(5);
     seeded
         .path("items")
         .forEach(
@@ -968,20 +960,24 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
               }
             });
 
-    putPromotion(1L, flashRequest("Flash Sale 24H", now, false, null, null)).andExpect(status().isOk());
-    Long createdId = null;
+    List<Long> createdIds = new java.util.ArrayList<>();
     try {
-      // 1. Per-variant flash sale: 1001 variants 1,2 stay 89900, variant 3 -> 119900
-      List<PromotionItemRequest> create = new java.util.ArrayList<>(items);
-      create.add(new PromotionItemRequest(1001L, 3L, 119900L));
+      // 1. Per-variant flash sale on 1001 variant 3 -> 119900 while promotion 1 stays active:
+      //    variants 1,2 keep 89900 (promotion 1), variant 3 gets 119900, variant 4 not on sale
       String res =
-          postPromotion(flashRequest("Laptop variant flash", now, true, null, create))
+          postPromotion(
+                  flashRequest(
+                      "Laptop variant flash",
+                      now,
+                      true,
+                      null,
+                      List.of(new PromotionItemRequest(1001L, 3L, 119900L))))
               .andExpect(status().isOk())
-              .andExpect(jsonPath("$.data.items.length()").value(6))
+              .andExpect(jsonPath("$.data.items.length()").value(1))
               .andReturn()
               .getResponse()
               .getContentAsString();
-      createdId = objectMapper.readTree(res).path("data").path("id").asLong();
+      createdIds.add(objectMapper.readTree(res).path("data").path("id").asLong());
 
       mockMvc
           .perform(get("/api/products/1001"))
@@ -990,6 +986,30 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.variants[1].salePriceCents").value(89900))
           .andExpect(jsonPath("$.data.variants[2].salePriceCents").value(119900))
           .andExpect(jsonPath("$.data.variants[3].salePriceCents").doesNotExist());
+
+      // 1b. Same variant in a second overlapping flash sale -> 409 naming variant and other promo
+      postPromotion(
+              flashRequest(
+                  "Dup variant", now, true, null, List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.error.code").value("CONFLICT"))
+          .andExpect(
+              jsonPath("$.error.details['items[0]']")
+                  .value(org.hamcrest.Matchers.allOf(
+                      org.hamcrest.Matchers.containsString("Variant 1 of product 1001"),
+                      org.hamcrest.Matchers.containsString("(id 1)"))));
+
+      // 1c. Same variant in a NON-overlapping window is fine
+      Instant later = now.plus(30, ChronoUnit.DAYS);
+      String later1 =
+          postPromotion(
+                  flashRequest(
+                      "Later flash", later, true, null, List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      createdIds.add(objectMapper.readTree(later1).path("data").path("id").asLong());
 
       // 2. Product-wide FLASH_SALE item on a product with variants -> 400 with details
       postPromotion(
@@ -1030,12 +1050,9 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
           .perform(delete("/api/admin/promotions/" + legacyId).header("Authorization", adminToken))
           .andExpect(status().isOk());
     } finally {
-      if (createdId != null) {
-        mockMvc.perform(
-            delete("/api/admin/promotions/" + createdId).header("Authorization", adminToken));
+      for (Long cid : createdIds) {
+        mockMvc.perform(delete("/api/admin/promotions/" + cid).header("Authorization", adminToken));
       }
-      putPromotion(1L, flashRequest("Flash Sale 24H", now.minus(1, ChronoUnit.DAYS), true, null, items))
-          .andExpect(status().isOk());
     }
   }
 

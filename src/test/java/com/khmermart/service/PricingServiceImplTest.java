@@ -303,4 +303,43 @@ class PricingServiceImplTest {
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
     assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(10000L);
   }
+
+  @Test
+  @DisplayName(
+      "13. Two active flash sales on different variants: each line gets its own flash price, once")
+  void testTwoActiveFlashSalesOnDifferentVariants() {
+    Instant now = Instant.now();
+    Promotion flashA =
+        Promotion.builder()
+            .name("Flash A")
+            .type(PromotionType.FLASH_SALE)
+            .startsAt(now.minusSeconds(3600))
+            .endsAt(now.plusSeconds(3600))
+            .active(true)
+            .build();
+    Promotion flashB =
+        Promotion.builder()
+            .name("Flash B")
+            .type(PromotionType.FLASH_SALE)
+            .startsAt(now.minusSeconds(3600))
+            .endsAt(now.plusSeconds(7200))
+            .active(true)
+            .build();
+
+    // Variant 1: 99900 -> 89900 (flash A); variant 3: 129900 -> 119900 (flash B); variant 4 not on sale
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(1001L, 1L, 99900L, 1, 89900L),
+            new PricingItem(1001L, 3L, 129900L, 2, 119900L),
+            new PricingItem(1001L, 4L, 129900L, 1, null));
+
+    PricingResult result = pricingService.calculate(items, List.of(flashA, flashB), null, null);
+
+    assertThat(result.subtotalCents()).isEqualTo(99900L + 2 * 129900L + 129900L);
+    // 10000 (variant 1) + 2 * 10000 (variant 3); variant 4 pays full price
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(30000L);
+    assertThat(result.totalCents()).isEqualTo(result.subtotalCents() - 30000L);
+  }
 }

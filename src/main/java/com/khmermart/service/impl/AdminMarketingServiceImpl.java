@@ -220,6 +220,10 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
         request.discountPercent(), request.startsAt(), request.endsAt());
     List<PromotionItemRequest> items = resolveItems(request);
     validatePromotionItems(request.type(), items);
+    if (items != null && request.active() != Boolean.FALSE) {
+      assertNoFlashSaleOverlap(
+          request.type(), -1L, request.startsAt(), request.endsAt(), items);
+    }
 
     Promotion promo =
         Promotion.builder()
@@ -261,6 +265,20 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
         request.discountPercent(), request.startsAt(), request.endsAt());
     List<PromotionItemRequest> items = resolveItems(request);
     validatePromotionItems(request.type(), items);
+    boolean willBeActive = request.active() != null ? request.active() : promo.isActive();
+    if (willBeActive) {
+      // Dates/type/active may change without items: re-check the products already attached.
+      List<PromotionItemRequest> effective =
+          items != null
+              ? items
+              : promotionProductRepository.findByPromotionId(id).stream()
+                  .map(
+                      pp ->
+                          new PromotionItemRequest(
+                              pp.getProductId(), pp.getVariantId(), pp.getSalePriceCents()))
+                  .toList();
+      assertNoFlashSaleOverlap(request.type(), id, request.startsAt(), request.endsAt(), effective);
+    }
 
     Map<String, Object> beforeState =
         Map.of(
@@ -386,6 +404,58 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
     if (!errors.isEmpty()) {
       throw new CustomException(
           ErrorCode.VALIDATION_ERROR, "Invalid promotion items", errors);
+    }
+  }
+
+  /**
+   * One variant (or product without variants) may not be in two FLASH_SALE promotions whose time
+   * windows overlap; the lowest-price rule would otherwise silently decide which one wins.
+   */
+  private void assertNoFlashSaleOverlap(
+      PromotionType type,
+      Long selfId,
+      Instant startsAt,
+      Instant endsAt,
+      List<PromotionItemRequest> items) {
+    if (type != PromotionType.FLASH_SALE || items.isEmpty()) {
+      return;
+    }
+    List<PromotionProduct> others =
+        promotionProductRepository.findInOverlappingActive(
+            PromotionType.FLASH_SALE, selfId, startsAt, endsAt);
+    if (others.isEmpty()) {
+      return;
+    }
+    Map<Long, Promotion> promos = new java.util.HashMap<>();
+    promotionRepository
+        .findAllById(others.stream().map(PromotionProduct::getPromotionId).distinct().toList())
+        .forEach(pr -> promos.put(pr.getId(), pr));
+    Map<String, String> conflicts = new LinkedHashMap<>();
+    for (int i = 0; i < items.size(); i++) {
+      PromotionItemRequest item = items.get(i);
+      for (PromotionProduct other : others) {
+        if (other.getProductId().equals(item.productId())
+            && java.util.Objects.equals(other.getVariantId(), item.variantId())) {
+          Promotion op = promos.get(other.getPromotionId());
+          String target =
+              item.variantId() != null
+                  ? "Variant " + item.variantId() + " of product " + item.productId()
+                  : "Product " + item.productId();
+          conflicts.put(
+              "items[" + i + "]",
+              target
+                  + " is already in overlapping flash sale '"
+                  + (op != null ? op.getName() : "?")
+                  + "' (id "
+                  + other.getPromotionId()
+                  + ")");
+          break;
+        }
+      }
+    }
+    if (!conflicts.isEmpty()) {
+      throw new CustomException(
+          ErrorCode.CONFLICT, "Overlapping flash sale for the same variant", conflicts);
     }
   }
 

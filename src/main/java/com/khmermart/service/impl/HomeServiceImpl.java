@@ -56,14 +56,16 @@ public class HomeServiceImpl implements HomeService {
 
     Instant now = Instant.now();
     HomeDto.FlashSaleDto flashSale = null;
-    Optional<Promotion> flashPromoOpt =
-        promotionRepository.findFirstActiveByType(PromotionType.FLASH_SALE, now);
-    if (flashPromoOpt.isPresent()) {
-      Promotion promo = flashPromoOpt.get();
-      List<PromotionProduct> promoProducts =
-          promotionProductRepository.findByPromotionId(promo.getId());
+    // Soonest-ending active flash sale headlines the banner; products come from all of them.
+    List<Promotion> flashPromos = promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
+    if (!flashPromos.isEmpty()) {
+      Promotion promo = flashPromos.get(0);
       List<Long> productIds =
-          promoProducts.stream().map(PromotionProduct::getProductId).distinct().toList();
+          flashPromos.stream()
+              .flatMap(fp -> promotionProductRepository.findByPromotionId(fp.getId()).stream())
+              .map(PromotionProduct::getProductId)
+              .distinct()
+              .toList();
       List<ProductCardDto> products =
           productIds.isEmpty()
               ? Collections.emptyList()
