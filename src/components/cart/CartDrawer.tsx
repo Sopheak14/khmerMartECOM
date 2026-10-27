@@ -274,12 +274,12 @@ export function CartDrawer() {
 
               {/* Coupon Discount */}
               {cart.coupon && calculateCouponDiscountCents(cart.discountCents, cart.promotionDiscounts) > 0 ? (
-                <div className="flex items-center justify-between text-green-600 dark:text-green-400 font-semibold">
+                <div className="flex items-center justify-between text-green-800 dark:text-green-400 font-semibold">
                   <span>{t('couponDiscount')} ({cart.coupon.code})</span>
                   <span>-{formatUsd(calculateCouponDiscountCents(cart.discountCents, cart.promotionDiscounts))}</span>
                 </div>
               ) : !cart.promotionDiscounts?.length && cart.discountCents > 0 ? (
-                <div className="flex items-center justify-between text-green-600 dark:text-green-400">
+                <div className="flex items-center justify-between text-green-800 dark:text-green-400">
                   <span>{t('discount')}</span>
                   <span className="font-semibold">
                     -{formatUsd(cart.discountCents)}

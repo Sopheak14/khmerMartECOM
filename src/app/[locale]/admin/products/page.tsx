@@ -619,7 +619,7 @@ export default function AdminProductsPage() {
           </div>
         ) : isError ? (
           <div className="p-12 text-center space-y-3">
-            <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+            <AlertCircle className="w-10 h-10 text-red-700 mx-auto" />
             <h3 className="text-sm font-bold text-foreground">{commonT('errorTitle')}</h3>
             <button
               onClick={() => refetch()}
@@ -777,7 +777,7 @@ export default function AdminProductsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
-                      {t('nameEn')} <span className="text-red-500">*</span>
+                      {t('nameEn')} <span className="text-red-700">*</span>
                     </label>
                     <input
                       type="text"
@@ -789,7 +789,7 @@ export default function AdminProductsPage() {
                       required
                     />
                     {fieldErrors.name && (
-                      <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+                      <p className="text-xs text-red-700 mt-1">{fieldErrors.name}</p>
                     )}
                   </div>
 
@@ -820,7 +820,7 @@ export default function AdminProductsPage() {
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-lg font-mono"
                     />
                     {fieldErrors.sku && (
-                      <p className="text-xs text-red-600 mt-1">{fieldErrors.sku}</p>
+                      <p className="text-xs text-red-700 mt-1">{fieldErrors.sku}</p>
                     )}
                   </div>
 
@@ -910,7 +910,7 @@ export default function AdminProductsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
-                      {t('priceDollars')} <span className="text-red-500">*</span>
+                      {t('priceDollars')} <span className="text-red-700">*</span>
                     </label>
                     <input
                       type="number"
@@ -924,7 +924,7 @@ export default function AdminProductsPage() {
                       required
                     />
                     {fieldErrors.priceCents && (
-                      <p className="text-xs text-red-600 mt-1">{fieldErrors.priceCents}</p>
+                      <p className="text-xs text-red-700 mt-1">{fieldErrors.priceCents}</p>
                     )}
                   </div>
 

@@ -354,7 +354,7 @@ export default function AdminOrderDetailPage() {
                 </span>
               </div>
               {order.discountCents > 0 && (
-                <div className="flex justify-between text-emerald-600 font-medium">
+                <div className="flex justify-between text-emerald-700 font-medium">
                   <span>Discount:</span>
                   <span className="font-mono">-{formatUsd(order.discountCents)}</span>
                 </div>

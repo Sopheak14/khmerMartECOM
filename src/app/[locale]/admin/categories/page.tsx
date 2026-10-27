@@ -200,7 +200,7 @@ export default function AdminCategoriesPage() {
           </div>
         ) : isError ? (
           <div className="p-8 text-center space-y-3">
-            <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+            <AlertCircle className="w-8 h-8 text-red-700 mx-auto" />
             <p className="text-xs text-muted">{commonT('errorTitle')}</p>
             <button
               onClick={() => refetch()}
@@ -345,7 +345,7 @@ export default function AdminCategoriesPage() {
             <form onSubmit={handleFormSubmit} className="space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('nameEn')} <span className="text-red-500">*</span>
+                  {t('nameEn')} <span className="text-red-700">*</span>
                 </label>
                 <input
                   type="text"
@@ -357,7 +357,7 @@ export default function AdminCategoriesPage() {
                   required
                 />
                 {fieldErrors.name && (
-                  <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+                  <p className="text-xs text-red-700 mt-1">{fieldErrors.name}</p>
                 )}
               </div>
 
@@ -475,7 +475,7 @@ export default function AdminCategoriesPage() {
             {deleteError && (
               <div
                 data-testid="category-delete-error"
-                className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-xs text-left font-medium"
+                className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 text-xs text-left font-medium"
               >
                 {deleteError}
               </div>

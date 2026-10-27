@@ -97,7 +97,7 @@ export default function AdminOrdersPage() {
   const getOrderStatusBadge = (orderStatus: OrderStatus) => {
     switch (orderStatus) {
       case 'PENDING_PAYMENT':
-        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+        return 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20';
       case 'CONFIRMED':
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
       case 'PROCESSING':
@@ -121,7 +121,7 @@ export default function AdminOrdersPage() {
       case 'PAID':
         return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
       case 'PENDING':
-        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+        return 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20';
       case 'FAILED':
       case 'EXPIRED':
         return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20';

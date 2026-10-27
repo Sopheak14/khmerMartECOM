@@ -121,7 +121,7 @@ export default function OrderDetailPage() {
       case 'PENDING_PAYMENT':
         return {
           label: t('status.PENDING_PAYMENT'),
-          className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+          className: 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20',
           icon: Clock,
         };
       case 'CONFIRMED':
@@ -146,7 +146,7 @@ export default function OrderDetailPage() {
       case 'DELIVERED':
         return {
           label: t('status.DELIVERED'),
-          className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+          className: 'bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20',
           icon: CheckCircle2,
         };
       case 'CANCELLED':
@@ -154,7 +154,7 @@ export default function OrderDetailPage() {
       case 'REFUNDED':
         return {
           label: t(`status.${status}`) || status,
-          className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+          className: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
           icon: XCircle,
         };
       default:
@@ -178,7 +178,7 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-lg text-center space-y-4">
-        <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+        <AlertCircle className="w-10 h-10 text-red-700 mx-auto" />
         <h2 className="text-lg font-bold text-foreground">Order Not Found</h2>
         <p className="text-xs text-muted">We could not locate order {orderNumber}.</p>
         <Link
@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
                   ) : reviewedProductIds.has(item.productId) ? (
                     <span
                       data-testid={`reviewed-btn-${item.productId}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-semibold bg-green-500/10 text-green-700 dark:text-green-400"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-semibold bg-green-500/10 text-green-800 dark:text-green-400"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>{reviewsT('reviewed')}</span>
@@ -403,9 +403,9 @@ export default function OrderDetailPage() {
                   <span
                     className={`font-bold px-2 py-0.5 rounded text-[11px] ${
                       order.paymentStatus === 'PAID'
-                        ? 'bg-green-500/10 text-green-600'
+                        ? 'bg-green-500/10 text-green-800'
                         : order.paymentStatus === 'PENDING'
-                        ? 'bg-amber-500/10 text-amber-600'
+                        ? 'bg-amber-500/10 text-amber-800'
                         : 'bg-muted/15 text-muted'
                     }`}
                   >
@@ -429,7 +429,7 @@ export default function OrderDetailPage() {
               </div>
 
               {order.discountCents > 0 && (
-                <div className="flex justify-between text-green-600 dark:text-green-400 font-medium">
+                <div className="flex justify-between text-green-800 dark:text-green-400 font-medium">
                   <span>
                     {t('discount')}
                     {order.couponCode ? ` (${order.couponCode})` : ''}
@@ -485,7 +485,7 @@ export default function OrderDetailPage() {
                 type="button"
                 data-testid="cancel-order-btn"
                 onClick={() => setIsCancelDialogOpen(true)}
-                className="px-4 py-2.5 rounded-btn border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-btn border border-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors flex items-center gap-1.5"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 <span>{t('cancel')}</span>
@@ -551,7 +551,7 @@ export default function OrderDetailPage() {
         >
           <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-left">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-700 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-foreground leading-snug">

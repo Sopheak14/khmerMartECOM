@@ -237,11 +237,11 @@ export default function AdminInventoryPage() {
   const getMovementTypeBadge = (type: InventoryMovementType) => {
     switch (type) {
       case 'RESTOCK':
-        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-500/10 text-green-700 dark:text-green-400">RESTOCK</span>;
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-500/10 text-green-800 dark:text-green-400">RESTOCK</span>;
       case 'ADJUST':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400">ADJUST</span>;
       case 'RESERVE':
-        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400">RESERVE</span>;
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-400">RESERVE</span>;
       case 'RELEASE':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400">RELEASE</span>;
       case 'SALE':
@@ -304,7 +304,7 @@ export default function AdminInventoryPage() {
                   : 'bg-background border-border text-foreground hover:bg-muted/10'
               )}
             >
-              <AlertTriangle className={cn('w-4 h-4', lowStock ? 'text-amber-600' : 'text-muted')} />
+              <AlertTriangle className={cn('w-4 h-4', lowStock ? 'text-amber-800' : 'text-muted')} />
               <span>{t('lowStockFilter')}</span>
             </button>
 
@@ -342,7 +342,7 @@ export default function AdminInventoryPage() {
           </div>
         ) : isError ? (
           <div className="p-12 text-center space-y-3">
-            <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+            <AlertCircle className="w-10 h-10 text-red-700 mx-auto" />
             <h3 className="text-sm font-bold text-foreground">{commonT('errorTitle')}</h3>
             <p className="text-xs text-muted max-w-sm mx-auto">{commonT('errorDesc')}</p>
             <button
@@ -408,7 +408,7 @@ export default function AdminInventoryPage() {
                             isOut
                               ? 'bg-red-500/15 text-red-700 dark:text-red-400'
                               : isLow
-                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                              ? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
                               : 'text-foreground'
                           )}
                         >
@@ -422,12 +422,12 @@ export default function AdminInventoryPage() {
                             {t('statusOut')}
                           </span>
                         ) : isLow ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-400">
                             <AlertTriangle className="w-3 h-3" />
                             <span>{t('statusLow')}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/10 text-green-700 dark:text-green-400">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/10 text-green-800 dark:text-green-400">
                             {t('statusHealthy')}
                           </span>
                         )}
@@ -515,14 +515,14 @@ export default function AdminInventoryPage() {
 
             <form onSubmit={handleRestockSubmit} className="space-y-4">
               {formErrors.general && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 text-xs">
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 text-xs">
                   {formErrors.general}
                 </div>
               )}
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('quantity')} <span className="text-red-500">*</span>
+                  {t('quantity')} <span className="text-red-700">*</span>
                 </label>
                 <input
                   type="number"
@@ -540,7 +540,7 @@ export default function AdminInventoryPage() {
                   )}
                 />
                 {formErrors.quantity ? (
-                  <p data-testid="restock-error-quantity" className="text-xs text-red-600 mt-1 font-medium">
+                  <p data-testid="restock-error-quantity" className="text-xs text-red-700 mt-1 font-medium">
                     {formErrors.quantity}
                   </p>
                 ) : (
@@ -561,7 +561,7 @@ export default function AdminInventoryPage() {
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 />
                 {formErrors.reason && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">{formErrors.reason}</p>
+                  <p className="text-xs text-red-700 mt-1 font-medium">{formErrors.reason}</p>
                 )}
               </div>
 
@@ -608,14 +608,14 @@ export default function AdminInventoryPage() {
 
             <form onSubmit={handleAdjustSubmit} className="space-y-4">
               {formErrors.general && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 text-xs">
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 text-xs">
                   {formErrors.general}
                 </div>
               )}
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('quantity')} <span className="text-red-500">*</span>
+                  {t('quantity')} <span className="text-red-700">*</span>
                 </label>
                 <input
                   type="number"
@@ -632,7 +632,7 @@ export default function AdminInventoryPage() {
                   )}
                 />
                 {formErrors.quantity ? (
-                  <p data-testid="adjust-error-quantity" className="text-xs text-red-600 mt-1 font-medium">
+                  <p data-testid="adjust-error-quantity" className="text-xs text-red-700 mt-1 font-medium">
                     {formErrors.quantity}
                   </p>
                 ) : (
@@ -725,7 +725,7 @@ export default function AdminInventoryPage() {
                           <span
                             className={cn(
                               'font-bold font-mono',
-                              movement.quantity > 0 ? 'text-green-600' : 'text-red-500'
+                              movement.quantity > 0 ? 'text-green-800' : 'text-red-700'
                             )}
                           >
                             {movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}

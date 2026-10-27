@@ -125,7 +125,7 @@ export default function BankTransferPage() {
           <span className="text-xs font-bold text-muted uppercase tracking-wider">
             Order: <span className="text-foreground font-mono" data-testid="order-number-display">{orderNumber}</span>
           </span>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-400">
             Pending Payment
           </span>
         </div>
@@ -202,7 +202,7 @@ export default function BankTransferPage() {
           data-testid="slip-submitted-state"
           className="bg-green-500/10 border border-green-500/20 rounded-2xl p-6 text-center space-y-4 animate-in zoom-in-95"
         >
-          <div className="w-12 h-12 mx-auto rounded-full bg-green-500/20 text-green-600 dark:text-green-400 flex items-center justify-center">
+          <div className="w-12 h-12 mx-auto rounded-full bg-green-500/20 text-green-800 dark:text-green-400 flex items-center justify-center">
             <Clock className="w-6 h-6 animate-pulse" />
           </div>
           <div className="space-y-1">

@@ -174,7 +174,7 @@ export default function AdminReviewsPage() {
           </div>
         ) : isError ? (
           <div className="p-8 text-center space-y-2">
-            <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+            <AlertCircle className="w-8 h-8 text-red-700 mx-auto" />
             <p className="text-xs text-muted">{commonT('errorTitle')}</p>
             <button
               onClick={() => refetch()}
@@ -250,7 +250,7 @@ export default function AdminReviewsPage() {
                         type="button"
                         onClick={() => handleReject(rev)}
                         data-testid={`reject-review-btn-${rev.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-600 hover:bg-red-500/10 text-xs font-bold transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-700 hover:bg-red-500/10 text-xs font-bold transition-colors"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         <span>{t('reject')}</span>

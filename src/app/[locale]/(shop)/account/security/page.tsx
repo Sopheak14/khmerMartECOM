@@ -172,7 +172,7 @@ export default function SecurityPage() {
         {pushStatusMessage && (
           <div
             data-testid="web-push-message"
-            className="p-3 text-xs rounded-btn bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2"
+            className="p-3 text-xs rounded-btn bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-400 font-medium flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{pushStatusMessage}</span>

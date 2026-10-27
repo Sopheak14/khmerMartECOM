@@ -59,7 +59,7 @@ export function AdminTopBar({ onToggleMobileSidebar }: AdminTopBarProps) {
 
   const roleColor =
     user?.role === 'ADMIN'
-      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+      ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
       : 'bg-purple-500/10 text-purple-600 border-purple-500/20';
 
   return (

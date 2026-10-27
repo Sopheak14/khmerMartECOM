@@ -159,7 +159,7 @@ export function ReviewStep({
                 : selectedPaymentMethod}
             </p>
             {selectedPaymentMethod === 'KHQR' && (
-              <p className="text-green-600 dark:text-green-400 font-medium">
+              <p className="text-green-800 dark:text-green-400 font-medium">
                 {t('instantKhqrPayment')}
               </p>
             )}
@@ -240,7 +240,7 @@ export function ReviewStep({
             </div>
 
             {discountCents > 0 && (
-              <div className="flex items-center justify-between text-green-600 dark:text-green-400 font-semibold">
+              <div className="flex items-center justify-between text-green-800 dark:text-green-400 font-semibold">
                 <span>{t('discount')}</span>
                 <span>-{formatUsd(discountCents)}</span>
               </div>

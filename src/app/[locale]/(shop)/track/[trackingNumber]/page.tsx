@@ -44,7 +44,7 @@ export default function TrackingDetailPage() {
       case 'PREPARING':
         return {
           label: t('status.PREPARING'),
-          className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+          className: 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20',
           icon: Clock,
         };
       case 'DISPATCHED':
@@ -68,7 +68,7 @@ export default function TrackingDetailPage() {
       case 'DELIVERED':
         return {
           label: t('status.DELIVERED'),
-          className: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20',
+          className: 'bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20',
           icon: CheckCircle2,
         };
       case 'FAILED':
@@ -102,7 +102,7 @@ export default function TrackingDetailPage() {
         data-testid="tracking-not-found"
         className="max-w-lg mx-auto px-4 py-16 text-center space-y-6"
       >
-        <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-700 flex items-center justify-center mx-auto">
           <Search className="w-8 h-8" />
         </div>
 

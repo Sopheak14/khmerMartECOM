@@ -225,7 +225,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
   if (error || !payment) {
     return (
       <div className="max-w-md mx-auto p-6 bg-surface border border-red-500/20 rounded-2xl shadow-sm text-center space-y-4">
-        <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+        <AlertCircle className="w-10 h-10 text-red-700 mx-auto" />
         <div className="space-y-1">
           <h2 className="text-base font-bold text-foreground">{t('paymentFailed')}</h2>
           <p className="text-xs text-muted">{error || 'Could not retrieve payment information'}</p>
@@ -316,7 +316,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
                 className="absolute inset-0 bg-background/80 backdrop-blur-xs rounded-xl flex flex-col items-center justify-center p-4 text-center space-y-3 animate-in fade-in duration-200"
                 data-testid="qr-expired-overlay"
               >
-                <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-700 flex items-center justify-center">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div className="space-y-0.5">
@@ -344,7 +344,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
             <div
               className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
                 countdown.isUnderOneMinute
-                  ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-bold animate-pulse'
+                  ? 'bg-red-500/10 text-red-700 dark:text-red-400 font-bold animate-pulse'
                   : 'bg-muted/15 text-muted'
               }`}
               data-testid="khqr-countdown"
@@ -360,7 +360,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
           <div aria-live="polite" className="w-full text-center">
             {isPaid ? (
               <div
-                className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 rounded-btn flex items-center justify-center gap-2 text-xs font-bold animate-in zoom-in-95"
+                className="p-3 bg-green-500/10 border border-green-500/20 text-green-800 dark:text-green-400 rounded-btn flex items-center justify-center gap-2 text-xs font-bold animate-in zoom-in-95"
                 data-testid="payment-status-paid"
               >
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -368,7 +368,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
               </div>
             ) : status === 'FAILED' ? (
               <div
-                className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-btn flex items-center justify-center gap-2 text-xs font-bold"
+                className="p-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-btn flex items-center justify-center gap-2 text-xs font-bold"
                 data-testid="payment-status-failed"
               >
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -422,7 +422,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
             data-testid="simulate-paid-btn"
             onClick={simulatePaid}
             disabled={isSimulating}
-            className="w-full py-2.5 px-4 rounded-btn border-2 border-dashed border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-btn border-2 border-dashed border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold transition-colors flex items-center justify-center gap-2"
           >
             {isSimulating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -475,7 +475,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
           type="button"
           data-testid="cancel-order-btn"
           onClick={() => setIsCancelDialogOpen(true)}
-          className="w-full h-10 flex items-center justify-center gap-2 rounded-btn border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/10 font-bold transition-colors"
+          className="w-full h-10 flex items-center justify-center gap-2 rounded-btn border border-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-500/10 font-bold transition-colors"
         >
           <XCircle className="w-4 h-4" />
           <span>{t('cancelOrder')}</span>
@@ -492,7 +492,7 @@ export function KhqrCard({ orderNumber, khrRate = 4100 }: KhqrCardProps) {
         >
           <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-left">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-700 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-foreground leading-snug">

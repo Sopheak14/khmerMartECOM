@@ -91,7 +91,7 @@ export default function OrderSuccessPage() {
         return {
           icon: QrCode,
           label: t('paymentKhqrTitle'),
-          badgeClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+          badgeClass: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
         };
       case 'BANK_TRANSFER':
         return {
@@ -104,7 +104,7 @@ export default function OrderSuccessPage() {
         return {
           icon: Banknote,
           label: t('paymentCodTitle'),
-          badgeClass: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+          badgeClass: 'bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20',
         };
     }
   };
@@ -118,7 +118,7 @@ export default function OrderSuccessPage() {
       data-testid="order-success-page"
     >
       {/* Success Icon */}
-      <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center animate-in zoom-in-75">
+      <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-800 dark:text-green-400 flex items-center justify-center animate-in zoom-in-75">
         <CheckCircle2 className="w-10 h-10" />
       </div>
 
@@ -189,7 +189,7 @@ export default function OrderSuccessPage() {
               {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-green-500" />
-                  <span className="text-[11px] text-green-600 font-bold" data-testid="copied-tooltip">
+                  <span className="text-[11px] text-green-800 font-bold" data-testid="copied-tooltip">
                     {t('copied')}
                   </span>
                 </>

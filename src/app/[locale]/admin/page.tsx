@@ -179,7 +179,7 @@ export default function AdminDashboardPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted">{t('orders')}</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
@@ -200,7 +200,7 @@ export default function AdminDashboardPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted">{t('avgOrderValue')}</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-800 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
@@ -288,7 +288,7 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="py-2.5 font-mono text-[11px] text-muted">{item.sku}</td>
                       <td className="py-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-400">
                           {item.available} / {item.threshold}
                         </span>
                       </td>

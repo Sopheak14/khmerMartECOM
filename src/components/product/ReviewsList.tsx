@@ -120,7 +120,7 @@ export function ReviewsList({ productId, reviews: initialReviews = [] }: Reviews
                   {rev.verifiedPurchase && (
                     <span
                       data-testid="verified-purchase-badge"
-                      className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium bg-green-500/10 px-2 py-0.5 rounded-full"
+                      className="flex items-center gap-1 text-[11px] text-green-800 dark:text-green-400 font-medium bg-green-500/10 px-2 py-0.5 rounded-full"
                     >
                       <CheckCircle className="w-3 h-3" />
                       <span>{t('verifiedPurchase')}</span>

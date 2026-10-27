@@ -254,7 +254,7 @@ export default function CartPage() {
                         {stockError?.itemId === item.id && (
                           <div
                             data-testid="stock-error"
-                            className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-500/10 px-2 py-1 rounded"
+                            className="flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-500/10 px-2 py-1 rounded"
                           >
                             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                             <span>{stockError.message}</span>
@@ -456,7 +456,7 @@ export default function CartPage() {
                         <div
                           key={idx}
                           data-testid="promotion-discount-item"
-                          className="flex items-center justify-between text-accent font-medium text-[11px]"
+                          className="flex items-center justify-between text-amber-800 font-medium text-[11px]"
                         >
                           <span>{translatePromotionLabel(promo.label, locale)}</span>
                           <span>-{formatUsd(promo.amountCents)}</span>
@@ -469,7 +469,7 @@ export default function CartPage() {
                   {cart.coupon && calculateCouponDiscountCents(cart.discountCents, cart.promotionDiscounts) > 0 && (
                     <div
                       data-testid="coupon-discount-line"
-                      className="flex items-center justify-between text-green-600 dark:text-green-400 font-semibold"
+                      className="flex items-center justify-between text-green-800 dark:text-green-400 font-semibold"
                     >
                       <span>{t('couponDiscount')} ({cart.coupon.code})</span>
                       <span data-testid="coupon-discount-amount">

@@ -229,7 +229,7 @@ export default function AdminCouponsPage() {
           </div>
         ) : isError ? (
           <div className="p-8 text-center space-y-2">
-            <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+            <AlertCircle className="w-8 h-8 text-red-700 mx-auto" />
             <p className="text-xs text-muted">{commonT('errorTitle')}</p>
             <button
               onClick={() => refetch()}
@@ -350,7 +350,7 @@ export default function AdminCouponsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('code')} <span className="text-red-500">*</span>
+                    {t('code')} <span className="text-red-700">*</span>
                   </label>
                   <input
                     type="text"
@@ -362,7 +362,7 @@ export default function AdminCouponsPage() {
                     required
                   />
                   {fieldErrors.code && (
-                    <p className="text-xs text-red-600 mt-1">{fieldErrors.code}</p>
+                    <p className="text-xs text-red-700 mt-1">{fieldErrors.code}</p>
                   )}
                 </div>
 
@@ -384,7 +384,7 @@ export default function AdminCouponsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('value')} <span className="text-red-500">*</span>
+                    {t('value')} <span className="text-red-700">*</span>
                   </label>
                   <input
                     type="number"

@@ -203,7 +203,7 @@ export default function AdminPaymentsPage() {
       case 'PAID':
         return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
       case 'PENDING':
-        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+        return 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20';
       case 'FAILED':
       case 'EXPIRED':
         return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20';
@@ -270,7 +270,7 @@ export default function AdminPaymentsPage() {
         >
           <span>{t('reconciliationTab')}</span>
           {reconData?.mismatchCount ? (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-800">
               {reconData.mismatchCount}
             </span>
           ) : null}
@@ -545,7 +545,7 @@ export default function AdminPaymentsPage() {
                       'px-3.5 py-1.5 rounded-full text-xs font-bold border',
                       reconData?.mismatchCount === 0
                         ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                        : 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20'
                     )}
                   >
                     Status: {reconData?.status || 'OK'}

@@ -162,9 +162,19 @@ export function DashboardCharts({
             {formattedPayments.length === 0 ? (
               <div className="text-xs text-muted">{t('noChartData')}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" aria-label={t('paymentMethodsTitle')}>
-                <PieChart>
+              <>
+              <ul className="sr-only" aria-label={t('paymentMethodsTitle')}>
+                {formattedPayments.map((p: any) => (
+                  <li key={p.name}>
+                    {p.name}: {p.value}
+                  </li>
+                ))}
+              </ul>
+              <div aria-hidden="true" className="w-full h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart accessibilityLayer={false} tabIndex={-1}>
                   <Pie
+                    rootTabIndex={-1}
                     data={formattedPayments}
                     cx="50%"
                     cy="45%"
@@ -196,6 +206,8 @@ export function DashboardCharts({
                   />
                 </PieChart>
               </ResponsiveContainer>
+              </div>
+              </>
             )}
           </div>
         </div>

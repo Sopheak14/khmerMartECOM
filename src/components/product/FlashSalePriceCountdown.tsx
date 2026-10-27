@@ -91,29 +91,29 @@ export function FlashSalePriceCountdown({
       {isOnSale && mounted && flashSaleEndsAt && timeLeft && !timeLeft.expired && (
         <div
           data-testid="flash-sale-countdown-box"
-          className="p-3 bg-red-500/10 border border-red-500/20 rounded-card flex items-center justify-between flex-wrap gap-2 text-red-600 dark:text-red-400"
+          className="p-3 bg-red-500/10 border border-red-500/20 rounded-card flex items-center justify-between flex-wrap gap-2 text-red-700 dark:text-red-400"
         >
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
-            <Flame className="w-4 h-4 fill-red-500 text-red-500 animate-pulse" />
+            <Flame className="w-4 h-4 fill-red-500 text-red-700 animate-pulse" />
             <span>{t('flashSaleEnds')}</span>
           </div>
 
           <div className="flex items-center gap-1.5 font-mono text-xs font-bold" suppressHydrationWarning>
             <Clock className="w-3.5 h-3.5" />
             {timeLeft.days > 0 && (
-              <span className="bg-red-500 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
+              <span className="bg-red-600 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
                 {timeLeft.days}{t('days')}
               </span>
             )}
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
+            <span className="bg-red-600 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
               {String(timeLeft.hours).padStart(2, '0')}{t('hours')}
             </span>
             <span>:</span>
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
+            <span className="bg-red-600 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
               {String(timeLeft.minutes).padStart(2, '0')}{t('mins')}
             </span>
             <span>:</span>
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
+            <span className="bg-red-600 text-white px-1.5 py-0.5 rounded" suppressHydrationWarning>
               {String(timeLeft.seconds).padStart(2, '0')}{t('secs')}
             </span>
           </div>

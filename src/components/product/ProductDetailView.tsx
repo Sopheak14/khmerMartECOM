@@ -300,7 +300,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
           {/* Stock Status */}
           <div className="space-y-1" data-testid="stock-status">
             {inStock ? (
-              <div className="flex items-center gap-2 text-xs font-semibold text-green-600 dark:text-green-400">
+              <div className="flex items-center gap-2 text-xs font-semibold text-green-800 dark:text-green-400">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-ping" />
                 <span>
                   {maxAvailable <= 5
@@ -309,7 +309,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-red-500">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
                 <AlertCircle className="w-3.5 h-3.5" />
                 <span>{t('outOfStock')}</span>
               </div>
@@ -327,6 +327,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
                 <button
                   type="button"
                   data-testid="qty-minus-btn"
+                  aria-label="Decrease quantity"
                   onClick={handleDecreaseQty}
                   disabled={quantity <= 1 || !inStock}
                   className="w-9 h-10 flex items-center justify-center text-muted hover:text-foreground hover:bg-muted/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -342,6 +343,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
                 <button
                   type="button"
                   data-testid="qty-plus-btn"
+                  aria-label="Increase quantity"
                   onClick={handleIncreaseQty}
                   disabled={quantity >= maxAvailable || !inStock}
                   className="w-9 h-10 flex items-center justify-center text-muted hover:text-foreground hover:bg-muted/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

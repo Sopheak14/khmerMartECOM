@@ -395,7 +395,8 @@ export default function AdminPromotionsPage() {
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
       active,
-      items: items.length > 0 ? items : undefined,
+      // On edit always send items (even []) so unticking everything replaces the list; omitting it leaves products untouched
+      items: editingPromotion || items.length > 0 ? items : undefined,
     };
 
     if (editingPromotion) {

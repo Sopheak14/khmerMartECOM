@@ -95,7 +95,7 @@ export function AdminSidebar({ userRole, isOpenMobile, onCloseMobile }: AdminSid
             </div>
             <div>
               <span className="font-extrabold text-white text-sm tracking-tight block">
-                Khmer<span className="text-primary">Mart</span>
+                Khmer<span className="text-red-400">Mart</span>
               </span>
               <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block -mt-0.5">
                 Backoffice
@@ -209,7 +209,7 @@ export function AdminSidebar({ userRole, isOpenMobile, onCloseMobile }: AdminSid
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-mono text-[10px]">API :4000 ONLINE</span>
           </div>
-          <span className="text-[10px] font-mono opacity-60">v1.0.0</span>
+          <span className="text-[10px] font-mono text-slate-400">v1.0.0</span>
         </div>
       </aside>
     </>

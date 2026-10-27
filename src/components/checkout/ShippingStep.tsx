@@ -136,7 +136,7 @@ export function ShippingStep({
                 {isSameDayDisabled && (
                   <div
                     data-testid="sameday-disabled-reason"
-                    className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] flex items-start gap-1.5"
+                    className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-400 text-[11px] flex items-start gap-1.5"
                   >
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>
@@ -153,7 +153,7 @@ export function ShippingStep({
                 <span
                   data-testid={`fee-${method.code}`}
                   className={`text-sm font-black ${
-                    isFreeStandard ? 'text-green-600 dark:text-green-400' : 'text-foreground'
+                    isFreeStandard ? 'text-green-800 dark:text-green-400' : 'text-foreground'
                   }`}
                 >
                   {feeDisplay}
