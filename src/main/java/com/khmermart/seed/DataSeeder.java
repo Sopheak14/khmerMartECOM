@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Profile("!prod")
+@Order(0)
 public class DataSeeder implements CommandLineRunner {
 
   private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
@@ -632,15 +634,16 @@ public class DataSeeder implements CommandLineRunner {
   private void seedPromotionsAndCoupons() {
     Instant now = Instant.now();
 
-    // 1. FLASH_SALE: 4 products (1001, 1010, 1015, 1031) ending in 3 days
+    // 1. FLASH_SALE: 4 products (1001, 1010, 1015, 1031), live from seed time for 7 days so a demo
+    // right after a reset always shows a running countdown
     jdbcTemplate.update(
         """
         INSERT INTO promotions (id, name, name_km, type, discount_percent, threshold_cents, starts_at, ends_at, banner_image, link, is_active)
         VALUES (1, 'Flash Sale 24H', 'ការលក់បញ្ចុះតម្លៃពិសេស 24 ម៉ោង', 'FLASH_SALE', 15, 0, ?, ?, NULL, '/promotions/flash-sale', true)
         ON CONFLICT (id) DO NOTHING
         """,
-        Timestamp.from(now.minus(1, ChronoUnit.DAYS)),
-        Timestamp.from(now.plus(3, ChronoUnit.DAYS)));
+        Timestamp.from(now),
+        Timestamp.from(now.plus(7, ChronoUnit.DAYS)));
 
     // 4 products in flash sale (Laptop Pro 15 variants 1 & 2 on sale; variants 3 & 4 not on sale)
     insertPromotionProduct(1L, 1001L, 1L, 89900L); // Laptop Pro 15 (variant 1)

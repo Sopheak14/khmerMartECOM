@@ -46,7 +46,7 @@ Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@
 
 ### Troubleshooting
 - `STEP 0` fails with "promotion 1 returns per-variant items[]": the running backend is an old build — restart it from the latest commit, then re-run.
-- `variant 1 on flash sale` fails: the seeded flash sale has ended (it lasts 3 days from seeding); re-seed or create a new flash sale for variants 1–2 at 89900.
+- `variant 1 on flash sale` fails: the seeded flash sale has ended (it lasts 7 days from seeding); run `scripts/reset_demo.sh` (see below) or create a new flash sale for variants 1–2 at 89900.
 - A failed run can leave a few cancelled/pending orders for throwaway users; they are harmless.
 
 ---
@@ -92,5 +92,29 @@ BASE=http://192.168.1.10:4000 scripts/smoke_test.sh
 
 ### ដោះស្រាយបញ្ហា
 - `STEP 0` បរាជ័យ "promotion 1 returns per-variant items[]"៖ backend ដែលកំពុងរត់ជា build ចាស់ — សូមចាប់ផ្តើមឡើងវិញពី commit ចុងក្រោយ រួចដំណើរការម្តងទៀត។
-- `variant 1 on flash sale` បរាជ័យ៖ flash sale ដែល seed ទុកបានផុតកំណត់ (មានរយៈពេល ៣ ថ្ងៃចាប់ពីពេល seed); សូម seed ឡើងវិញ ឬបង្កើត flash sale ថ្មីសម្រាប់ variant 1–2 តម្លៃ 89900។
+- `variant 1 on flash sale` បរាជ័យ៖ flash sale ដែល seed ទុកបានផុតកំណត់ (មានរយៈពេល ៧ ថ្ងៃចាប់ពីពេល seed); សូមរត់ `scripts/reset_demo.sh` (មើលខាងក្រោម) ឬបង្កើត flash sale ថ្មីសម្រាប់ variant 1–2 តម្លៃ 89900។
 - ការរត់ដែលបរាជ័យអាចទុកការបញ្ជាទិញដែលបានលុបចោល/កំពុងរង់ចាំខ្លះសម្រាប់អ្នកប្រើបណ្តោះអាសន្ន ហើយវាមិនមានគ្រោះថ្នាក់ទេ។
+
+---
+
+## Demo reset (`scripts/reset_demo.sh`) / កំណត់ការបង្ហាញឡើងវិញ
+
+**English.** Puts the local dev database back to a fresh, seeded state so the demo always starts clean and the flash sale shows a live countdown (the seeder starts it at seed time and ends it 7 days later).
+
+Exact order:
+1. **Stop the backend** (Ctrl+C in its terminal). The script never stops or starts it, and it refuses to run while something answers on `BACKEND_URL` (default `http://localhost:4000`).
+2. `scripts/reset_demo.sh` — type the database name to confirm (or pass `--yes`).
+3. **Start the backend** again (`./mvnw spring-boot:run`). A backend that was running during the reset has stale connections and caches, so it must be restarted.
+4. `scripts/smoke_test.sh` — must print `RESULT: ALL 18 STEPS PASSED`.
+
+What it does: (a) refuses unless `SPRING_PROFILES_ACTIVE` is `dev` (default), the `DB_URL` host is `localhost`/`127.0.0.1`/`::1` and the database name does not look like production; (b) asks for confirmation; (c) `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`; (d) clears KhmerMart cache keys in Redis, then does a one-shot run of the application (`--app.seed.reset=true --app.seed.exit-after=true`, random port) that applies the Flyway migrations, runs the seeder and exits by itself; (e) prints the seeded flash sale window. Requires `psql`; `redis-cli` is optional. Config variables: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `BACKEND_URL` (defaults match `docker-compose.yml`).
+
+**ខ្មែរ។** កំណត់មូលដ្ឋានទិន្នន័យ dev ក្នុងម៉ាស៊ីនឲ្យត្រឡប់ទៅទិន្នន័យ seed ថ្មីស្រស់ ដើម្បីឲ្យ demo ចាប់ផ្តើមស្អាត និង flash sale បង្ហាញម៉ោងរាប់ថយក្រោយពិតប្រាកដ (seeder ចាប់ផ្តើមវាពេល seed ហើយបញ្ចប់ក្រោយ ៧ ថ្ងៃ)។
+
+លំដាប់ពិតប្រាកដ៖
+1. **បិទ backend** (Ctrl+C ក្នុង terminal របស់វា)។ ស្គ្រីបមិនបិទ ឬបើកវាឡើយ ហើយបដិសេធមិនដំណើរការបើមានអ្វីឆ្លើយតបនៅ `BACKEND_URL` (លំនាំដើម `http://localhost:4000`)។
+2. `scripts/reset_demo.sh` — វាយឈ្មោះមូលដ្ឋានទិន្នន័យដើម្បីបញ្ជាក់ (ឬប្រើ `--yes`)។
+3. **ចាប់ផ្តើម backend** ឡើងវិញ (`./mvnw spring-boot:run`)។ backend ដែលកំពុងរត់ពេល reset មាន connection និង cache ចាស់ ដូច្នេះត្រូវចាប់ផ្តើមឡើងវិញ។
+4. `scripts/smoke_test.sh` — ត្រូវបង្ហាញ `RESULT: ALL 18 STEPS PASSED`។
+
+អ្វីដែលវាធ្វើ៖ (a) បដិសេធបើ `SPRING_PROFILES_ACTIVE` មិនមែន `dev` ម៉ាស៊ីនក្នុង `DB_URL` មិនមែន `localhost`/`127.0.0.1`/`::1` ឬឈ្មោះមូលដ្ឋានទិន្នន័យមើលទៅដូច production; (b) សួរការបញ្ជាក់; (c) `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`; (d) សម្អាត cache key របស់ KhmerMart ក្នុង Redis ហើយដំណើរការកម្មវិធីម្តងបណ្តោះអាសន្ន (`--app.seed.reset=true --app.seed.exit-after=true`, port ចៃដន្យ) ដែលអនុវត្ត Flyway migration, seed ទិន្នន័យ ហើយចេញដោយខ្លួនឯង; (e) បង្ហាញរយៈពេល flash sale ដែលបាន seed។ ត្រូវការ `psql`; `redis-cli` ជាជម្រើស។

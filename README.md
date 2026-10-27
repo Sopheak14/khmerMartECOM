@@ -52,6 +52,20 @@ The server starts on port `4000`:
 - Swagger Interactive UI: `http://localhost:4000/api/docs`
 - Live OpenAPI Spec: `http://localhost:4000/api/v3/api-docs`
 
+### 3. Reset the demo to a fresh state (EN / ខ្មែរ)
+Before a demo, put the dev database back to a clean seeded state (fresh data, flash sale live **from now for 7 days** so the countdown is running):
+```bash
+# 1. stop the backend yourself (Ctrl+C in its terminal)
+scripts/reset_demo.sh            # asks you to type the database name; --yes skips the prompt
+# 2. start the backend again   (the script never stops or starts it)
+./mvnw spring-boot:run
+# 3. check everything works
+scripts/smoke_test.sh
+```
+Safety: the script refuses unless `SPRING_PROFILES_ACTIVE` is `dev`, the database host is `localhost`, and no backend answers on `BACKEND_URL` (default `http://localhost:4000`). It drops and re-creates the `public` schema, runs Flyway + the seeder, and clears KhmerMart cache keys in Redis. **The backend must be restarted after the reset.** Details: [`docs/SMOKE_TEST.md`](docs/SMOKE_TEST.md).
+
+មុនពេល demo សូមកំណត់មូលដ្ឋានទិន្នន័យ dev ឲ្យត្រឡប់ទៅទិន្នន័យថ្មីស្រស់ (flash sale ដំណើរការ **ចាប់ពីពេលនេះរយៈពេល ៧ ថ្ងៃ** ដើម្បីឲ្យមានម៉ោងរាប់ថយក្រោយ)៖ ១) បិទ backend ដោយខ្លួនឯង ២) `scripts/reset_demo.sh` (វាសួរឲ្យវាយឈ្មោះមូលដ្ឋានទិន្នន័យ; `--yes` រំលងសំណួរ) ៣) ចាប់ផ្តើម backend ឡើងវិញ (ស្គ្រីបមិនបិទ/បើក backend ឡើយ) ៤) `scripts/smoke_test.sh`។ ស្គ្រីបបដិសេធបើមិនមែនប្រូហ្វាល `dev` មិនមែនម៉ាស៊ីន `localhost` ឬមាន backend កំពុងឆ្លើយតប។ **ត្រូវចាប់ផ្តើម backend ឡើងវិញបន្ទាប់ពី reset។**
+
 ---
 
 ## 3. Seeded Demo Accounts
