@@ -1,6 +1,7 @@
 package com.khmermart.model.request;
 
 import com.khmermart.model.enumerate.PromotionType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -15,4 +16,5 @@ public record AdminPromotionRequest(
     @NotNull(message = "startsAt is required") Instant startsAt,
     @NotNull(message = "endsAt is required") Instant endsAt,
     Boolean active,
-    List<Long> productIds) {}
+    @Deprecated List<Long> productIds,
+    @Valid List<PromotionItemRequest> items) {}

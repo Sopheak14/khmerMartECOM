@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.model.entity.AppUser;
@@ -34,6 +35,7 @@ import com.khmermart.model.request.AdminSettingsUpdateRequest;
 import com.khmermart.model.request.AdminUserUpdateRequest;
 import com.khmermart.model.request.CategoryRequest;
 import com.khmermart.model.request.InventoryAdjustRequest;
+import com.khmermart.model.request.PromotionItemRequest;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.request.ReorderImagesRequest;
 import com.khmermart.model.request.UpdateOrderStatusRequest;
@@ -884,7 +886,8 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
             now,
             now.plus(10, ChronoUnit.DAYS),
             true,
-            List.of());
+            List.of(),
+            null);
 
     String promoRes =
         mockMvc
@@ -911,7 +914,8 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
             now,
             now.plus(15, ChronoUnit.DAYS),
             true,
-            List.of());
+            List.of(),
+            null);
 
     mockMvc
         .perform(
@@ -925,6 +929,151 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
     mockMvc
         .perform(delete("/api/admin/promotions/" + promoId).header("Authorization", adminToken))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("k. Promotions: per-variant flash sale items, validation, legacy productIds")
+  void testPerVariantPromotionItems() throws Exception {
+    Instant now = Instant.now();
+
+    // Seeded flash sale (id 1) is the only active FLASH_SALE allowed: capture its items, pause it.
+    JsonNode seeded =
+        objectMapper
+            .readTree(
+                mockMvc
+                    .perform(get("/api/admin/promotions/1").header("Authorization", adminToken))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .path("data");
+    List<PromotionItemRequest> items = new java.util.ArrayList<>();
+    for (JsonNode it : seeded.path("items")) {
+      items.add(
+          new PromotionItemRequest(
+              it.path("productId").asLong(),
+              it.hasNonNull("variantId") ? it.path("variantId").asLong() : null,
+              it.hasNonNull("salePriceCents") ? it.path("salePriceCents").asLong() : null));
+    }
+    assertThat(items).hasSize(5);
+    seeded
+        .path("items")
+        .forEach(
+            it -> {
+              if (it.path("variantId").asLong() == 1L) {
+                assertThat(it.path("sku").asText()).isNotEmpty();
+                assertThat(it.path("attributes").isObject()).isTrue();
+                assertThat(it.path("priceCents").asLong()).isEqualTo(99900L);
+                assertThat(it.path("salePriceCents").asLong()).isEqualTo(89900L);
+              }
+            });
+
+    putPromotion(1L, flashRequest("Flash Sale 24H", now, false, null, null)).andExpect(status().isOk());
+    Long createdId = null;
+    try {
+      // 1. Per-variant flash sale: 1001 variants 1,2 stay 89900, variant 3 -> 119900
+      List<PromotionItemRequest> create = new java.util.ArrayList<>(items);
+      create.add(new PromotionItemRequest(1001L, 3L, 119900L));
+      String res =
+          postPromotion(flashRequest("Laptop variant flash", now, true, null, create))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.data.items.length()").value(6))
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      createdId = objectMapper.readTree(res).path("data").path("id").asLong();
+
+      mockMvc
+          .perform(get("/api/products/1001"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.variants[0].salePriceCents").value(89900))
+          .andExpect(jsonPath("$.data.variants[1].salePriceCents").value(89900))
+          .andExpect(jsonPath("$.data.variants[2].salePriceCents").value(119900))
+          .andExpect(jsonPath("$.data.variants[3].salePriceCents").doesNotExist());
+
+      // 2. Product-wide FLASH_SALE item on a product with variants -> 400 with details
+      postPromotion(
+              flashRequest(
+                  "Bad wide", now, false, null, List.of(new PromotionItemRequest(1001L, null, 89900L))))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+          .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
+
+      // 3. Variant from another product -> 400
+      postPromotion(
+              flashRequest(
+                  "Bad variant", now, false, null, List.of(new PromotionItemRequest(1010L, 3L, 1000L))))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+          .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
+
+      // 4. Sale price must be > 0 and < variant price (variant 3 = 129900)
+      for (long bad : new long[] {0L, 129900L, 150000L}) {
+        postPromotion(
+                flashRequest(
+                    "Bad price", now, false, null, List.of(new PromotionItemRequest(1001L, 3L, bad))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.details['items[0].salePriceCents']").exists());
+      }
+
+      // 5. Legacy productIds-only payload on a product without variants still works
+      String legacy =
+          postPromotion(flashRequest("Legacy ids", now, false, List.of(1015L), null))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.data.productIds[0]").value(1015))
+              .andExpect(jsonPath("$.data.items[0].productId").value(1015))
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      Long legacyId = objectMapper.readTree(legacy).path("data").path("id").asLong();
+      mockMvc
+          .perform(delete("/api/admin/promotions/" + legacyId).header("Authorization", adminToken))
+          .andExpect(status().isOk());
+    } finally {
+      if (createdId != null) {
+        mockMvc.perform(
+            delete("/api/admin/promotions/" + createdId).header("Authorization", adminToken));
+      }
+      putPromotion(1L, flashRequest("Flash Sale 24H", now.minus(1, ChronoUnit.DAYS), true, null, items))
+          .andExpect(status().isOk());
+    }
+  }
+
+  private AdminPromotionRequest flashRequest(
+      String name,
+      Instant startsAt,
+      boolean active,
+      List<Long> productIds,
+      List<PromotionItemRequest> items) {
+    return new AdminPromotionRequest(
+        name,
+        null,
+        PromotionType.FLASH_SALE,
+        15,
+        null,
+        startsAt.minus(1, ChronoUnit.DAYS),
+        startsAt.plus(3, ChronoUnit.DAYS),
+        active,
+        productIds,
+        items);
+  }
+
+  private org.springframework.test.web.servlet.ResultActions postPromotion(
+      AdminPromotionRequest req) throws Exception {
+    return mockMvc.perform(
+        post("/api/admin/promotions")
+            .header("Authorization", adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(req)));
+  }
+
+  private org.springframework.test.web.servlet.ResultActions putPromotion(
+      Long id, AdminPromotionRequest req) throws Exception {
+    return mockMvc.perform(
+        put("/api/admin/promotions/" + id)
+            .header("Authorization", adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(req)));
   }
 
   @Test

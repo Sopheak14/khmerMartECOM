@@ -15,3 +15,10 @@
 - **Contract Additions**:
   - `VariantDTO.salePriceCents`: Additive, optional `Long` field present in the response only when that variant is on an active flash sale (omitted when not on sale).
   - `ProductCardDTO.salePriceCents` & `ProductDetailDTO.salePriceCents`: Populated with the lowest active variant sale price (or product sale price when no variants).
+
+## 4. Admin Promotion Items (per-variant flash sales)
+- **Issue**: `AdminPromotionRequest` only accepted `productIds`, so admins could not create the per-variant flash sales that pricing supports (`promotion_products.variant_id`).
+- **Contract Additions** (additive):
+  - `AdminPromotionRequest.items`: `[{ productId, variantId?, salePriceCents? }]`. `productIds` remains accepted (deprecated) and maps to items without `variantId`; `items` wins if both are sent.
+  - `AdminPromotionDto.items`: `[{ productId, productName, variantId?, sku?, attributes?, priceCents, salePriceCents? }]`; `productIds` is kept.
+- **Validation** (`400 VALIDATION_ERROR`, `error.details` keyed `items[i].variantId` / `items[i].salePriceCents` / ...): variant must belong to the product; a `FLASH_SALE` item for a product with variants must name a `variantId`; `salePriceCents` must be > 0 and < the variant's (or product's) `priceCents`.

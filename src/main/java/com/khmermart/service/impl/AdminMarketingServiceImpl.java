@@ -3,22 +3,32 @@ package com.khmermart.service.impl;
 import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
 import com.khmermart.model.entity.Coupon;
+import com.khmermart.model.entity.Product;
+import com.khmermart.model.entity.ProductVariant;
 import com.khmermart.model.entity.Promotion;
 import com.khmermart.model.entity.PromotionProduct;
 import com.khmermart.model.enumerate.CouponType;
 import com.khmermart.model.request.AdminCouponRequest;
 import com.khmermart.model.request.AdminPromotionRequest;
+import com.khmermart.model.request.PromotionItemRequest;
 import com.khmermart.model.response.AdminCouponDto;
 import com.khmermart.model.response.AdminPromotionDto;
+import com.khmermart.model.response.AdminPromotionItemDto;
+import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.repository.CouponRepository;
+import com.khmermart.repository.ProductRepository;
+import com.khmermart.repository.ProductVariantRepository;
 import com.khmermart.repository.PromotionProductRepository;
 import com.khmermart.repository.PromotionRepository;
 import com.khmermart.service.AdminMarketingService;
 import com.khmermart.service.AuditLogService;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,16 +39,22 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
   private final CouponRepository couponRepository;
   private final PromotionRepository promotionRepository;
   private final PromotionProductRepository promotionProductRepository;
+  private final ProductRepository productRepository;
+  private final ProductVariantRepository productVariantRepository;
   private final AuditLogService auditLogService;
 
   public AdminMarketingServiceImpl(
       CouponRepository couponRepository,
       PromotionRepository promotionRepository,
       PromotionProductRepository promotionProductRepository,
+      ProductRepository productRepository,
+      ProductVariantRepository productVariantRepository,
       AuditLogService auditLogService) {
     this.couponRepository = couponRepository;
     this.promotionRepository = promotionRepository;
     this.promotionProductRepository = promotionProductRepository;
+    this.productRepository = productRepository;
+    this.productVariantRepository = productVariantRepository;
     this.auditLogService = auditLogService;
   }
 
@@ -202,6 +218,8 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
   public AdminPromotionDto createPromotion(AdminPromotionRequest request, Long adminId, String ip) {
     validatePromotionDatesAndPercent(
         request.discountPercent(), request.startsAt(), request.endsAt());
+    List<PromotionItemRequest> items = resolveItems(request);
+    validatePromotionItems(request.type(), items);
 
     Promotion promo =
         Promotion.builder()
@@ -217,11 +235,8 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
 
     Promotion saved = promotionRepository.save(promo);
 
-    if (request.productIds() != null && !request.productIds().isEmpty()) {
-      for (Long pid : request.productIds()) {
-        promotionProductRepository.save(
-            PromotionProduct.builder().promotionId(saved.getId()).productId(pid).build());
-      }
+    if (items != null) {
+      saveItems(saved.getId(), items);
     }
 
     auditLogService.log(
@@ -244,6 +259,8 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
 
     validatePromotionDatesAndPercent(
         request.discountPercent(), request.startsAt(), request.endsAt());
+    List<PromotionItemRequest> items = resolveItems(request);
+    validatePromotionItems(request.type(), items);
 
     Map<String, Object> beforeState =
         Map.of(
@@ -267,12 +284,10 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
 
     Promotion updated = promotionRepository.save(promo);
 
-    if (request.productIds() != null) {
+    if (items != null) {
       promotionProductRepository.deleteByPromotionId(id);
-      for (Long pid : request.productIds()) {
-        promotionProductRepository.save(
-            PromotionProduct.builder().promotionId(updated.getId()).productId(pid).build());
-      }
+      promotionProductRepository.flush();
+      saveItems(updated.getId(), items);
     }
 
     auditLogService.log(
@@ -309,6 +324,81 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
         Map.of("id", id, "name", promo.getName()),
         Map.of("deleted", true),
         ip);
+  }
+
+  /** items wins over the deprecated productIds; null means the request does not touch products. */
+  private List<PromotionItemRequest> resolveItems(AdminPromotionRequest request) {
+    if (request.items() != null && !request.items().isEmpty()) {
+      return request.items();
+    }
+    if (request.productIds() != null) {
+      return request.productIds().stream()
+          .map(pid -> new PromotionItemRequest(pid, null, null))
+          .toList();
+    }
+    return request.items();
+  }
+
+  private void validatePromotionItems(PromotionType type, List<PromotionItemRequest> items) {
+    if (items == null || items.isEmpty()) {
+      return;
+    }
+    Map<String, String> errors = new LinkedHashMap<>();
+    Set<String> seen = new HashSet<>();
+    for (int i = 0; i < items.size(); i++) {
+      PromotionItemRequest item = items.get(i);
+      String path = "items[" + i + "]";
+      if (item.productId() == null) {
+        errors.put(path + ".productId", "productId is required");
+        continue;
+      }
+      if (!seen.add(item.productId() + ":" + item.variantId())) {
+        errors.put(path, "Duplicate product/variant in items");
+        continue;
+      }
+      Product product = productRepository.findById(item.productId()).orElse(null);
+      if (product == null) {
+        errors.put(path + ".productId", "Product not found: " + item.productId());
+        continue;
+      }
+      Long basePrice = product.getPriceCents();
+      if (item.variantId() != null) {
+        ProductVariant variant = productVariantRepository.findById(item.variantId()).orElse(null);
+        if (variant == null || !variant.getProductId().equals(item.productId())) {
+          errors.put(path + ".variantId", "Variant " + item.variantId() + " does not belong to product " + item.productId());
+          continue;
+        }
+        if (variant.getPriceCents() != null) {
+          basePrice = variant.getPriceCents();
+        }
+      } else if (type == PromotionType.FLASH_SALE
+          && !productVariantRepository.findByProductIdAndActiveTrue(item.productId()).isEmpty()) {
+        errors.put(path + ".variantId", "variantId is required: product "
+                    + item.productId()
+                    + " has variants, a flash sale cannot be product-wide");
+        continue;
+      }
+      Long sale = item.salePriceCents();
+      if (sale != null && (sale <= 0 || basePrice == null || sale >= basePrice)) {
+        errors.put(path + ".salePriceCents", "salePriceCents must be greater than 0 and less than the price (" + basePrice + ")");
+      }
+    }
+    if (!errors.isEmpty()) {
+      throw new CustomException(
+          ErrorCode.VALIDATION_ERROR, "Invalid promotion items", errors);
+    }
+  }
+
+  private void saveItems(Long promotionId, List<PromotionItemRequest> items) {
+    for (PromotionItemRequest item : items) {
+      promotionProductRepository.save(
+          PromotionProduct.builder()
+              .promotionId(promotionId)
+              .productId(item.productId())
+              .variantId(item.variantId())
+              .salePriceCents(item.salePriceCents())
+              .build());
+    }
   }
 
   private void validateCouponDatesAndValues(
@@ -352,10 +442,32 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
   }
 
   private AdminPromotionDto toPromotionDto(Promotion p) {
-    List<Long> productIds =
-        promotionProductRepository.findByPromotionId(p.getId()).stream()
-            .map(PromotionProduct::getProductId)
-            .distinct()
+    List<PromotionProduct> rows = promotionProductRepository.findByPromotionId(p.getId());
+    List<Long> productIds = rows.stream().map(PromotionProduct::getProductId).distinct().toList();
+    Map<Long, Product> products = new java.util.HashMap<>();
+    productRepository.findAllById(productIds).forEach(pr -> products.put(pr.getId(), pr));
+    List<AdminPromotionItemDto> items =
+        rows.stream()
+            .map(
+                row -> {
+                  Product pr = products.get(row.getProductId());
+                  ProductVariant v =
+                      row.getVariantId() == null
+                          ? null
+                          : productVariantRepository.findById(row.getVariantId()).orElse(null);
+                  Long price =
+                      v != null && v.getPriceCents() != null
+                          ? v.getPriceCents()
+                          : pr != null ? pr.getPriceCents() : null;
+                  return new AdminPromotionItemDto(
+                      row.getProductId(),
+                      pr != null ? pr.getName() : null,
+                      row.getVariantId(),
+                      v != null ? v.getSku() : null,
+                      v != null ? v.getAttributes() : null,
+                      price,
+                      row.getSalePriceCents());
+                })
             .toList();
 
     return new AdminPromotionDto(
@@ -368,6 +480,7 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
         p.getStartsAt(),
         p.getEndsAt(),
         p.isActive(),
-        productIds);
+        productIds,
+        items);
   }
 }

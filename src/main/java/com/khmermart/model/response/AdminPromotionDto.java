@@ -16,4 +16,5 @@ public record AdminPromotionDto(
     Instant startsAt,
     Instant endsAt,
     boolean active,
-    List<Long> productIds) {}
+    List<Long> productIds,
+    List<AdminPromotionItemDto> items) {}

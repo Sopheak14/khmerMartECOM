@@ -134,6 +134,9 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `GET /api/admin/promotions`: List campaigns (`FLASH_SALE`, `SEASONAL`, `BOGO`).
 - `POST /api/admin/promotions`: Create promotion campaign and evict home cache.
 - `PUT /api/admin/promotions/{id}`: Update promotion campaign.
+  - `AdminPromotionRequest.items`: `[{ productId, variantId?: Long, salePriceCents?: Long }]` (additive). `productIds: [Long]` still works but is deprecated; it maps to items without `variantId`. If both are sent, `items` wins. On PUT, omitting both leaves the promotion's products untouched; sending either replaces them.
+  - Validation (`400 VALIDATION_ERROR`, `error.details` = `{ "items[i].<field>": message }`): `variantId` must belong to `productId`; a `FLASH_SALE` item for a product with variants must name a `variantId`; `salePriceCents` must be > 0 and < the variant's `priceCents` (the product's `priceCents` for a product-wide item); unknown products and duplicate product/variant pairs are rejected.
+  - `AdminPromotionDto` (GET list/detail, POST/PUT response) adds `items: [{ productId, productName, variantId?, sku?, attributes?, priceCents, salePriceCents? }]`; `productIds` is kept.
 - `DELETE /api/admin/promotions/{id}`: Delete promotion campaign.
 
 ### 7.9 Reviews Moderation
