@@ -72,6 +72,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     const cartItems = page.locator('[data-testid="cart-item"]');
     if ((await cartItems.count()) === 0) {
       await page.goto('/en/products/laptop-pro-15');
+      await page.waitForLoadState('networkidle');
       await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
       await page.click('[data-testid="variant-chip-ram-16GB"]');
       await page.click('[data-testid="variant-chip-color-Space Gray"]');
@@ -122,6 +123,43 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     // Wait for item to be removed
     await expect(page.locator('[data-testid="cart-empty-state"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid="cart-empty-state"]')).toContainText(/កន្ត្រកទំនិញរបស់អ្នកទទេ/i);
+  });
+
+  test('2b: Cart stepper at max stock shows OUT_OF_STOCK message in EN and KM', async ({ page, context }) => {
+    await context.clearCookies();
+    await page.goto('/en/products/laptop-pro-15');
+    await page.waitForLoadState('networkidle');
+    await page.click('[data-testid="variant-chip-ram-16GB"]');
+    await page.click('[data-testid="variant-chip-color-Space Gray"]');
+    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
+    await page.click('[data-testid="add-to-cart-button"]');
+    await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
+
+    // Raise the line to its full available stock through the real API, then press "+" once more
+    const available = await page.evaluate(async () => {
+      const api = 'http://localhost:4000/api';
+      const cart = (await (await fetch(`${api}/cart`, { credentials: 'include' })).json()).data;
+      const item = cart.items[0];
+      await fetch(`${api}/cart/items/${item.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: item.available }),
+      });
+      return item.available as number;
+    });
+
+    for (const [locale, expected] of [
+      ['en', `Only ${available} left in stock (OUT_OF_STOCK)`],
+      ['km', `នៅសល់តែ ${available} ទៀតប៉ុណ្ណោះក្នុងស្តុក (OUT_OF_STOCK)`],
+    ] as const) {
+      await page.goto(`/${locale}/cart`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="qty-value"]').first()).toHaveText(String(available));
+      await page.click('[data-testid="qty-plus"]');
+      await expect(page.locator('[data-testid="stock-error"]')).toHaveText(expected);
+    }
   });
 
   test('3: Coupons (SAVE5, WELCOME10, FREESHIP, invalid) and promotion lines in CartDTO', async ({ page }) => {

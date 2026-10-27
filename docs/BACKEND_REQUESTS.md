@@ -69,7 +69,7 @@
       Boolean active,
       List<Long> productIds) {}
   ```
-  The entity `PromotionProduct` has a `variantId` column, but `AdminMarketingServiceImpl` assigns `variantId: null` because `AdminPromotionRequest` cannot accept variant IDs or per-variant sale prices.
+  The database already has `promotion_products.variant_id` (migration V3) and the `PromotionProduct` entity maps it; only the admin promotion API is missing support. `AdminMarketingServiceImpl` assigns `variantId: null` because `AdminPromotionRequest` cannot accept variant IDs or per-variant sale prices.
 - **Request:** Update `AdminPromotionRequest` to accept structured product/variant mappings:
   ```java
   public record PromotionItemRequest(Long productId, Long variantId, Long salePriceCents) {}

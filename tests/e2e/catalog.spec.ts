@@ -359,6 +359,7 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     // 1. Fresh guest cart session for 32GB / 1TB
     await context.clearCookies();
     await page.goto('/en/products/laptop-pro-15');
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
 
     const addBtn = page.locator('[data-testid="add-to-cart-button"]');
