@@ -161,7 +161,9 @@ public class AdminProductController {
         .body(data);
   }
 
-  @PostMapping(value = {"/import", "/import.csv"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(
+      value = {"/import", "/import.csv"},
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
   @Audited(action = "IMPORT_PRODUCTS", entity = "PRODUCT")
   @Operation(summary = "Import products from CSV with per-row validation reporting")

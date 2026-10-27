@@ -69,8 +69,7 @@ public class ReportServiceImpl implements ReportService {
     Timestamp fromTs = (from != null) ? Timestamp.from(from) : null;
     Timestamp toTs = (to != null) ? Timestamp.from(to) : null;
 
-    Long net =
-        jdbcTemplate.queryForObject(sql, Long.class, fromTs, fromTs, toTs, toTs);
+    Long net = jdbcTemplate.queryForObject(sql, Long.class, fromTs, fromTs, toTs, toTs);
     return net != null ? net : 0L;
   }
 
@@ -108,7 +107,7 @@ public class ReportServiceImpl implements ReportService {
 
     String sql =
         """
-        SELECT 
+        SELECT
           TO_CHAR(COALESCE(p_paid.paid_at, o.placed_at) AT TIME ZONE 'Asia/Phnom_Penh', 'YYYY-MM-DD') AS day,
           COUNT(o.id) AS orders,
           COALESCE(SUM(o.total_cents - COALESCE(r.refunded_cents, 0)), 0) AS revenue_cents
@@ -159,7 +158,7 @@ public class ReportServiceImpl implements ReportService {
   public List<PaymentMethodBreakdownDto> getPaymentMethodBreakdown(Instant from, Instant to) {
     String sql =
         """
-        SELECT 
+        SELECT
           o.payment_method AS method,
           COUNT(o.id) AS count,
           COALESCE(SUM(o.total_cents - COALESCE(r.refunded_cents, 0)), 0) AS amount_cents
@@ -202,7 +201,7 @@ public class ReportServiceImpl implements ReportService {
   public List<TopProductDto> getTopProducts(Instant from, Instant to, int limit) {
     String sql =
         """
-        SELECT 
+        SELECT
           p.id AS product_id,
           p.name AS product_name,
           COALESCE(SUM(oi.quantity), 0) AS sold_qty,
@@ -347,7 +346,7 @@ public class ReportServiceImpl implements ReportService {
     return switch (groupBy) {
       case "month" ->
           """
-          SELECT 
+          SELECT
             TO_CHAR(COALESCE(p_paid.paid_at, o.placed_at) AT TIME ZONE 'Asia/Phnom_Penh', 'YYYY-MM') AS grp,
             COUNT(DISTINCT o.id) AS orders_count,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,
@@ -376,7 +375,7 @@ public class ReportServiceImpl implements ReportService {
           """;
       case "category" ->
           """
-          SELECT 
+          SELECT
             COALESCE(c.name, 'Uncategorized') AS grp,
             COUNT(DISTINCT o.id) AS orders_count,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,
@@ -399,7 +398,7 @@ public class ReportServiceImpl implements ReportService {
           """;
       case "product" ->
           """
-          SELECT 
+          SELECT
             p.name AS grp,
             COUNT(DISTINCT o.id) AS orders_count,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,
@@ -421,7 +420,7 @@ public class ReportServiceImpl implements ReportService {
           """;
       case "paymentmethod" ->
           """
-          SELECT 
+          SELECT
             o.payment_method AS grp,
             COUNT(DISTINCT o.id) AS orders_count,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,
@@ -450,7 +449,7 @@ public class ReportServiceImpl implements ReportService {
           """;
       default ->
           """
-          SELECT 
+          SELECT
             TO_CHAR(COALESCE(p_paid.paid_at, o.placed_at) AT TIME ZONE 'Asia/Phnom_Penh', 'YYYY-MM-DD') AS grp,
             COUNT(DISTINCT o.id) AS orders_count,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,

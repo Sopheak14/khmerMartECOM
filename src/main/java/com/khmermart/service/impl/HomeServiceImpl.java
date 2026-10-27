@@ -17,7 +17,6 @@ import com.khmermart.service.SettingService;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +56,8 @@ public class HomeServiceImpl implements HomeService {
     Instant now = Instant.now();
     HomeDto.FlashSaleDto flashSale = null;
     // Soonest-ending active flash sale headlines the banner; products come from all of them.
-    List<Promotion> flashPromos = promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
+    List<Promotion> flashPromos =
+        promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
     if (!flashPromos.isEmpty()) {
       Promotion promo = flashPromos.get(0);
       List<Long> productIds =

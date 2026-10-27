@@ -14,10 +14,11 @@ public class InvoiceDiscountArithmeticTest {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
-  @DisplayName("Discount Breakdown Arithmetic: Subtotal - promotion lines - coupon + shipping == Total")
+  @DisplayName(
+      "Discount Breakdown Arithmetic: Subtotal - promotion lines - coupon + shipping == Total")
   void testDiscountBreakdownArithmetic() throws Exception {
     long subtotalCents = 99900L; // $999.00
-    long shippingCents = 1500L;  // $15.00
+    long shippingCents = 1500L; // $15.00
 
     String discountBreakdownJson =
         """
@@ -56,7 +57,8 @@ public class InvoiceDiscountArithmeticTest {
     assertThat(totalCents).isEqualTo(90400L); // $904.00
 
     // Strict formula: Subtotal − lines + shipping must equal Total
-    assertThat(subtotalCents - (promoLinesSum + couponAmount) + shippingCents).isEqualTo(totalCents);
+    assertThat(subtotalCents - (promoLinesSum + couponAmount) + shippingCents)
+        .isEqualTo(totalCents);
   }
 
   @Test
@@ -68,6 +70,7 @@ public class InvoiceDiscountArithmeticTest {
     long shippingCents = 200L;
     long totalCents = 4700L;
 
-    assertThat(subtotalCents - (promoLinesSum + couponAmount) + shippingCents).isEqualTo(totalCents);
+    assertThat(subtotalCents - (promoLinesSum + couponAmount) + shippingCents)
+        .isEqualTo(totalCents);
   }
 }

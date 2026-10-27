@@ -76,7 +76,6 @@ class FlashSalePriceResolverTest {
     when(rows.findByPromotionIdAndProductIdAndVariantIdIsNull(1L, 1001L))
         .thenReturn(Optional.of(row(1, 1001, null, 50000)));
 
-    assertThat(resolver.resolve(List.of(promo(1, PromotionType.FLASH_SALE)), 1001L, null))
-        .isNull();
+    assertThat(resolver.resolve(List.of(promo(1, PromotionType.FLASH_SALE)), 1001L, null)).isNull();
   }
 }

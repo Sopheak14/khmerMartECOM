@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -483,7 +482,8 @@ public class ProductServiceImpl implements ProductService {
 
     // Flash sale active promo products
     Map<Long, Long> flashSalePrices = new HashMap<>();
-    List<Promotion> flashPromos = promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
+    List<Promotion> flashPromos =
+        promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
     if (!flashPromos.isEmpty() && !products.isEmpty()) {
       List<Long> pIds = products.stream().map(Product::getId).toList();
       java.util.Set<Long> productIdsWithVariants =
@@ -492,7 +492,8 @@ public class ProductServiceImpl implements ProductService {
               .collect(Collectors.toSet());
 
       for (Promotion flashPromo : flashPromos) {
-        for (PromotionProduct pp : promotionProductRepository.findByPromotionId(flashPromo.getId())) {
+        for (PromotionProduct pp :
+            promotionProductRepository.findByPromotionId(flashPromo.getId())) {
           if (pp.getSalePriceCents() == null) continue;
           boolean hasVariants = productIdsWithVariants.contains(pp.getProductId());
           if (hasVariants == (pp.getVariantId() != null)) {

@@ -8,13 +8,13 @@ import com.khmermart.model.entity.ProductVariant;
 import com.khmermart.model.entity.Promotion;
 import com.khmermart.model.entity.PromotionProduct;
 import com.khmermart.model.enumerate.CouponType;
+import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.model.request.AdminCouponRequest;
 import com.khmermart.model.request.AdminPromotionRequest;
 import com.khmermart.model.request.PromotionItemRequest;
 import com.khmermart.model.response.AdminCouponDto;
 import com.khmermart.model.response.AdminPromotionDto;
 import com.khmermart.model.response.AdminPromotionItemDto;
-import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.repository.CouponRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.repository.ProductVariantRepository;
@@ -221,8 +221,7 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
     List<PromotionItemRequest> items = resolveItems(request);
     validatePromotionItems(request.type(), items);
     if (items != null && request.active() != Boolean.FALSE) {
-      assertNoFlashSaleOverlap(
-          request.type(), -1L, request.startsAt(), request.endsAt(), items);
+      assertNoFlashSaleOverlap(request.type(), -1L, request.startsAt(), request.endsAt(), items);
     }
 
     Promotion promo =
@@ -383,7 +382,9 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
       if (item.variantId() != null) {
         ProductVariant variant = productVariantRepository.findById(item.variantId()).orElse(null);
         if (variant == null || !variant.getProductId().equals(item.productId())) {
-          errors.put(path + ".variantId", "Variant " + item.variantId() + " does not belong to product " + item.productId());
+          errors.put(
+              path + ".variantId",
+              "Variant " + item.variantId() + " does not belong to product " + item.productId());
           continue;
         }
         if (variant.getPriceCents() != null) {
@@ -391,19 +392,22 @@ public class AdminMarketingServiceImpl implements AdminMarketingService {
         }
       } else if (type == PromotionType.FLASH_SALE
           && !productVariantRepository.findByProductIdAndActiveTrue(item.productId()).isEmpty()) {
-        errors.put(path + ".variantId", "variantId is required: product "
-                    + item.productId()
-                    + " has variants, a flash sale cannot be product-wide");
+        errors.put(
+            path + ".variantId",
+            "variantId is required: product "
+                + item.productId()
+                + " has variants, a flash sale cannot be product-wide");
         continue;
       }
       Long sale = item.salePriceCents();
       if (sale != null && (sale <= 0 || basePrice == null || sale >= basePrice)) {
-        errors.put(path + ".salePriceCents", "salePriceCents must be greater than 0 and less than the price (" + basePrice + ")");
+        errors.put(
+            path + ".salePriceCents",
+            "salePriceCents must be greater than 0 and less than the price (" + basePrice + ")");
       }
     }
     if (!errors.isEmpty()) {
-      throw new CustomException(
-          ErrorCode.VALIDATION_ERROR, "Invalid promotion items", errors);
+      throw new CustomException(ErrorCode.VALIDATION_ERROR, "Invalid promotion items", errors);
     }
   }
 

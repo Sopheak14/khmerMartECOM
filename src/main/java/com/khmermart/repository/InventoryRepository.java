@@ -26,7 +26,9 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
       "SELECT i FROM Inventory i WHERE (i.quantityOnHand - i.quantityReserved) <= i.lowStockThreshold")
   Page<Inventory> findLowStock(Pageable pageable);
 
-  /** Fresh available stock straight from the DB (a scalar query never returns the cached entity). */
+  /**
+   * Fresh available stock straight from the DB (a scalar query never returns the cached entity).
+   */
   @Query("SELECT i.quantityOnHand - i.quantityReserved FROM Inventory i WHERE i.id = :id")
   int availableOf(@Param("id") long id);
 

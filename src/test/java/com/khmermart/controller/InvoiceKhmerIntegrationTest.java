@@ -25,8 +25,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +56,8 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("Khmer invoice PDF: embedded Khmer font, pdftotext extraction, visual PNG, and paid sample")
+  @DisplayName(
+      "Khmer invoice PDF: embedded Khmer font, pdftotext extraction, visual PNG, and paid sample")
   void testKhmerInvoiceGeneration() throws Exception {
     Product product =
         productRepository.save(
@@ -146,8 +145,7 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
     }
 
     // Verify pdffonts: Noto Sans Khmer must be embedded (emb = yes)
-    Process fontsProc =
-        new ProcessBuilder("pdffonts", paidPdfFile.getAbsolutePath()).start();
+    Process fontsProc = new ProcessBuilder("pdffonts", paidPdfFile.getAbsolutePath()).start();
     String fontsOutput;
     try (BufferedReader reader =
         new BufferedReader(new InputStreamReader(fontsProc.getInputStream()))) {
@@ -166,8 +164,7 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
     assertThat(fontsOutput).contains("yes");
 
     // Verify pdftotext: exact Khmer strings extracted
-    Process textProc =
-        new ProcessBuilder("pdftotext", paidPdfFile.getAbsolutePath(), "-").start();
+    Process textProc = new ProcessBuilder("pdftotext", paidPdfFile.getAbsolutePath(), "-").start();
     String textOutput;
     try (BufferedReader reader =
         new BufferedReader(new InputStreamReader(textProc.getInputStream()))) {
@@ -195,7 +192,12 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
     // Render page 1 to PNG via pdftoppm -png -r 100
     Process ppmProc =
         new ProcessBuilder(
-                "pdftoppm", "-png", "-r", "100", paidPdfFile.getAbsolutePath(), "target/test-invoice-khmer-tmp")
+                "pdftoppm",
+                "-png",
+                "-r",
+                "100",
+                paidPdfFile.getAbsolutePath(),
+                "target/test-invoice-khmer-tmp")
             .start();
     ppmProc.waitFor();
 
@@ -238,7 +240,8 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
                 .discountCents(0L)
                 .shippingCents(0L)
                 .totalCents(5000L)
-                .shippingAddress("{\"recipientName\":\"សុភាព\",\"phone\":\"+85512345678\",\"line1\":\"Street 2004\",\"province\":\"Phnom Penh\"}")
+                .shippingAddress(
+                    "{\"recipientName\":\"សុភាព\",\"phone\":\"+85512345678\",\"line1\":\"Street 2004\",\"province\":\"Phnom Penh\"}")
                 .shippingMethodCode("STANDARD")
                 .placedAt(Instant.now())
                 .build());

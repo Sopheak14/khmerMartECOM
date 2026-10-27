@@ -13,7 +13,6 @@ import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.model.entity.Address;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
-import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Review;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
@@ -69,7 +68,8 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .perform(
                 post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"email\":\"customer1@khmermart.local\",\"password\":\"Customer@123\"}"))
+                    .content(
+                        "{\"email\":\"customer1@khmermart.local\",\"password\":\"Customer@123\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andReturn()
@@ -77,7 +77,8 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .getContentAsString();
     String customerToken =
         "Bearer " + objectMapper.readTree(custLoginRes).path("data").path("accessToken").asText();
-    long customerId = objectMapper.readTree(custLoginRes).path("data").path("user").path("id").asLong();
+    long customerId =
+        objectMapper.readTree(custLoginRes).path("data").path("user").path("id").asLong();
 
     String adminLoginRes =
         mockMvc
@@ -99,7 +100,8 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .perform(get("/api/products?q=Laptop&brand=Dell"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+            .andExpect(
+                jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -127,13 +129,16 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     long variantPrice = detailJson.path("variants").get(0).path("priceCents").asLong();
     assertThat(variantPrice).isEqualTo(85000L);
 
-    log.info("=== STEP 4: Add to Cart (productId: {}, variantId: {}) ===", targetProductId, variantId);
+    log.info(
+        "=== STEP 4: Add to Cart (productId: {}, variantId: {}) ===", targetProductId, variantId);
     mockMvc
         .perform(
             post("/api/cart/items")
                 .header("Authorization", customerToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new CartItemRequest(targetProductId, variantId, 1))))
+                .content(
+                    objectMapper.writeValueAsString(
+                        new CartItemRequest(targetProductId, variantId, 1))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.subtotalCents").value(85000));
@@ -151,14 +156,13 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data.subtotalCents").value(85000))
         .andExpect(jsonPath("$.data.coupon.code").value("SAVE5"))
         .andExpect(jsonPath("$.data.coupon.value").value(500))
-        .andExpect(jsonPath("$.data.discountCents").value(17500)) // 17000 (20% KNY Promo) + 500 (Coupon)
+        .andExpect(
+            jsonPath("$.data.discountCents").value(17500)) // 17000 (20% KNY Promo) + 500 (Coupon)
         .andExpect(jsonPath("$.data.totalCents").value(67500)); // 85000 - 17500
 
     log.info("=== STEP 6: Checkout with KHQR ===");
     Address address =
-        addressRepository
-            .findByUserIdOrderByIdAsc(customerId)
-            .stream()
+        addressRepository.findByUserIdOrderByIdAsc(customerId).stream()
             .findFirst()
             .orElseGet(
                 () ->
@@ -191,15 +195,20 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.data.order.orderNumber").isNotEmpty())
             .andExpect(jsonPath("$.data.order.subtotalCents").value(85000))
             .andExpect(jsonPath("$.data.order.discountCents").value(17500))
-            .andExpect(jsonPath("$.data.order.shippingCents").value(0)) // STANDARD shipping is free over $50 threshold (5000 cents)
-            .andExpect(jsonPath("$.data.order.totalCents").value(67500)) // 85000 - 17500 + 0 = 67500
+            .andExpect(
+                jsonPath("$.data.order.shippingCents")
+                    .value(0)) // STANDARD shipping is free over $50 threshold (5000 cents)
+            .andExpect(
+                jsonPath("$.data.order.totalCents").value(67500)) // 85000 - 17500 + 0 = 67500
             .andExpect(jsonPath("$.data.next").isNotEmpty())
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    String orderNumber = objectMapper.readTree(checkoutRes).path("data").path("order").path("orderNumber").asText();
-    long orderId = objectMapper.readTree(checkoutRes).path("data").path("order").path("id").asLong();
+    String orderNumber =
+        objectMapper.readTree(checkoutRes).path("data").path("order").path("orderNumber").asText();
+    long orderId =
+        objectMapper.readTree(checkoutRes).path("data").path("order").path("id").asLong();
 
     // Verify 6-digit order number format: KM-YYYYMMDD-NNNNNN
     assertThat(orderNumber).matches("^KM-\\d{8}-\\d{6}$");
@@ -208,8 +217,7 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     String khqrRes =
         mockMvc
             .perform(
-                post("/api/payments/khqr/" + orderNumber)
-                    .header("Authorization", customerToken))
+                post("/api/payments/khqr/" + orderNumber).header("Authorization", customerToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.qrString").isNotEmpty())
@@ -241,20 +249,19 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     assertThat(movements)
         .anyMatch(
             m ->
-                (m.getType() == InventoryMovementType.RESERVE || m.getType() == InventoryMovementType.SALE)
+                (m.getType() == InventoryMovementType.RESERVE
+                        || m.getType() == InventoryMovementType.SALE)
                     && orderId == (m.getRefOrderId() != null ? m.getRefOrderId() : -1L));
 
     log.info("=== STEP 9: Notifications sent check ===");
     long notifDeadline = System.currentTimeMillis() + 4000;
     while (System.currentTimeMillis() < notifDeadline) {
       boolean hasNotif =
-          notificationRepository.findAll().stream()
-              .anyMatch(n -> n.getUserId().equals(customerId));
+          notificationRepository.findAll().stream().anyMatch(n -> n.getUserId().equals(customerId));
       if (hasNotif) break;
       Thread.sleep(100);
     }
-    assertThat(notificationRepository.findAll())
-        .anyMatch(n -> n.getUserId().equals(customerId));
+    assertThat(notificationRepository.findAll()).anyMatch(n -> n.getUserId().equals(customerId));
 
     log.info("=== STEP 10: Admin Ship Order ===");
     ShipOrderRequest shipReq = new ShipOrderRequest("KhmerMart Express");
@@ -282,9 +289,14 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data.status").value("DELIVERED"));
 
     log.info("=== STEP 12: Customer Review Submission & Admin Moderation ===");
-    reviewRepository.findByUserIdAndProductId(customerId, targetProductId).ifPresent(reviewRepository::delete);
+    reviewRepository
+        .findByUserIdAndProductId(customerId, targetProductId)
+        .ifPresent(reviewRepository::delete);
     CreateReviewRequest reviewReq =
-        new CreateReviewRequest(5, "Great product", "Excellent Dell laptop! Performs remarkably well for daily multitasking.");
+        new CreateReviewRequest(
+            5,
+            "Great product",
+            "Excellent Dell laptop! Performs remarkably well for daily multitasking.");
     String reviewRes =
         mockMvc
             .perform(

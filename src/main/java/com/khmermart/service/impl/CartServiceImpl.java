@@ -11,7 +11,6 @@ import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.ProductImage;
 import com.khmermart.model.entity.ProductVariant;
 import com.khmermart.model.entity.Promotion;
-import com.khmermart.model.entity.PromotionProduct;
 import com.khmermart.model.entity.ShippingMethod;
 import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.model.request.CartItemRequest;

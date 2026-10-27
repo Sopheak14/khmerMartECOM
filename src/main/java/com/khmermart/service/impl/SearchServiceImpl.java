@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,7 +90,8 @@ public class SearchServiceImpl implements SearchService {
     // Resolve active flash sale prices if applicable
     Instant now = Instant.now();
     Map<Long, Long> flashSalePrices = new HashMap<>();
-    List<Promotion> flashPromos = promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
+    List<Promotion> flashPromos =
+        promotionRepository.findActiveByType(PromotionType.FLASH_SALE, now);
     if (!flashPromos.isEmpty() && !prodIds.isEmpty()) {
       java.util.Set<Long> productIdsWithVariants =
           productVariantRepository.findByProductIdInAndActiveTrue(prodIds).stream()

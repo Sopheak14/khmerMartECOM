@@ -515,8 +515,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
     assertThat(approvedProd.getAvgRating().doubleValue()).isEqualTo(4.0);
 
     // 10. Admin rejects review -> product rating and count revert to 0
-    AdminReviewUpdateRequest rejectReq =
-        new AdminReviewUpdateRequest(ReviewStatus.REJECTED, null);
+    AdminReviewUpdateRequest rejectReq = new AdminReviewUpdateRequest(ReviewStatus.REJECTED, null);
     mockMvc
         .perform(
             patch("/api/admin/reviews/" + reviewId)

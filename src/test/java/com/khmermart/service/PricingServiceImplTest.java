@@ -326,7 +326,8 @@ class PricingServiceImplTest {
             .active(true)
             .build();
 
-    // Variant 1: 99900 -> 89900 (flash A); variant 3: 129900 -> 119900 (flash B); variant 4 not on sale
+    // Variant 1: 99900 -> 89900 (flash A); variant 3: 129900 -> 119900 (flash B); variant 4 not on
+    // sale
     List<PricingItem> items =
         List.of(
             new PricingItem(1001L, 1L, 99900L, 1, 89900L),

@@ -44,7 +44,8 @@ public class DataSeeder implements CommandLineRunner {
   private final JdbcTemplate jdbcTemplate;
   private final com.khmermart.service.ReviewService reviewService;
   private final PricingService pricingService;
-  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+      new com.fasterxml.jackson.databind.ObjectMapper();
 
   @Value("${app.seed.reset:false}")
   private boolean seedReset;

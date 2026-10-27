@@ -172,7 +172,8 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
 
               statusCodes.add((HttpStatus) res.getStatusCode());
               if (res.getStatusCode() == HttpStatus.CONFLICT) {
-                errorCodes.add(objectMapper.readTree(res.getBody()).path("error").path("code").asText());
+                errorCodes.add(
+                    objectMapper.readTree(res.getBody()).path("error").path("code").asText());
               }
               if (res.getStatusCode() == HttpStatus.OK) {
                 successCount.incrementAndGet();

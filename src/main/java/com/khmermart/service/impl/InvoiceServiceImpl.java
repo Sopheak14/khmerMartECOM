@@ -154,7 +154,9 @@ public class InvoiceServiceImpl implements InvoiceService {
     List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
     Payment payment = paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
     List<Refund> refunds =
-        payment != null ? refundRepository.findByPaymentId(payment.getId()) : Collections.emptyList();
+        payment != null
+            ? refundRepository.findByPaymentId(payment.getId())
+            : Collections.emptyList();
     Refund latestRefund =
         refunds.stream().max(Comparator.comparing(Refund::getCreatedAt)).orElse(null);
     AppUser user = userRepository.findById(order.getUserId()).orElse(null);
@@ -180,13 +182,27 @@ public class InvoiceServiceImpl implements InvoiceService {
 
       // Setup fonts
       BaseFont latinBase =
-          BaseFont.createFont(latinRegularUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, latinRegularBytes, null);
+          BaseFont.createFont(
+              latinRegularUrl,
+              BaseFont.IDENTITY_H,
+              BaseFont.EMBEDDED,
+              true,
+              latinRegularBytes,
+              null);
       BaseFont latinBoldBase =
-          BaseFont.createFont(latinBoldUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, latinBoldBytes, null);
+          BaseFont.createFont(
+              latinBoldUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, latinBoldBytes, null);
       BaseFont khmerBase =
-          BaseFont.createFont(khmerRegularUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, khmerRegularBytes, null);
+          BaseFont.createFont(
+              khmerRegularUrl,
+              BaseFont.IDENTITY_H,
+              BaseFont.EMBEDDED,
+              true,
+              khmerRegularBytes,
+              null);
       BaseFont khmerBoldBase =
-          BaseFont.createFont(khmerBoldUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, khmerBoldBytes, null);
+          BaseFont.createFont(
+              khmerBoldUrl, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, khmerBoldBytes, null);
 
       Font titleFont = new Font(latinBoldBase, 20, Font.NORMAL, new Color(30, 41, 59));
       Font subTitleFont = new Font(latinBase, 10, Font.NORMAL, Color.DARK_GRAY);
@@ -250,7 +266,9 @@ public class InvoiceServiceImpl implements InvoiceService {
       }
 
       String refundLine = null;
-      if ("REFUNDED".equals(paymentStatus) || "PARTIALLY_REFUNDED".equals(paymentStatus) || latestRefund != null) {
+      if ("REFUNDED".equals(paymentStatus)
+          || "PARTIALLY_REFUNDED".equals(paymentStatus)
+          || latestRefund != null) {
         if (latestRefund != null) {
           refundLine =
               "Refunded: "
@@ -322,14 +340,21 @@ public class InvoiceServiceImpl implements InvoiceService {
       if (address != null) {
         customerPhrase.add(new Chunk("Recipient: ", boldFont));
         customerPhrase.add(createMixedPhrase(address.recipientName(), normalFont, khmerNormalFont));
-        customerPhrase.add(new Chunk("\nPhone: " + (address.phone() != null ? address.phone() : "-") + "\nAddress: ", normalFont));
+        customerPhrase.add(
+            new Chunk(
+                "\nPhone: " + (address.phone() != null ? address.phone() : "-") + "\nAddress: ",
+                normalFont));
         String fullAddress =
             address.line1()
                 + (address.district() != null ? ", " + address.district() : "")
                 + (address.province() != null ? ", " + address.province() : "");
         customerPhrase.add(createMixedPhrase(fullAddress, normalFont, khmerNormalFont));
       } else if (user != null) {
-        customerPhrase.add(createMixedPhrase(user.getFullName() != null ? user.getFullName() : "Customer", normalFont, khmerNormalFont));
+        customerPhrase.add(
+            createMixedPhrase(
+                user.getFullName() != null ? user.getFullName() : "Customer",
+                normalFont,
+                khmerNormalFont));
         customerPhrase.add(new Chunk("\nEmail: " + user.getEmail(), normalFont));
       } else {
         customerPhrase.add(new Chunk("Customer", normalFont));
@@ -344,7 +369,8 @@ public class InvoiceServiceImpl implements InvoiceService {
       table.setWidthPercentage(100);
       table.setWidths(new float[] {4.5f, 2f, 1.5f, 1f, 1.5f});
 
-      addCell(table, new Phrase("Item Description", boldFont), Color.LIGHT_GRAY, Element.ALIGN_LEFT);
+      addCell(
+          table, new Phrase("Item Description", boldFont), Color.LIGHT_GRAY, Element.ALIGN_LEFT);
       addCell(table, new Phrase("SKU", boldFont), Color.LIGHT_GRAY, Element.ALIGN_LEFT);
       addCell(table, new Phrase("Unit Price", boldFont), Color.LIGHT_GRAY, Element.ALIGN_RIGHT);
       addCell(table, new Phrase("Qty", boldFont), Color.LIGHT_GRAY, Element.ALIGN_CENTER);
@@ -358,7 +384,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         String nameKm = prod != null ? prod.getNameKm() : null;
 
         Phrase itemDescPhrase = new Phrase("", normalFont);
-        itemDescPhrase.add(createMixedPhrase(item.getProductNameSnapshot(), normalFont, khmerNormalFont));
+        itemDescPhrase.add(
+            createMixedPhrase(item.getProductNameSnapshot(), normalFont, khmerNormalFont));
         if (nameKm != null && !nameKm.isBlank()) {
           itemDescPhrase.add(new Chunk("\n", normalFont));
           itemDescPhrase.add(createMixedPhrase(nameKm, normalFont, khmerNormalFont));
@@ -395,7 +422,12 @@ public class InvoiceServiceImpl implements InvoiceService {
       totalsTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
       totalsTable.setWidths(new float[] {2.5f, 1.5f});
 
-      addTotalRow(totalsTable, "Subtotal:", MONEY_FORMAT.format(order.getSubtotalCents() / 100.0), boldFont, false);
+      addTotalRow(
+          totalsTable,
+          "Subtotal:",
+          MONEY_FORMAT.format(order.getSubtotalCents() / 100.0),
+          boldFont,
+          false);
 
       // Parse discount breakdown snapshot if available
       boolean breakdownRendered = false;
@@ -455,8 +487,18 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
       }
 
-      addTotalRow(totalsTable, "Shipping:", MONEY_FORMAT.format(order.getShippingCents() / 100.0), normalFont, false);
-      addTotalRow(totalsTable, "Total (USD):", MONEY_FORMAT.format(order.getTotalCents() / 100.0), boldFont, true);
+      addTotalRow(
+          totalsTable,
+          "Shipping:",
+          MONEY_FORMAT.format(order.getShippingCents() / 100.0),
+          normalFont,
+          false);
+      addTotalRow(
+          totalsTable,
+          "Total (USD):",
+          MONEY_FORMAT.format(order.getTotalCents() / 100.0),
+          boldFont,
+          true);
 
       // Total in KHR with ៛ symbol
       long khrRate = appProperty.khqr().usdKhrRate() > 0 ? appProperty.khqr().usdKhrRate() : 4100L;
@@ -480,7 +522,9 @@ public class InvoiceServiceImpl implements InvoiceService {
       totalsTable.addCell(khrValCell);
 
       // Exchange rate note
-      PdfPCell rateCell = new PdfPCell(new Phrase("(exchange rate " + KHR_FORMAT.format(khrRate) + ")", smallGrayFont));
+      PdfPCell rateCell =
+          new PdfPCell(
+              new Phrase("(exchange rate " + KHR_FORMAT.format(khrRate) + ")", smallGrayFont));
       rateCell.setColspan(2);
       rateCell.setBorder(PdfPCell.NO_BORDER);
       rateCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
@@ -496,12 +540,18 @@ public class InvoiceServiceImpl implements InvoiceService {
       document.add(paymentHeader);
 
       StringBuilder paymentDetails = new StringBuilder();
-      paymentDetails.append("Payment Method: ").append(order.getPaymentMethod().name()).append("\n");
+      paymentDetails
+          .append("Payment Method: ")
+          .append(order.getPaymentMethod().name())
+          .append("\n");
 
       if (payment != null && payment.getBakongHash() != null) {
         paymentDetails.append("Bakong Hash: ").append(payment.getBakongHash()).append("\n");
         if (payment.getPaidAt() != null) {
-          paymentDetails.append("Paid At: ").append(DATE_FORMATTER.format(payment.getPaidAt())).append("\n");
+          paymentDetails
+              .append("Paid At: ")
+              .append(DATE_FORMATTER.format(payment.getPaidAt()))
+              .append("\n");
         }
       }
 

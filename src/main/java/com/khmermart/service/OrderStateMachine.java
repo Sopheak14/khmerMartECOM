@@ -28,8 +28,7 @@ public class OrderStateMachine {
         OrderStatus.PROCESSING,
         Set.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.REFUNDED));
     TRANSITIONS.put(
-        OrderStatus.SHIPPED,
-        Set.of(OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED));
+        OrderStatus.SHIPPED, Set.of(OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED));
     TRANSITIONS.put(OrderStatus.OUT_FOR_DELIVERY, Set.of(OrderStatus.DELIVERED));
     TRANSITIONS.put(OrderStatus.DELIVERED, Set.of(OrderStatus.REFUNDED));
     TRANSITIONS.put(OrderStatus.CANCELLED, Collections.emptySet());

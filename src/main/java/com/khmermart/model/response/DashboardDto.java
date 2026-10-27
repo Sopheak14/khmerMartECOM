@@ -17,11 +17,7 @@ public record DashboardDto(
     List<PaymentMethodBreakdownDto> paymentMethodBreakdown) {
 
   public record LowStockItemDto(
-      Long productId,
-      String name,
-      String sku,
-      int available,
-      int threshold) {}
+      Long productId, String name, String sku, int available, int threshold) {}
 
   public record DailySalesDto(String date, long revenueCents, long orders) {}
 

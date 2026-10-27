@@ -1,6 +1,5 @@
 package com.khmermart.service.impl;
 
-import com.khmermart.model.entity.Order;
 import com.khmermart.model.response.DashboardDto;
 import com.khmermart.model.response.DashboardDto.DailySalesDto;
 import com.khmermart.model.response.DashboardDto.LowStockItemDto;
@@ -105,7 +104,7 @@ public class DashboardServiceImpl implements DashboardService {
     // 8. Low stock items
     String lowStockSql =
         """
-        SELECT 
+        SELECT
           p.id AS product_id,
           p.name AS product_name,
           COALESCE(pv.sku, p.sku) AS sku,

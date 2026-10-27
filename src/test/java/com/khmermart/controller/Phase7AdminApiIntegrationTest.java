@@ -990,21 +990,30 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
       // 1b. Same variant in a second overlapping flash sale -> 409 naming variant and other promo
       postPromotion(
               flashRequest(
-                  "Dup variant", now, true, null, List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+                  "Dup variant",
+                  now,
+                  true,
+                  null,
+                  List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("CONFLICT"))
           .andExpect(
               jsonPath("$.error.details['items[0]']")
-                  .value(org.hamcrest.Matchers.allOf(
-                      org.hamcrest.Matchers.containsString("Variant 1 of product 1001"),
-                      org.hamcrest.Matchers.containsString("(id 1)"))));
+                  .value(
+                      org.hamcrest.Matchers.allOf(
+                          org.hamcrest.Matchers.containsString("Variant 1 of product 1001"),
+                          org.hamcrest.Matchers.containsString("(id 1)"))));
 
       // 1c. Same variant in a NON-overlapping window is fine
       Instant later = now.plus(30, ChronoUnit.DAYS);
       String later1 =
           postPromotion(
                   flashRequest(
-                      "Later flash", later, true, null, List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+                      "Later flash",
+                      later,
+                      true,
+                      null,
+                      List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -1014,7 +1023,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
       // 2. Product-wide FLASH_SALE item on a product with variants -> 400 with details
       postPromotion(
               flashRequest(
-                  "Bad wide", now, false, null, List.of(new PromotionItemRequest(1001L, null, 89900L))))
+                  "Bad wide",
+                  now,
+                  false,
+                  null,
+                  List.of(new PromotionItemRequest(1001L, null, 89900L))))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
           .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
@@ -1022,7 +1035,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
       // 3. Variant from another product -> 400
       postPromotion(
               flashRequest(
-                  "Bad variant", now, false, null, List.of(new PromotionItemRequest(1010L, 3L, 1000L))))
+                  "Bad variant",
+                  now,
+                  false,
+                  null,
+                  List.of(new PromotionItemRequest(1010L, 3L, 1000L))))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
           .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
@@ -1031,7 +1048,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
       for (long bad : new long[] {0L, 129900L, 150000L}) {
         postPromotion(
                 flashRequest(
-                    "Bad price", now, false, null, List.of(new PromotionItemRequest(1001L, 3L, bad))))
+                    "Bad price",
+                    now,
+                    false,
+                    null,
+                    List.of(new PromotionItemRequest(1001L, 3L, bad))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.details['items[0].salePriceCents']").exists());
       }
