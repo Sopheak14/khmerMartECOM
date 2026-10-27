@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
+import com.khmermart.model.entity.Inventory;
+import com.khmermart.repository.InventoryRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +20,22 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
   @Autowired private TestRestTemplate restTemplate;
 
   @Autowired private ObjectMapper objectMapper;
+
+  @Autowired private InventoryRepository inventoryRepository;
+
+  /**
+   * Other test classes buy Laptop Pro 15 (1001); put its seeded stock back (variants 1-4 =
+   * 15/15/10/10 on hand, nothing reserved) so the availability assertions do not depend on order.
+   */
+  @BeforeEach
+  void resetLaptopStock() {
+    int[] seeded = {15, 15, 10, 10};
+    for (Inventory inv : inventoryRepository.findByProductId(1001L)) {
+      inv.setQuantityOnHand(seeded[(int) (inv.getVariantId() - 1)]);
+      inv.setQuantityReserved(0);
+      inventoryRepository.save(inv);
+    }
+  }
 
   @Test
   @DisplayName(

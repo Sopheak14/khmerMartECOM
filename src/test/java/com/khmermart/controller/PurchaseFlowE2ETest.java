@@ -27,13 +27,13 @@ import com.khmermart.model.request.CreateReviewRequest;
 import com.khmermart.model.request.ShipOrderRequest;
 import com.khmermart.model.request.UpdateOrderStatusRequest;
 import com.khmermart.repository.AddressRepository;
-import com.khmermart.repository.CouponRedemptionRepository;
 import com.khmermart.repository.InventoryMovementRepository;
 import com.khmermart.repository.NotificationRepository;
 import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ReviewRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,28 +57,39 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
   @Autowired private InventoryMovementRepository movementRepository;
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private ReviewRepository reviewRepository;
-  @Autowired private CouponRedemptionRepository couponRedemptionRepository;
 
   @Test
   @DisplayName("Full 12-step lesson scenario as ONE comprehensive integration test")
   void testFullTwelveStepPurchaseFlow() throws Exception {
-    log.info("=== STEP 1: Authentication (Customer & Admin Login) ===");
-    String custLoginRes =
+    log.info("=== STEP 1: Authentication (throwaway Customer & seeded Admin) ===");
+    // A brand-new customer per run: the seeded customers' carts, reviews and coupon redemptions are
+    // shared with other test classes, which made this flow depend on test class order.
+    String customerEmail = "e2e+" + UUID.randomUUID() + "@khmermart.local";
+    String registerRes =
         mockMvc
             .perform(
-                post("/api/auth/login")
+                post("/api/auth/register")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        "{\"email\":\"customer1@khmermart.local\",\"password\":\"Customer@123\"}"))
+                        objectMapper.writeValueAsString(
+                            Map.of(
+                                "email",
+                                customerEmail,
+                                "password",
+                                "E2eFlow@12345",
+                                "fullName",
+                                "Sopheap Customer",
+                                "phone",
+                                "+85512345678"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andReturn()
             .getResponse()
             .getContentAsString();
     String customerToken =
-        "Bearer " + objectMapper.readTree(custLoginRes).path("data").path("accessToken").asText();
+        "Bearer " + objectMapper.readTree(registerRes).path("data").path("accessToken").asText();
     long customerId =
-        objectMapper.readTree(custLoginRes).path("data").path("user").path("id").asLong();
+        objectMapper.readTree(registerRes).path("data").path("user").path("id").asLong();
 
     String adminLoginRes =
         mockMvc
@@ -144,7 +155,6 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data.subtotalCents").value(85000));
 
     log.info("=== STEP 5: Apply Coupon SAVE5 ===");
-    couponRedemptionRepository.deleteAll();
     mockMvc
         .perform(
             post("/api/cart/coupon")
@@ -289,9 +299,6 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data.status").value("DELIVERED"));
 
     log.info("=== STEP 12: Customer Review Submission & Admin Moderation ===");
-    reviewRepository
-        .findByUserIdAndProductId(customerId, targetProductId)
-        .ifPresent(reviewRepository::delete);
     CreateReviewRequest reviewReq =
         new CreateReviewRequest(
             5,

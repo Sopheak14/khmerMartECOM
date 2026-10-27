@@ -54,6 +54,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -144,6 +145,20 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
         "Bearer "
             + jwtService.generateAccessToken(
                 customerUser.getId(), customerUser.getEmail(), Roles.CUSTOMER);
+  }
+
+  /** Tests k/l change global settings (store name, KHR rate); put the seed values back. */
+  @AfterEach
+  void restoreSeededSettings() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/admin/settings")
+                .header("Authorization", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new AdminSettingsUpdateRequest("KhmerMart", 4100L, "MOCK", List.of()))))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -525,6 +540,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
 
     // Delete product first, now category can be deleted
     productRepository.delete(prod);
+    // The category created through the API above must not outlive the test (it would show up as a
+    // 9th root category in /api/categories for every later test class).
+    mockMvc
+        .perform(delete("/api/admin/categories/" + newCatId).header("Authorization", adminToken))
+        .andExpect(status().isOk());
     mockMvc
         .perform(delete("/api/admin/categories/" + cat.getId()).header("Authorization", adminToken))
         .andExpect(status().isOk())
