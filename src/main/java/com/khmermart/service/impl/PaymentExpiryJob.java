@@ -155,8 +155,7 @@ public class PaymentExpiryJob {
                     .orElse(null);
 
         if (inv != null) {
-          inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
-          inventoryRepository.save(inv);
+          inventoryRepository.releaseReserved(inv.getId(), item.getQuantity());
 
           InventoryMovement movement =
               InventoryMovement.builder()

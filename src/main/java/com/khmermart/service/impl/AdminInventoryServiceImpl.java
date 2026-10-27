@@ -14,6 +14,8 @@ import com.khmermart.repository.InventoryRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.service.AdminInventoryService;
 import com.khmermart.service.AuditLogService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,8 @@ public class AdminInventoryServiceImpl implements AdminInventoryService {
   private final InventoryMovementRepository movementRepository;
   private final ProductRepository productRepository;
   private final AuditLogService auditLogService;
+
+  @PersistenceContext private EntityManager entityManager;
 
   public AdminInventoryServiceImpl(
       InventoryRepository inventoryRepository,
@@ -70,11 +74,10 @@ public class AdminInventoryServiceImpl implements AdminInventoryService {
     int beforeQty = inv.getQuantityOnHand();
     boolean beforeAlerted = inv.isLowStockAlerted();
 
-    inv.setQuantityOnHand(inv.getQuantityOnHand() + request.quantity());
-    // Rule: restock resets the low-stock alert flag
-    inv.setLowStockAlerted(false);
-    inv.setUpdatedAt(Instant.now());
-    Inventory updated = inventoryRepository.save(inv);
+    // Rule: restock resets the low-stock alert flag (atomic update, no read-modify-write)
+    inventoryRepository.restock(inv.getId(), request.quantity());
+    entityManager.refresh(inv);
+    Inventory updated = inv;
 
     String reason = request.reason() != null ? request.reason() : "Admin manual restock";
     InventoryMovement movement =
@@ -109,16 +112,13 @@ public class AdminInventoryServiceImpl implements AdminInventoryService {
             .orElseThrow(
                 () -> new CustomException(ErrorCode.NOT_FOUND, "Inventory item not found"));
 
-    int newQty = inv.getQuantityOnHand() + request.quantity();
-    if (newQty < 0) {
+    int beforeQty = inv.getQuantityOnHand();
+    if (inventoryRepository.tryAdjustOnHand(inv.getId(), request.quantity()) != 1) {
       throw new CustomException(
           ErrorCode.VALIDATION_ERROR, "Inventory quantity on hand cannot become negative");
     }
-
-    int beforeQty = inv.getQuantityOnHand();
-    inv.setQuantityOnHand(newQty);
-    inv.setUpdatedAt(Instant.now());
-    Inventory updated = inventoryRepository.save(inv);
+    entityManager.refresh(inv);
+    Inventory updated = inv;
 
     String reason = request.reason() != null ? request.reason() : "Admin inventory adjustment";
     InventoryMovement movement =

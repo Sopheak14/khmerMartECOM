@@ -591,23 +591,24 @@ public class CheckoutServiceImpl implements CheckoutService {
         throw new CustomException(ErrorCode.OUT_OF_STOCK, "Inventory item not found");
       }
 
-      int availableBefore = Math.max(0, inv.getQuantityOnHand() - inv.getQuantityReserved());
       int rows = inventoryRepository.tryReserve(inv.getId(), item.getQuantity());
-      if (rows == 0) {
+      if (rows != 1) {
+        // Fresh scalar read for the message; the loaded entity may predate concurrent reservations.
+        int availableNow = Math.max(0, inventoryRepository.availableOf(inv.getId()));
         throw new CustomException(
             ErrorCode.OUT_OF_STOCK,
-            "Only " + availableBefore + " left in stock",
-            Map.of("productId", item.getProductId(), "available", availableBefore));
+            "Only " + availableNow + " left in stock",
+            Map.of("productId", item.getProductId(), "available", availableNow));
       }
 
-      int availableAfter = availableBefore - item.getQuantity();
+      // Never save(inv) here: that would write back the stale quantity_reserved loaded above.
+      int availableAfter = Math.max(0, inventoryRepository.availableOf(inv.getId()));
       int threshold = inv.getLowStockThreshold();
-      if (!inv.isLowStockAlerted() && availableBefore > threshold && availableAfter <= threshold) {
+      if (availableAfter <= threshold
+          && inventoryRepository.markLowStockAlerted(inv.getId()) == 1) {
         Product prod = productRepository.findById(item.getProductId()).orElse(null);
         String prodName = prod != null ? prod.getName() : "Product #" + item.getProductId();
         String sku = prod != null ? prod.getSku() : "";
-        inv.setLowStockAlerted(true);
-        inventoryRepository.save(inv);
         eventPublisher.publishEvent(
             new InventoryLowEvent(item.getProductId(), prodName, sku, availableAfter, threshold));
       }

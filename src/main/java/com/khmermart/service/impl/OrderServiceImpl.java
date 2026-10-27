@@ -396,9 +396,7 @@ public class OrderServiceImpl implements OrderService {
                     .orElse(null);
 
         if (inv != null) {
-          inv.setQuantityOnHand(Math.max(0, inv.getQuantityOnHand() - item.getQuantity()));
-          inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
-          inventoryRepository.save(inv);
+          inventoryRepository.deductReservedSale(inv.getId(), item.getQuantity());
 
           InventoryMovement movement =
               InventoryMovement.builder()
@@ -507,13 +505,12 @@ public class OrderServiceImpl implements OrderService {
       if (inv != null) {
         InventoryMovementType movementType;
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
-          inv.setQuantityOnHand(inv.getQuantityOnHand() + item.getQuantity());
+          inventoryRepository.addOnHand(inv.getId(), item.getQuantity());
           movementType = InventoryMovementType.RETURN;
         } else {
-          inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
+          inventoryRepository.releaseReserved(inv.getId(), item.getQuantity());
           movementType = InventoryMovementType.RELEASE;
         }
-        inventoryRepository.save(inv);
 
         InventoryMovement movement =
             InventoryMovement.builder()

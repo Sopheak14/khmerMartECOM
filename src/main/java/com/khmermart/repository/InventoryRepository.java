@@ -26,36 +26,91 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
       "SELECT i FROM Inventory i WHERE (i.quantityOnHand - i.quantityReserved) <= i.lowStockThreshold")
   Page<Inventory> findLowStock(Pageable pageable);
 
-  @Modifying
+  /** Fresh available stock straight from the DB (a scalar query never returns the cached entity). */
+  @Query("SELECT i.quantityOnHand - i.quantityReserved FROM Inventory i WHERE i.id = :id")
+  int availableOf(@Param("id") long id);
+
+  // Stock is only ever changed by the atomic statements below, never by read-modify-write of a
+  // managed Inventory. Each bumps `version` so a stale entity save fails instead of overwriting.
+
+  @Modifying(flushAutomatically = true)
   @Query(
       value =
           """
-            UPDATE inventory SET quantity_reserved = quantity_reserved + :qty, updated_at = now()
+            UPDATE inventory
+            SET quantity_reserved = quantity_reserved + :qty, version = version + 1, updated_at = now()
             WHERE id = :id AND quantity_on_hand - quantity_reserved >= :qty
             """,
       nativeQuery = true)
   int tryReserve(@Param("id") long id, @Param("qty") int qty);
 
-  @Modifying
-  @Query(
-      value =
-          """
-            UPDATE inventory SET quantity_reserved = quantity_reserved - :qty, updated_at = now()
-            WHERE id = :id AND quantity_reserved >= :qty
-            """,
-      nativeQuery = true)
-  int releaseReserved(@Param("id") long id, @Param("qty") int qty);
-
-  @Modifying
+  @Modifying(flushAutomatically = true)
   @Query(
       value =
           """
             UPDATE inventory
-            SET quantity_on_hand = quantity_on_hand - :qty,
-                quantity_reserved = quantity_reserved - :qty,
-                updated_at = now()
-            WHERE id = :id AND quantity_reserved >= :qty AND quantity_on_hand >= :qty
+            SET quantity_reserved = GREATEST(0, quantity_reserved - :qty),
+                version = version + 1, updated_at = now()
+            WHERE id = :id
+            """,
+      nativeQuery = true)
+  int releaseReserved(@Param("id") long id, @Param("qty") int qty);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE inventory
+            SET quantity_on_hand = GREATEST(0, quantity_on_hand - :qty),
+                quantity_reserved = GREATEST(0, quantity_reserved - :qty),
+                version = version + 1, updated_at = now()
+            WHERE id = :id
             """,
       nativeQuery = true)
   int deductReservedSale(@Param("id") long id, @Param("qty") int qty);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE inventory
+            SET quantity_on_hand = quantity_on_hand + :qty, version = version + 1, updated_at = now()
+            WHERE id = :id
+            """,
+      nativeQuery = true)
+  int addOnHand(@Param("id") long id, @Param("qty") int qty);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE inventory
+            SET quantity_on_hand = quantity_on_hand + :qty, low_stock_alerted = false,
+                version = version + 1, updated_at = now()
+            WHERE id = :id
+            """,
+      nativeQuery = true)
+  int restock(@Param("id") long id, @Param("qty") int qty);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE inventory
+            SET quantity_on_hand = quantity_on_hand + :delta, version = version + 1, updated_at = now()
+            WHERE id = :id AND quantity_on_hand + :delta >= 0
+            """,
+      nativeQuery = true)
+  int tryAdjustOnHand(@Param("id") long id, @Param("delta") int delta);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE inventory
+            SET low_stock_alerted = true, version = version + 1, updated_at = now()
+            WHERE id = :id AND low_stock_alerted = false
+            """,
+      nativeQuery = true)
+  int markLowStockAlerted(@Param("id") long id);
 }

@@ -180,9 +180,7 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
                   .orElse(null);
 
       if (inv != null) {
-        inv.setQuantityOnHand(Math.max(0, inv.getQuantityOnHand() - item.getQuantity()));
-        inv.setQuantityReserved(Math.max(0, inv.getQuantityReserved() - item.getQuantity()));
-        inventoryRepository.save(inv);
+        inventoryRepository.deductReservedSale(inv.getId(), item.getQuantity());
 
         InventoryMovement movement =
             InventoryMovement.builder()

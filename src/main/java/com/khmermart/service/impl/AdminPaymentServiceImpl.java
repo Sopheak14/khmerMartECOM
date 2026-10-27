@@ -204,8 +204,7 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
                         inventoryRepository.findByProductIdAndVariantIdIsNull(item.getProductId()))
                 .orElse(null);
         if (inv != null) {
-          inv.setQuantityOnHand(inv.getQuantityOnHand() + item.getQuantity());
-          inventoryRepository.save(inv);
+          inventoryRepository.addOnHand(inv.getId(), item.getQuantity());
 
           inventoryMovementRepository.save(
               InventoryMovement.builder()

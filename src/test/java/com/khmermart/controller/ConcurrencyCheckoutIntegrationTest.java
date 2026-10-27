@@ -79,7 +79,9 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
             .variantId(null)
             .quantityOnHand(5)
             .quantityReserved(0)
-            .lowStockThreshold(2)
+            // threshold 4: every thread's initial read of 5 crosses it, so each one hits the
+            // low-stock path while the other checkouts are reserving (exposes lost updates)
+            .lowStockThreshold(4)
             .build();
     inv = inventoryRepository.save(inv);
 
@@ -145,6 +147,7 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger outOfStockCount = new AtomicInteger(0);
     List<HttpStatus> statusCodes = Collections.synchronizedList(new ArrayList<>());
+    List<String> errorCodes = Collections.synchronizedList(new ArrayList<>());
 
     for (int i = 0; i < threadCount; i++) {
       final int idx = i;
@@ -168,6 +171,9 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
                       String.class);
 
               statusCodes.add((HttpStatus) res.getStatusCode());
+              if (res.getStatusCode() == HttpStatus.CONFLICT) {
+                errorCodes.add(objectMapper.readTree(res.getBody()).path("error").path("code").asText());
+              }
               if (res.getStatusCode() == HttpStatus.OK) {
                 successCount.incrementAndGet();
               } else if (res.getStatusCode() == HttpStatus.CONFLICT) {
@@ -186,13 +192,18 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
     executor.shutdown();
 
     // 4. Assert concurrency outcomes
+    assertThat(doneGate.getCount()).isZero();
+    assertThat(statusCodes).hasSize(threadCount);
+    assertThat(statusCodes).allMatch(c -> c == HttpStatus.OK || c == HttpStatus.CONFLICT);
     assertThat(successCount.get()).isEqualTo(5);
     assertThat(outOfStockCount.get()).isEqualTo(15);
+    assertThat(errorCodes).hasSize(15).allMatch("OUT_OF_STOCK"::equals);
 
     // 5. Verify database inventory state
     Inventory finalInv = inventoryRepository.findById(inv.getId()).orElseThrow();
     assertThat(finalInv.getQuantityOnHand()).isEqualTo(5);
     assertThat(finalInv.getQuantityReserved()).isEqualTo(5);
+    assertThat(finalInv.getQuantityOnHand() - finalInv.getQuantityReserved()).isZero();
 
     // Verify inventory movements
     List<InventoryMovement> movements =
@@ -201,5 +212,6 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
             .toList();
     assertThat(movements).hasSize(5);
     assertThat(movements).allMatch(m -> m.getType().name().equals("RESERVE"));
+    assertThat(movements.stream().mapToInt(InventoryMovement::getQuantity).sum()).isEqualTo(5);
   }
 }
