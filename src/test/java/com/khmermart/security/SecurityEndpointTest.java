@@ -30,6 +30,8 @@ class SecurityEndpointTest extends AbstractIntegrationTest {
 
   @Autowired private ObjectMapper objectMapper;
 
+  @Autowired private org.springframework.context.ApplicationContext context;
+
   @Value("${app.jwt.access-secret}")
   private String accessSecret;
 
@@ -109,5 +111,25 @@ class SecurityEndpointTest extends AbstractIntegrationTest {
         restTemplate.getForEntity("/api/v3/api-docs", String.class);
     assertThat(apiDocsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(apiDocsResponse.getBody()).contains("openapi");
+  }
+
+  @Test
+  @DisplayName(
+      "No default in-memory user: HTTP Basic is rejected with 401 and no UserDetailsService")
+  void basicAuthRejectedAndNoDefaultUser() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    headers.set("Authorization", "Basic dXNlcjp4"); // user:x
+    ResponseEntity<String> response =
+        restTemplate.exchange(
+            "/api/admin/dashboard", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(response.getHeaders().get(HttpHeaders.WWW_AUTHENTICATE)).isNull();
+    assertThat(objectMapper.readTree(response.getBody()).at("/error/code").asText())
+        .isEqualTo("UNAUTHORIZED");
+    assertThat(
+            context.getBeanNamesForType(
+                org.springframework.security.core.userdetails.UserDetailsService.class))
+        .isEmpty();
   }
 }
