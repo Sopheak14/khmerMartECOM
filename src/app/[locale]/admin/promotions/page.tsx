@@ -5,7 +5,15 @@ import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
-import { AdminPromotionDTO, AdminPromotionRequest, PromotionType, ProductCardDTO } from '@/types/api';
+import {
+  AdminPromotionDTO,
+  AdminPromotionRequest,
+  PromotionItemRequest,
+  PromotionType,
+  ProductCardDTO,
+  ProductDetailDTO,
+} from '@/types/api';
+import { toCents, formatUsd } from '@/lib/money';
 import {
   Sparkles,
   Plus,
@@ -17,9 +25,168 @@ import {
   Calendar,
   Check,
   Search,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+interface SelectedItem {
+  productId: number;
+  variantId?: number;
+  name: string;
+  sku?: string;
+  attributes?: Record<string, string>;
+  priceCents: number;
+  salePrice: string; // dollars as typed
+}
+
+const itemKey = (productId: number, variantId?: number) => `${productId}:${variantId ?? 'p'}`;
+
+/** Parse "1199.00" -> 119900; returns null when not a valid non-negative dollar amount */
+function parseDollars(value: string): number | null {
+  const v = value.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(v)) return null;
+  return toCents(parseFloat(v));
+}
+
+function variantLabel(attributes?: Record<string, string>) {
+  return attributes ? Object.values(attributes).join(' / ') : '';
+}
+
+interface PickerRowProps {
+  product: ProductCardDTO;
+  isFlash: boolean;
+  selected: Record<string, SelectedItem>;
+  rowErrors: Record<string, string>;
+  onToggle: (item: Omit<SelectedItem, 'salePrice'>) => void;
+  onPrice: (key: string, value: string) => void;
+}
+
+function PickerRow({ product, isFlash, selected, rowErrors, onToggle, onPrice }: PickerRowProps) {
+  const t = useTranslations('admin.promotions');
+  const [open, setOpen] = useState(false);
+
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['admin', 'promotion-picker', product.id],
+    queryFn: async () => {
+      const res = await apiClient<ProductDetailDTO>(`/admin/products/${product.id}`);
+      return res.data;
+    },
+    enabled: open,
+  });
+
+  const selectedCount = Object.values(selected).filter((i) => i.productId === product.id).length;
+  const variants = detail?.variants ?? [];
+
+  const options: { key: string; label: string; sku?: string; priceCents: number; item: Omit<SelectedItem, 'salePrice'> }[] =
+    variants.length > 0
+      ? variants.map((v) => ({
+          key: itemKey(product.id, v.id),
+          label: variantLabel(v.attributes),
+          sku: v.sku,
+          priceCents: v.priceCents,
+          item: {
+            productId: product.id,
+            variantId: v.id,
+            name: product.name,
+            sku: v.sku,
+            attributes: v.attributes,
+            priceCents: v.priceCents,
+          },
+        }))
+      : detail
+        ? [
+            {
+              key: itemKey(product.id),
+              label: t('wholeProduct'),
+              sku: product.sku,
+              priceCents: detail.priceCents,
+              item: { productId: product.id, name: product.name, sku: product.sku, priceCents: detail.priceCents },
+            },
+          ]
+        : [];
+
+  return (
+    <div data-testid={`picker-item-${product.id}`} className="py-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        data-testid={`picker-toggle-${product.id}`}
+        onClick={() => setOpen(!open)}
+        className="w-full p-2 rounded-lg flex items-center justify-between text-left hover:bg-muted/10"
+      >
+        <span className="min-w-0 pr-2">
+          <span className="block text-xs truncate font-semibold text-foreground">{product.name}</span>
+          <span className="block text-[10px] text-muted font-mono">{product.sku}</span>
+        </span>
+        <span className="flex items-center gap-2 shrink-0">
+          {selectedCount > 0 && (
+            <span className="text-[10px] font-bold text-primary">{selectedCount}</span>
+          )}
+          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+      </button>
+
+      {open && (
+        <div className="pl-3 pr-1 pb-1 space-y-1">
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+          {options.map((o) => {
+            const sel = selected[o.key];
+            const err = rowErrors[o.key];
+            return (
+              <div
+                key={o.key}
+                data-testid={o.item.variantId ? `variant-row-${o.item.variantId}` : `product-row-${product.id}`}
+                className="rounded-lg border border-border/50 p-2 space-y-1"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`pick-${o.key}`}
+                    data-testid={o.item.variantId ? `variant-checkbox-${o.item.variantId}` : `product-checkbox-${product.id}`}
+                    checked={Boolean(sel)}
+                    onChange={() => onToggle(o.item)}
+                    className="rounded border-border"
+                  />
+                  <label htmlFor={`pick-${o.key}`} className="flex-1 min-w-0 text-xs cursor-pointer">
+                    <span className="font-semibold text-foreground">{o.label}</span>
+                    {o.sku && <span className="ml-2 font-mono text-[10px] text-muted">{o.sku}</span>}
+                  </label>
+                  <span className="text-xs font-mono font-bold text-foreground">{formatUsd(o.priceCents)}</span>
+                </div>
+                {sel && isFlash && (
+                  <div className="flex items-center gap-2 pl-6">
+                    <label htmlFor={`sale-${o.key}`} className="text-[11px] text-muted">
+                      {t('salePrice')} ($)
+                    </label>
+                    <input
+                      id={`sale-${o.key}`}
+                      type="text"
+                      inputMode="decimal"
+                      data-testid={
+                        o.item.variantId ? `variant-sale-price-${o.item.variantId}` : `product-sale-price-${product.id}`
+                      }
+                      value={sel.salePrice}
+                      onChange={(e) => onPrice(o.key, e.target.value)}
+                      placeholder="0.00"
+                      className="w-28 px-2 py-1 text-xs font-mono bg-background border border-border rounded-md"
+                    />
+                  </div>
+                )}
+                {err && (
+                  <p data-testid="picker-item-error" role="alert" className="text-[11px] text-red-700 pl-6">
+                    {err}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPromotionsPage() {
   const t = useTranslations('admin.promotions');
@@ -39,7 +206,10 @@ export default function AdminPromotionsPage() {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [active, setActive] = useState(true);
-  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Record<string, SelectedItem>>({});
+  const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
+  const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -64,6 +234,18 @@ export default function AdminPromotionsPage() {
   });
   const allProducts = productsData || [];
 
+  const handleSaveError = (err: ApiError, fallback: string) => {
+    if (err.details && typeof err.details === 'object') {
+      setFieldErrors(err.details);
+    }
+    // Validation/conflict responses: keep the message visible in the form, details sit under each row
+    if (err.status === 409 || err.status === 400) {
+      setFormError(err.message || fallback);
+    } else {
+      toast.error(err.message || fallback);
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (payload: AdminPromotionRequest) => {
       const res = await apiClient<AdminPromotionDTO>('/admin/promotions', {
@@ -78,13 +260,7 @@ export default function AdminPromotionsPage() {
       setFormOpen(false);
       resetForm();
     },
-    onError: (err: ApiError) => {
-      if (err.details && typeof err.details === 'object') {
-        setFieldErrors(err.details);
-      } else {
-        toast.error(err.message || 'Failed to create promotion');
-      }
-    },
+    onError: (err: ApiError) => handleSaveError(err, 'Failed to create promotion'),
   });
 
   const updateMutation = useMutation({
@@ -101,13 +277,7 @@ export default function AdminPromotionsPage() {
       setFormOpen(false);
       resetForm();
     },
-    onError: (err: ApiError) => {
-      if (err.details && typeof err.details === 'object') {
-        setFieldErrors(err.details);
-      } else {
-        toast.error(err.message || 'Failed to update promotion');
-      }
-    },
+    onError: (err: ApiError) => handleSaveError(err, 'Failed to update promotion'),
   });
 
   const deleteMutation = useMutation({
@@ -135,7 +305,10 @@ export default function AdminPromotionsPage() {
     setStartsAt('');
     setEndsAt('');
     setActive(true);
-    setSelectedProductIds([]);
+    setSelectedItems({});
+    setSubmittedOrder([]);
+    setClientErrors({});
+    setFormError('');
     setProductSearch('');
     setFieldErrors({});
   };
@@ -161,13 +334,53 @@ export default function AdminPromotionsPage() {
     setStartsAt(p.startsAt ? p.startsAt.slice(0, 16) : '');
     setEndsAt(p.endsAt ? p.endsAt.slice(0, 16) : '');
     setActive(p.active);
-    setSelectedProductIds(p.productIds || []);
+    const initial: Record<string, SelectedItem> = {};
+    if (p.items && p.items.length > 0) {
+      for (const it of p.items) {
+        initial[itemKey(it.productId, it.variantId)] = {
+          productId: it.productId,
+          variantId: it.variantId,
+          name: it.productName,
+          sku: it.sku,
+          attributes: it.attributes,
+          priceCents: it.priceCents,
+          salePrice: it.salePriceCents ? (it.salePriceCents / 100).toFixed(2) : '',
+        };
+      }
+    } else {
+      for (const pid of p.productIds || []) {
+        initial[itemKey(pid)] = { productId: pid, name: `#${pid}`, priceCents: 0, salePrice: '' };
+      }
+    }
+    setSelectedItems(initial);
     setFormOpen(true);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
+    setFormError('');
+
+    const entries = Object.entries(selectedItems);
+    const errors: Record<string, string> = {};
+    const items: PromotionItemRequest[] = [];
+    for (const [key, it] of entries) {
+      let salePriceCents: number | undefined;
+      if (type === 'FLASH_SALE') {
+        const cents = parseDollars(it.salePrice);
+        if (cents === null || cents <= 0) {
+          errors[key] = t('salePriceRequired');
+        } else if (it.priceCents > 0 && cents >= it.priceCents) {
+          errors[key] = t('salePriceBelow', { price: formatUsd(it.priceCents) });
+        } else {
+          salePriceCents = cents;
+        }
+      }
+      items.push({ productId: it.productId, variantId: it.variantId, salePriceCents });
+    }
+    setClientErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setSubmittedOrder(entries.map(([key]) => key));
 
     const thresholdCents = thresholdDollars
       ? Math.round((parseFloat(thresholdDollars) || 0) * 100)
@@ -182,7 +395,7 @@ export default function AdminPromotionsPage() {
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
       active,
-      productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
+      items: items.length > 0 ? items : undefined,
     };
 
     if (editingPromotion) {
@@ -192,13 +405,28 @@ export default function AdminPromotionsPage() {
     }
   };
 
-  const toggleProduct = (pid: number) => {
-    if (selectedProductIds.includes(pid)) {
-      setSelectedProductIds(selectedProductIds.filter((id) => id !== pid));
-    } else {
-      setSelectedProductIds([...selectedProductIds, pid]);
-    }
+  const toggleItem = (item: Omit<SelectedItem, 'salePrice'>) => {
+    const key = itemKey(item.productId, item.variantId);
+    setSelectedItems((prev) => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = { ...item, salePrice: '' };
+      return next;
+    });
   };
+
+  const setItemPrice = (key: string, value: string) => {
+    setSelectedItems((prev) => ({ ...prev, [key]: { ...prev[key], salePrice: value } }));
+  };
+
+  // Row-level errors: client validation + backend details keyed items[i].field / items[i]
+  const rowErrors: Record<string, string> = { ...clientErrors };
+  submittedOrder.forEach((key, idx) => {
+    const msgs = Object.entries(fieldErrors)
+      .filter(([k]) => k === `items[${idx}]` || k.startsWith(`items[${idx}].`))
+      .map(([, v]) => String(v));
+    if (msgs.length > 0 && !rowErrors[key]) rowErrors[key] = msgs.join(' · ');
+  });
 
   const filteredPickerProducts = allProducts.filter(
     (p) =>
@@ -240,7 +468,7 @@ export default function AdminPromotionsPage() {
           </div>
         ) : isError ? (
           <div className="p-8 text-center space-y-2">
-            <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+            <AlertCircle className="w-8 h-8 text-red-700 mx-auto" />
             <p className="text-xs text-muted">{commonT('errorTitle')}</p>
             <button
               onClick={() => refetch()}
@@ -354,7 +582,7 @@ export default function AdminPromotionsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('nameEn')} <span className="text-red-500">*</span>
+                    {t('nameEn')} <span className="text-red-700">*</span>
                   </label>
                   <input
                     type="text"
@@ -366,7 +594,7 @@ export default function AdminPromotionsPage() {
                     required
                   />
                   {fieldErrors.name && (
-                    <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+                    <p className="text-xs text-red-700 mt-1">{fieldErrors.name}</p>
                   )}
                 </div>
 
@@ -418,7 +646,7 @@ export default function AdminPromotionsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('startsAt')} <span className="text-red-500">*</span>
+                    {t('startsAt')} <span className="text-red-700">*</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -432,7 +660,7 @@ export default function AdminPromotionsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('endsAt')} <span className="text-red-500">*</span>
+                    {t('endsAt')} <span className="text-red-700">*</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -445,6 +673,16 @@ export default function AdminPromotionsPage() {
                 </div>
               </div>
 
+              {formError && (
+                <p
+                  data-testid="promotion-form-error"
+                  role="alert"
+                  className="text-xs font-semibold text-red-700 bg-red-500/10 px-3 py-2 rounded-lg"
+                >
+                  {formError}
+                </p>
+              )}
+
               {/* Product Picker */}
               <div className="space-y-2 pt-2 border-t border-border">
                 <div className="flex items-center justify-between">
@@ -452,7 +690,7 @@ export default function AdminPromotionsPage() {
                     {t('selectProducts')}
                   </label>
                   <span className="text-[11px] font-bold text-primary">
-                    {t('selectedCount', { count: selectedProductIds.length })}
+                    {t('selectedCount', { count: Object.keys(selectedItems).length })}
                   </span>
                 </div>
 
@@ -469,36 +707,19 @@ export default function AdminPromotionsPage() {
 
                 <div
                   data-testid="promotion-product-picker"
-                  className="max-h-48 overflow-y-auto border border-border rounded-xl p-2 space-y-1 bg-background divide-y divide-border/30"
+                  className="max-h-72 overflow-y-auto border border-border rounded-xl p-2 space-y-1 bg-background divide-y divide-border/30"
                 >
-                  {filteredPickerProducts.map((p) => {
-                    const isSelected = selectedProductIds.includes(p.id);
-
-                    return (
-                      <div
-                        key={p.id}
-                        data-testid={`picker-item-${p.id}`}
-                        onClick={() => toggleProduct(p.id)}
-                        className={cn(
-                          'p-2 rounded-lg flex items-center justify-between cursor-pointer transition-colors',
-                          isSelected ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/10 text-foreground'
-                        )}
-                      >
-                        <div className="min-w-0 pr-2">
-                          <p className="text-xs truncate">{p.name}</p>
-                          <p className="text-[10px] text-muted font-mono">{p.sku}</p>
-                        </div>
-                        <div
-                          className={cn(
-                            'w-5 h-5 rounded border flex items-center justify-center shrink-0',
-                            isSelected ? 'bg-primary border-primary text-white' : 'border-border'
-                          )}
-                        >
-                          {isSelected && <Check className="w-3.5 h-3.5" />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {filteredPickerProducts.map((p) => (
+                    <PickerRow
+                      key={p.id}
+                      product={p}
+                      isFlash={type === 'FLASH_SALE'}
+                      selected={selectedItems}
+                      rowErrors={rowErrors}
+                      onToggle={toggleItem}
+                      onPrice={setItemPrice}
+                    />
+                  ))}
                 </div>
               </div>
 

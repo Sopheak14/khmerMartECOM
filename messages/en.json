@@ -497,6 +497,10 @@
       "selectProducts": "Included Products",
       "selectedCount": "{count} products selected",
       "savePromotion": "Save Promotion",
+      "wholeProduct": "Whole product (no variants)",
+      "salePrice": "Sale price",
+      "salePriceRequired": "Enter a sale price greater than $0.00",
+      "salePriceBelow": "Sale price must be below {price}",
       "deleteConfirm": "Are you sure you want to delete this promotion?"
     },
     "reviews": {

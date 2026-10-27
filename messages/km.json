@@ -497,6 +497,10 @@
       "selectProducts": "ទំនិញដែលបានជ្រើសរើស",
       "selectedCount": "បានជ្រើសរើស {count} ទំនិញ",
       "savePromotion": "រក្សាទុកប្រូម៉ូសិន",
+      "wholeProduct": "ទំនិញទាំងមូល (គ្មានវ៉ារ្យ៉ង់)",
+      "salePrice": "តម្លៃបញ្ចុះ",
+      "salePriceRequired": "សូមបញ្ចូលតម្លៃបញ្ចុះធំជាង $0.00",
+      "salePriceBelow": "តម្លៃបញ្ចុះត្រូវតិចជាង {price}",
       "deleteConfirm": "តើអ្នកប្រាកដថាចង់លុបប្រូម៉ូសិននេះមែនទេ?"
     },
     "reviews": {

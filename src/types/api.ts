@@ -602,6 +602,23 @@ export interface AdminPromotionDTO {
   endsAt: string;
   active: boolean;
   productIds?: number[];
+  items?: AdminPromotionItemDTO[];
+}
+
+export interface AdminPromotionItemDTO {
+  productId: number;
+  productName: string;
+  variantId?: number;
+  sku?: string;
+  attributes?: Record<string, string>;
+  priceCents: number;
+  salePriceCents?: number;
+}
+
+export interface PromotionItemRequest {
+  productId: number;
+  variantId?: number;
+  salePriceCents?: number;
 }
 
 export interface AdminPromotionRequest {
@@ -613,7 +630,9 @@ export interface AdminPromotionRequest {
   startsAt: string;
   endsAt: string;
   active?: boolean;
+  /** @deprecated use items; the backend ignores productIds when items is sent */
   productIds?: number[];
+  items?: PromotionItemRequest[];
 }
 
 export interface AdminReviewUpdateRequest {
