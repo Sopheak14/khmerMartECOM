@@ -32,7 +32,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 // Shared promise to prevent multiple refresh calls simultaneously
 let refreshPromise: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+// Silent refresh (also used by AuthProvider on startup). Single-flight: the refresh token rotates,
+// so two concurrent calls would invalidate each other and log the user out.
+export async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -45,9 +47,12 @@ async function refreshAccessToken(): Promise<string | null> {
         headers: {
           "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) {
+        // Drain the body so the request completes (an unread body keeps the connection and network-idle pending)
+        await res.text().catch(() => "");
         useAuthStore.getState().clearAuth();
         return null;
       }
@@ -101,22 +106,21 @@ export async function apiClient<T>(
     reqHeaders["Content-Type"] = "application/json";
   }
 
-  // If request requires auth and session is not yet initialized in browser, wait briefly for AuthProvider
+  // Wait until the session restore (AuthProvider) has finished before sending an authenticated request.
+  // Sending it earlier would hit the backend as a guest and cache guest data (e.g. an empty cart) for a signed-in user.
+  // The restore itself is bounded by the refresh fetch timeout, so this cannot wait forever.
   if (process.env.NODE_ENV !== "test" && auth && typeof window !== "undefined" && !useAuthStore.getState().isInitialized) {
     await new Promise<void>((resolve) => {
-      if (useAuthStore.getState().isInitialized) return resolve();
       const unsub = useAuthStore.subscribe((state) => {
         if (state.isInitialized) {
           unsub();
           resolve();
         }
       });
-      setTimeout(() => {
-        try {
-          unsub();
-        } catch {}
+      if (useAuthStore.getState().isInitialized) {
+        unsub();
         resolve();
-      }, 1500);
+      }
     });
   }
 

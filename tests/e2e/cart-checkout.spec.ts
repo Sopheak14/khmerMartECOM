@@ -628,3 +628,24 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
   });
 
 });
+
+test.describe('Phase 8 — Session restore race', () => {
+  test('slow /auth/refresh on page load keeps the user signed in and the checkout address step reachable', async ({ page, request }) => {
+    const throwaway = await createThrowawayUser(request);
+    await request.post('http://localhost:4000/api/cart/items', {
+      headers: { Authorization: `Bearer ${throwaway.token}` },
+      data: { productId: 1001, variantId: 1, quantity: 1 },
+    });
+    await loginViaUI(page, throwaway.email, throwaway.password, 'en');
+
+    // Session restore (silent refresh) takes longer than the API client's wait for AuthProvider
+    await page.route('**/api/auth/refresh', async (route) => {
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.continue();
+    });
+    await page.goto('/en/checkout');
+
+    await expect(page.locator('[data-testid="add-new-address-btn"]')).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/checkout$/);
+  });
+});
