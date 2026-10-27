@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "next build && playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -45,6 +45,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.48.1",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
@@ -57,6 +58,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",
     "jsdom": "^25.0.1",
+    "lighthouse": "^12.8.2",
     "msw": "^2.4.11",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",

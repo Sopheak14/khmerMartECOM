@@ -63,7 +63,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await expect(drawer).toContainText('Laptop Pro 15');
   });
 
-  test('2: Cart page: quantity stepper limited to available, OUT_OF_STOCK message in EN & KM, remove item, empty state', async ({ page }) => {
+  test('2: Cart page: quantity stepper increase/decrease, remove item with confirmation, Khmer empty state', async ({ page }) => {
     // 1. Visit /en/cart (cart has 1 Laptop Pro 15 from previous test or add one)
     await page.goto('/en/cart');
     await page.waitForLoadState('networkidle');
