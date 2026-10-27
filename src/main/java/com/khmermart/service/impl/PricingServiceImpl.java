@@ -109,15 +109,17 @@ public class PricingServiceImpl implements PricingService {
         }
       }
 
-      // Rule: Each cart line gets AT MOST ONE automatic promotion:
-      // Best of FLASH_SALE / SEASONAL % / BOGO.
-      // Flash sale item gets flash sale (e.g. Laptop Pro 15 in flash sale + seasonal -> 89900).
-      if (flashDiscount > 0) {
-        totalFlashDiscount += flashDiscount;
-      } else if (seasonalDiscount > 0 && seasonalDiscount >= bogoDiscount) {
-        totalSeasonalDiscount += seasonalDiscount;
-      } else if (bogoDiscount > 0) {
-        totalBogoDiscount += bogoDiscount;
+      // Rule: each cart line gets AT MOST ONE automatic promotion: the one with the largest
+      // discount among FLASH_SALE / SEASONAL % / BOGO. Ties prefer flash, then seasonal, then BOGO.
+      long best = Math.max(flashDiscount, Math.max(seasonalDiscount, bogoDiscount));
+      if (best > 0) {
+        if (flashDiscount == best) {
+          totalFlashDiscount += flashDiscount;
+        } else if (seasonalDiscount == best) {
+          totalSeasonalDiscount += seasonalDiscount;
+        } else {
+          totalBogoDiscount += bogoDiscount;
+        }
       }
     }
 

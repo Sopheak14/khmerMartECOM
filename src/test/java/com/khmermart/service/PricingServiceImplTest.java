@@ -343,4 +343,80 @@ class PricingServiceImplTest {
     assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(30000L);
     assertThat(result.totalCents()).isEqualTo(result.subtotalCents() - 30000L);
   }
+
+  private Promotion promo(PromotionType type, Integer percent) {
+    return Promotion.builder()
+        .name(type.name())
+        .type(type)
+        .discountPercent(percent)
+        .active(true)
+        .build();
+  }
+
+  @Test
+  @DisplayName("14. Best wins per line: seasonal 20% beats a smaller flash discount, never both")
+  void testSeasonalBeatsSmallerFlash() {
+    // 99900c, flash price 89900c (10000 off) but also in seasonal 20% (19980 off) -> seasonal only
+    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, 20));
+
+    PricingResult result =
+        pricingService.calculate(
+            items,
+            List.of(promo(PromotionType.FLASH_SALE, null), promo(PromotionType.SEASONAL, 20)),
+            null,
+            null);
+
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).contains("Seasonal");
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(19980L);
+    assertThat(result.totalCents()).isEqualTo(99900L - 19980L);
+  }
+
+  @Test
+  @DisplayName(
+      "15. Best wins per line: flash beats a smaller seasonal %, BOGO beats both when bigger")
+  void testBestOfFlashSeasonalBogoPerLine() {
+    // Line A: 10000c, flash 5000c (5000 off) vs seasonal 10% (1000 off) -> flash
+    // Line B: 10000c x2, BOGO (10000 off) vs seasonal 10% (2000 off) -> BOGO
+    // Line C: 10000c x1, seasonal 10% only (1000 off) -> seasonal
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(1L, null, 10000L, 1, 5000L, false, 10),
+            new PricingItem(2L, null, 10000L, 2, null, true, 10),
+            new PricingItem(3L, null, 10000L, 1, null, false, 10));
+
+    PricingResult result =
+        pricingService.calculate(
+            items,
+            List.of(
+                promo(PromotionType.FLASH_SALE, null),
+                promo(PromotionType.SEASONAL, 10),
+                promo(PromotionType.BOGO, null)),
+            null,
+            null);
+
+    assertThat(result.promotionDiscounts())
+        .extracting(d -> d.label() + "=" + d.amountCents())
+        .containsExactly(
+            "Flash Sale Discount=5000", "Seasonal Promotion (10%)=1000", "Buy 1 Get 1 Free=10000");
+    assertThat(result.discountCents()).isEqualTo(16000L);
+  }
+
+  @Test
+  @DisplayName("16. Best wins: equal discounts tie-break flash, then seasonal, then BOGO")
+  void testTieBreakPrefersFlash() {
+    // 10000c: flash 9000c (1000 off) == seasonal 10% (1000 off) -> counted once, as flash
+    List<PricingItem> items = List.of(new PricingItem(1L, null, 10000L, 1, 9000L, false, 10));
+
+    PricingResult result =
+        pricingService.calculate(
+            items,
+            List.of(promo(PromotionType.FLASH_SALE, null), promo(PromotionType.SEASONAL, 10)),
+            null,
+            null);
+
+    assertThat(result.promotionDiscounts()).hasSize(1);
+    assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
+    assertThat(result.discountCents()).isEqualTo(1000L);
+  }
 }
