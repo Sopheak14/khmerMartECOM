@@ -9,7 +9,7 @@ describe('apiClient', () => {
   });
 
   it('unwraps success envelope and returns data and meta', async () => {
-    const mockData = { id: 1001, name: 'Laptop Pro 15' };
+    const mockData = { id: 1001, name: 'Takeo Hol Silk Sampot' };
     const mockMeta = { page: 1, limit: 20, total: 1, totalPages: 1 };
 
     global.fetch = vi.fn().mockResolvedValue({

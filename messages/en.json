@@ -56,8 +56,8 @@
     "khqrBanner": "KHQR Instant Checkout Enabled 🇰🇭"
   },
   "home": {
-    "heroTitle": "Khmer New Year Mega Deals",
-    "heroSubtitle": "Up to 50% off laptops, phones, electronics, and local Cambodian specialties. Instant checkout with KHQR.",
+    "heroTitle": "Authentic Cambodian Products, Delivered",
+    "heroSubtitle": "Hol silk, Kampot pepper, jasmine rice, Cambodian coffee and handicrafts made by local artisans. Instant checkout with KHQR.",
     "shopNow": "Shop Now",
     "exploreDeals": "Explore Flash Sale",
     "flashSaleTitle": "⚡ Flash Sale",
@@ -261,6 +261,7 @@
       "viewAllInventory": "View inventory"
     },
     "orders": {
+      "discounts": "Discounts",
       "title": "Orders",
       "subtitle": "Manage customer orders, fulfillment and tracking",
       "orderNumber": "Order #",
@@ -863,6 +864,7 @@
     "viewOrder": "View Order Details"
   },
   "orders": {
+    "discounts": "Discounts",
     "title": "My Orders",
     "subtitle": "View and manage your purchase history",
     "tabAll": "All",
@@ -908,7 +910,7 @@
       "CONFIRMED": "Confirmed",
       "PROCESSING": "Processing",
       "SHIPPED": "Shipped",
-      "OUT_FOR_DELIVERY": "Out for Delivery",
+      "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered",
       "CANCELLED": "Cancelled",
       "PAYMENT_EXPIRED": "Payment Expired",
@@ -956,7 +958,7 @@
       "PREPARING": "Preparing",
       "DISPATCHED": "Dispatched",
       "IN_TRANSIT": "In Transit",
-      "OUT_FOR_DELIVERY": "Out for Delivery",
+      "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered",
       "FAILED": "Delivery Failed"
     }

@@ -352,7 +352,7 @@ export default function AdminCategoriesPage() {
                   data-testid="category-name-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Laptops"
+                  placeholder="e.g. Silk & Textiles"
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs sm:text-sm"
                   required
                 />
@@ -384,7 +384,7 @@ export default function AdminCategoriesPage() {
                   data-testid="category-slug-input"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="e.g. laptops"
+                  placeholder="e.g. silk-textiles"
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs sm:text-sm font-mono"
                 />
               </div>
@@ -419,7 +419,7 @@ export default function AdminCategoriesPage() {
                   data-testid="category-icon-input"
                   value={icon}
                   onChange={(e) => setIcon(e.target.value)}
-                  placeholder="e.g. Laptop or https://.../icon.png"
+                  placeholder="e.g. https://.../icon.png"
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs sm:text-sm"
                 />
               </div>

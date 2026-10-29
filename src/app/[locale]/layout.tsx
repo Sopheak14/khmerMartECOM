@@ -12,7 +12,7 @@ import { locales } from '@/i18n/request';
 
 export const metadata: Metadata = {
   title: 'KhmerMart — Modern Cambodian Marketplace with KHQR',
-  description: 'Shop laptops, smartphones, electronics, and authentic Cambodian specialties with instant KHQR payments.',
+  description: 'Shop authentic Cambodian silk, Kampot pepper, rice, coffee and handicrafts with instant KHQR payments.',
 };
 
 export function generateStaticParams() {

@@ -30,10 +30,10 @@ vi.mock('next/image', () => ({
 
 const mockHomeData = {
   seasonalBanner: {
-    title: 'Khmer New Year Mega Sale',
-    titleKm: 'ការបញ្ចុះតម្លៃពិធីបុណ្យចូលឆ្នាំថ្មីប្រពៃណីជាតិ',
-    imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200',
-    link: '/promotions/kny-sale',
+    title: 'Pchum Ben Festival Sale',
+    titleKm: 'ពិធីបុណ្យភ្ជុំបិណ្ឌ',
+    imageUrl: 'https://placehold.co/1200x400/F3EBDD/5B4636/png?text=Pchum+Ben+Festival+Sale',
+    link: '/products?category=spices-sauces',
   },
   flashSale: {
     id: 1,
@@ -41,19 +41,18 @@ const mockHomeData = {
     endsAt: new Date(Date.now() + 86400000).toISOString(),
     products: [
       {
-        id: 1001,
-        sku: 'PROD-1001',
-        slug: 'laptop-pro-15',
-        name: 'Laptop Pro 15',
-        nameKm: 'កុំព្យូទ័រយួរដៃ Laptop Pro 15',
-        brand: 'KhmerTech',
-        priceCents: 99900,
-        compareAtCents: 119900,
-        salePriceCents: 89900,
-        imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
+        id: 1006,
+        sku: 'SPC-1006',
+        slug: 'kampot-black-pepper-100-g',
+        name: 'Kampot Black Pepper 100 g',
+        nameKm: 'ម្រេចខ្មៅកំពត ១០០ ក្រាម',
+        brand: 'Kampot Farms',
+        priceCents: 950,
+        salePriceCents: 790,
+        imageUrl: 'https://placehold.co/800x800/F3EBDD/5B4636/png?text=Kampot+Black+Pepper',
         avgRating: 4.7,
         reviewCount: 3,
-        available: 50,
+        available: 150,
         inStock: true,
         badges: ['FLASH_SALE'],
       },
@@ -61,28 +60,27 @@ const mockHomeData = {
   },
   categories: [
     {
-      id: 1,
-      name: 'Electronics',
-      nameKm: 'គ្រឿងអេឡិចត្រូនិច',
-      slug: 'electronics',
-      imageUrl: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=500',
-      productCount: 4,
+      id: 2,
+      name: 'Spices & Sauces',
+      nameKm: 'គ្រឿងទេស និងទឹកជ្រលក់',
+      slug: 'spices-sauces',
+      imageUrl: 'https://images.unsplash.com/photo-1509358271058-acd22cc93898?w=500',
+      productCount: 7,
     },
   ],
   bestSellers: [
     {
-      id: 1002,
-      sku: 'DELL-LAT-5520',
-      slug: 'dell-latitude-5520',
-      name: 'Dell Latitude 5520 Laptop',
-      nameKm: 'កុំព្យូទ័រយួរដៃ Dell Latitude 5520',
-      brand: 'Dell',
-      priceCents: 75000,
-      compareAtCents: 89900,
-      imageUrl: 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=800',
+      id: 1013,
+      sku: 'RICE-1013',
+      slug: 'phka-rumduol-jasmine-rice',
+      name: 'Phka Rumduol Jasmine Rice',
+      nameKm: 'អង្ករផ្កាម្លិះ ផ្កាស្រគំ',
+      brand: 'Battambang Rice',
+      priceCents: 1200,
+      imageUrl: 'https://placehold.co/800x800/F3EBDD/5B4636/png?text=Jasmine+Rice',
       avgRating: 4.5,
       reviewCount: 12,
-      available: 25,
+      available: 150,
       inStock: true,
       badges: ['POPULAR'],
     },
@@ -159,7 +157,7 @@ describe('Khmer Locale UI Strings on Home Page', () => {
     );
 
     // Wait for async queries to resolve
-    expect(await screen.findByText('ការបញ្ចុះតម្លៃពិធីបុណ្យចូលឆ្នាំថ្មីប្រពៃណីជាតិ')).toBeInTheDocument();
+    expect(await screen.findByText('ពិធីបុណ្យភ្ជុំបិណ្ឌ')).toBeInTheDocument();
 
     // Known English UI strings that must NOT appear when rendering in Khmer:
     const forbiddenEnglishStrings = [

@@ -34,7 +34,7 @@ API responses carry `name` and `nameKm`; components pick by `useLocale()`. An E2
 
 ## Money
 
-All amounts are integer cents. `formatUsd(129900)` → `$1,299.00`; `formatKhr(cents, rate)` → `≈ 5,325,900 ៛`
+All amounts are integer cents. `formatUsd(12400)` → `$124.00`; `formatKhr(12400, 4100)` → `≈ 508,400 ៛`
 (`khrRate` comes from `GET /settings/public`, 4100 in MOCK). Dollar form inputs convert with `toCents()` in `src/lib/money.ts`.
 Prices shown in the UI must equal the CartDTO/OrderDTO values — E2E tests assert `UI == API`.
 

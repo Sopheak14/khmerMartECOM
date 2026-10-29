@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -182,7 +182,7 @@ export function ReviewStep({
                 <div className="flex items-center gap-3">
                   <div className="relative w-12 h-12 rounded bg-muted/20 overflow-hidden shrink-0 border border-border/50">
                     {item.imageUrl ? (
-                      <Image
+                      <SafeImage
                         src={getImageUrl(item.imageUrl)}
                         alt={name}
                         fill

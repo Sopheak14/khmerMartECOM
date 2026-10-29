@@ -107,3 +107,9 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Full-screen overlays (dialogs, drawers) must cover the whole viewport, including the sticky admin top bar.
+   Without this, a `space-y-*` parent adds a margin-top to the fixed overlay and leaves a strip uncovered. */
+.fixed.inset-0 {
+  margin: 0 !important;
+}

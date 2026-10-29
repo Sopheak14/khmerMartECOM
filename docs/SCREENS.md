@@ -7,7 +7,7 @@ API paths are relative to `http://localhost:4000/api` (see [API_CONTRACT.md](API
 ## Storefront
 
 ### `/`
-Home: hero banner, flash-sale countdown, categories, featured/new/popular products.
+Home: hero banner (seasonal Pchum Ben banner from the API), flash-sale countdown, the 8 Khmer categories, featured/new/popular products.
 
 - **API:** GET /home, GET /settings/public
 - **Screenshots:** [phase1-en.png](screenshots/phase1-en.png), [phase1-km.png](screenshots/phase1-km.png), [phase1-mobile.png](screenshots/phase1-mobile.png)
@@ -22,10 +22,10 @@ Catalog: search, facets, sort, pagination, active-filter chips.
 Category and sub-category listing with breadcrumbs.
 
 - **API:** GET /categories, GET /products?category=
-- **Screenshots:** none captured for this route
+- **Screenshots:** [category-silk-en.png](screenshots/category-silk-en.png)
 
 ### `/products/[slug]`
-Product detail: gallery, variant chips, per-variant flash-sale price, stock, reviews, add to cart.
+Product detail: gallery, variant chips, per-variant flash-sale price (Standard $129.00 vs Premium $199.00 on the hero), stock, description in the current locale only, reviews, add to cart.
 
 - **API:** GET /products/{slug}, GET /products/{id}/reviews, POST /cart/items
 - **Screenshots:** [product-1001-en.png](screenshots/product-1001-en.png), [product-1001-km.png](screenshots/product-1001-km.png), [product-reviews.png](screenshots/product-reviews.png)
@@ -73,7 +73,7 @@ Order placed (COD / KHQR) confirmation.
 - **Screenshots:** [order-success-cod.png](screenshots/order-success-cod.png), [order-success-khqr.png](screenshots/order-success-khqr.png)
 
 ### `/orders/[orderNumber]`
-Order detail: timeline, items, invoice download, cancel, buy again, review.
+Order detail: timeline (every status has its own label, e.g. OUT_FOR_DELIVERY = "Out for delivery" / «កំពុងដឹកជញ្ជូន»), items, a single "Discounts" summary line, invoice download, cancel, buy again, review.
 
 - **API:** GET /orders/{n}, POST /orders/{n}/cancel, POST /orders/{n}/reorder, GET /orders/{n}/invoice.pdf
 - **Screenshots:** [order-detail.png](screenshots/order-detail.png), [order-detail-delivered.png](screenshots/order-detail-delivered.png)
@@ -145,7 +145,7 @@ Star rating and comment for a delivered item.
 ## Admin
 
 ### `/admin`
-Dashboard KPIs, sales trend, payment mix, top products, low stock, recent orders.
+Dashboard KPIs, sales trend, payment mix, top products, low stock (seed: 1027 Kampong Luong Silver Box, 1004 Hol Silk Table Runner), recent orders. The user menu's "Admin Backoffice" links here; `/admin/dashboard` redirects to `/admin` and unknown `/admin/*` paths show the 404 page.
 
 - **API:** GET /admin/dashboard?range=
 - **Screenshots:** [admin-dashboard-en.png](screenshots/admin-dashboard-en.png), [admin-dashboard-km.png](screenshots/admin-dashboard-km.png)
@@ -181,7 +181,7 @@ Stock list, restock, adjust, movement ledger.
 - **Screenshots:** [admin-inventory.png](screenshots/admin-inventory.png)
 
 ### `/admin/payments`
-Payments, refund, bank-transfer approval, reconciliation, CSV export.
+Payments, refund, bank-transfer approval, reconciliation, CSV export. **ADMIN only**: STAFF has no sidebar link and gets the 403 page when opening the URL.
 
 - **API:** GET /admin/payments, POST .../refund, POST .../approve-bank-transfer, GET .../reconciliation, GET export.csv
 - **Screenshots:** [admin-payments.png](screenshots/admin-payments.png)

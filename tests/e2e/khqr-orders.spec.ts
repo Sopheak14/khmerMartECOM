@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
+import { selectHeroVariant } from './helpers/shop';
+import { API, COUPON, DEMO_ORDER, HERO, usd } from './fixtures/catalog';
 
 test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () => {
 
@@ -8,7 +10,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
-  test('1: Complete KHQR flow: user -> add item -> coupon SAVE5 -> checkout KHQR -> assert UI == API -> simulate paid -> success page -> My Orders', async ({ page, request }) => {
+  test('1: Demo flow: hero Premium $199.00 (no flash) vs Standard $129.00 + countdown -> add -> SAVE5 -> review $124.00 = 508,400 ៛ -> KHQR -> simulate paid -> success page -> My Orders', async ({ page, request }) => {
     // 1. Create throwaway user & login
     const user = await createThrowawayUser(request);
     await loginViaUI(page, user.email, user.password, 'en');
@@ -29,12 +31,17 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     });
     expect(addrRes.ok()).toBe(true);
 
-    // 3. Add Laptop Pro 15 (variant 1: 16GB / Space Gray / 512GB on flash sale at $899)
-    await page.goto('/en/products/laptop-pro-15');
+    // 3. Hero 1001: Premium has no flash sale; Standard is on flash sale with the regular price struck through
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page, 'Premium');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.premiumCents));
+    await expect(page.locator('[data-testid="original-price"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).not.toBeVisible();
+    await selectHeroVariant(page, 'Standard');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.flashCents));
+    await expect(page.locator('[data-testid="original-price"]')).toHaveText(usd(HERO.standardCents));
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -44,9 +51,10 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await page.goto('/en/cart');
     await page.waitForLoadState('networkidle');
     const couponInput = page.locator('[data-testid="coupon-input"]');
-    await couponInput.fill('SAVE5');
+    await couponInput.fill(COUPON.save5);
     await page.click('[data-testid="apply-coupon-btn"]');
     await expect(page.locator('[data-testid="applied-coupon-badge"]')).toBeVisible();
+    await expect(page.locator('[data-testid="cart-total-usd"]')).toHaveText(usd(DEMO_ORDER.totalCents));
 
     // Proceed to checkout
     await page.click('[data-testid="proceed-to-checkout-btn"]');
@@ -65,8 +73,10 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await page.click('[data-testid="payment-method-KHQR"]');
     await page.click('[data-testid="next-to-review-btn"]');
 
-    // Step 4: Review & Place order
+    // Step 4: Review & Place order: $149.00 - $20.00 flash - $5.00 SAVE5 = $124.00 = 508,400 ៛
     await expect(page.locator('[data-testid="step-review"]')).toBeVisible();
+    await expect(page.locator('[data-testid="review-total-usd"]')).toHaveText(usd(DEMO_ORDER.totalCents));
+    await expect(page.locator('[data-testid="review-total-khr"]')).toContainText(`${DEMO_ORDER.totalKhr.toLocaleString('en-US')} ៛`);
 
     // Place order and wait for redirect to /checkout/pay/{orderNumber}
     await page.click('[data-testid="place-order-btn"]');
@@ -107,7 +117,8 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     });
     const khqrDto = (await khqrApiRes.json()).data;
 
-    // UI amount "$894.00" (or 89400 cents: 89900 - 500 coupon = 89400)
+    // UI amount $124.00 (12900 flash price - 500 SAVE5 coupon)
+    expect(orderDto.totalCents).toBe(DEMO_ORDER.totalCents);
     expect(khqrDto.amountCents).toBe(orderDto.totalCents);
     expect(uiAmountText).toBe(`$${(orderDto.totalCents / 100).toFixed(2)}`);
 
@@ -201,7 +212,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // Add item to cart
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
 
     // Checkout KHQR
@@ -290,9 +301,9 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await loginViaUI(page, user.email, user.password, 'en');
 
     // 1. Get initial stock of product 1001
-    const pBefore = await (await request.get('http://localhost:4000/api/products/laptop-pro-15')).json();
+    const pBefore = await (await request.get(`${API}/products/${HERO.slug}`)).json();
     const stockBefore = pBefore.data.available;
-    const variant1Before = pBefore.data.variants.find((v: any) => v.id === 1).available;
+    const variant1Before = pBefore.data.variants.find((v: any) => v.id === HERO.variants.redStandard).available;
 
     // 2. Add address
     const addrRes = await request.post('http://localhost:4000/api/users/me/addresses', {
@@ -313,7 +324,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // 3. Add 2 units of variant 1 to cart
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 2 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 2 },
     });
 
     // 4. Place order
@@ -331,8 +342,8 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     const orderNumber = (await coRes.json()).data.order.orderNumber;
 
     // Stock should now be reserved (-2 units)
-    const pDuring = await (await request.get('http://localhost:4000/api/products/laptop-pro-15')).json();
-    const variant1During = pDuring.data.variants.find((v: any) => v.id === 1).available;
+    const pDuring = await (await request.get(`${API}/products/${HERO.slug}`)).json();
+    const variant1During = pDuring.data.variants.find((v: any) => v.id === HERO.variants.redStandard).available;
     expect(variant1During).toBe(variant1Before - 2);
 
     // 5. Navigate to order detail page and click Cancel
@@ -359,8 +370,8 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await expect(badge).toContainText(/Cancelled/i);
 
     // 6. Verify stock has been fully restored (+2 units back)
-    const pAfter = await (await request.get('http://localhost:4000/api/products/laptop-pro-15')).json();
-    const variant1After = pAfter.data.variants.find((v: any) => v.id === 1).available;
+    const pAfter = await (await request.get(`${API}/products/${HERO.slug}`)).json();
+    const variant1After = pAfter.data.variants.find((v: any) => v.id === HERO.variants.redStandard).available;
     expect(variant1After).toBe(variant1Before);
   });
 
@@ -387,7 +398,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // Add item & checkout
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     const coRes = await request.post('http://localhost:4000/api/checkout', {
       headers: {
@@ -442,7 +453,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // Add item & checkout
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     const coRes = await request.post('http://localhost:4000/api/checkout', {
       headers: {
@@ -466,10 +477,10 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     await expect(buyAgainBtn).toBeVisible();
     await buyAgainBtn.click();
 
-    // Cart drawer should open automatically and contain Laptop Pro 15
+    // Cart drawer should open automatically and contain the hero product
     const drawer = page.locator('[data-testid="cart-drawer"]');
     await expect(drawer).toBeVisible({ timeout: 5000 });
-    await expect(drawer).toContainText('Laptop Pro 15');
+    await expect(drawer).toContainText(HERO.name);
   });
 
   test('6: Khmer locale + mobile 390x844 KHQR page', async ({ page, request }) => {
@@ -495,7 +506,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // Add item & checkout
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     const coRes = await request.post('http://localhost:4000/api/checkout', {
       headers: {
@@ -559,7 +570,7 @@ test.describe('Phase 5 — KHQR Payment & Orders E2E against Real Backend', () =
     // Add item & checkout
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${user.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     const coRes = await request.post('http://localhost:4000/api/checkout', {
       headers: {

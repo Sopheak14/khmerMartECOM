@@ -1,6 +1,8 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
+import { selectHeroVariant } from './helpers/shop';
+import { COCONUT_OIL, HERO } from './fixtures/catalog';
 
 test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Backend', () => {
   let consoleErrors: string[] = [];
@@ -65,15 +67,13 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     expect(addrRes.ok()).toBe(true);
 
     // -------------------------------------------------------------
-    // Step 3: Add Laptop Pro 15 (ProductId: 1001) to Cart & Checkout
+    // Step 3: Add the hero Takeo Hol Silk Sampot (ProductId: 1001) to Cart & Checkout
     // -------------------------------------------------------------
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
 
     // Select variants
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -234,7 +234,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     await page.goto(`/km/track/${trackingNumber}`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="tracking-detail-card"]')).toBeVisible();
-    await expect(page.locator('[data-testid="tracking-status-badge"]')).toContainText(/កំពុងដឹកជញ្ជូន/);
+    await expect(page.locator('[data-testid="tracking-status-badge"]')).toContainText(/កំពុងធ្វើដំណើរ/);
 
     await scrollFullPageAndSettle(page);
     // Screenshot 4: track-km.png
@@ -321,7 +321,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // Step 12: Customer Writes 5-Star Review
     // -------------------------------------------------------------
     // "Write review" button on order item row
-    const writeReviewBtn = page.locator('[data-testid="write-review-btn-1001"]');
+    const writeReviewBtn = page.locator(`[data-testid="write-review-btn-${HERO.id}"]`);
     await expect(writeReviewBtn).toBeVisible();
     await writeReviewBtn.click();
 
@@ -342,14 +342,14 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     await page.locator('[data-testid="review-title-input"]').fill('Exceptional Quality and Fast Delivery!');
     await page
       .locator('[data-testid="review-body-input"]')
-      .fill('Amazing performance, crisp display, and the delivery was extremely swift. 10/10 recommended!');
+      .fill('Beautiful weaving, rich colours, and the delivery was extremely swift. 10/10 recommended!');
 
     // Submit review
     await page.locator('[data-testid="submit-review-btn"]').click();
     await expect(reviewDialog).toBeHidden({ timeout: 5000 });
 
     // Button in order detail now displays "Reviewed"
-    const reviewedBtn = page.locator('[data-testid="reviewed-btn-1001"]');
+    const reviewedBtn = page.locator(`[data-testid="reviewed-btn-${HERO.id}"]`);
     await expect(reviewedBtn).toBeVisible();
 
     // -------------------------------------------------------------
@@ -361,7 +361,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     expect(pendingReviewsRes.ok()).toBe(true);
     const pendingJson = await pendingReviewsRes.json();
     const pendingReview = (pendingJson.data as any[]).find(
-      (r) => r.productId === 1001 || r.title === 'Exceptional Quality and Fast Delivery!'
+      (r) => r.productId === HERO.id || r.title === 'Exceptional Quality and Fast Delivery!'
     );
     expect(pendingReview).toBeTruthy();
     const reviewId = pendingReview.id;
@@ -374,7 +374,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
       },
       data: {
         status: 'APPROVED',
-        adminReply: 'Thank you for your wonderful review! We are delighted you love your new Laptop.',
+        adminReply: 'Thank you for your wonderful review! We are delighted you love your new silk sampot.',
       },
     });
     expect(approveRes.ok()).toBe(true);
@@ -382,7 +382,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // -------------------------------------------------------------
     // Step 14: Product Page Shows Review and Rating Count/Average Changed
     // -------------------------------------------------------------
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
 
     // Approved reviews list contains the new review with Verified purchase badge
@@ -398,7 +398,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // -------------------------------------------------------------
     // Step 15: Second Review Attempt Shows Error
     // -------------------------------------------------------------
-    const secondReviewRes = await request.post('http://localhost:4000/api/products/1001/reviews', {
+    const secondReviewRes = await request.post(`http://localhost:4000/api/products/${HERO.id}/reviews`, {
       headers: {
         Authorization: `Bearer ${user.token}`,
         'Content-Type': 'application/json',
@@ -425,7 +425,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
       '/en/account/notifications',
       '/km/account/notifications',
       `/en/orders/${orderNumber}`,
-      '/en/products/laptop-pro-15',
+      `/en/products/${HERO.slug}`,
     ]) {
       await page.goto(testUrl);
       await page.waitForLoadState('networkidle');
@@ -599,7 +599,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // 4. Check review dialog in English
     await page.goto(`/en/orders/${orderNumber}`);
     await page.waitForLoadState('networkidle');
-    const writeReviewBtnEn = page.locator('[data-testid="write-review-btn-1031"]');
+    const writeReviewBtnEn = page.locator(`[data-testid="write-review-btn-${COCONUT_OIL.id}"]`);
     await expect(writeReviewBtnEn).toBeVisible();
     await writeReviewBtnEn.click();
 
@@ -612,7 +612,7 @@ test.describe('Phase 6 — Notifications, Tracking & Reviews E2E against Real Ba
     // 5. Check review dialog in Khmer
     await page.goto(`/km/orders/${orderNumber}`);
     await page.waitForLoadState('networkidle');
-    const writeReviewBtnKm = page.locator('[data-testid="write-review-btn-1031"]');
+    const writeReviewBtnKm = page.locator(`[data-testid="write-review-btn-${COCONUT_OIL.id}"]`);
     await expect(writeReviewBtnKm).toBeVisible();
     await writeReviewBtnKm.click();
 
@@ -685,10 +685,10 @@ async function createDeliveredOrderWithTracking(request: APIRequestContext) {
   });
   const addressId = (await addrRes.json()).data.id;
 
-  // 4. Cart item (Product 1031, Variant 14, Qty 1)
+  // 4. Cart item (Virgin Coconut Oil, Qty 1)
   await request.post('http://localhost:4000/api/cart/items', {
     headers: { Authorization: `Bearer ${user.token}` },
-    data: { productId: 1031, variantId: 14, quantity: 1 },
+    data: { productId: COCONUT_OIL.id, quantity: 1 },
   });
 
   // 5. Checkout

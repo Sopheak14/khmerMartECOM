@@ -1,6 +1,7 @@
 import { test, expect, request as pwRequest, Browser } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { createThrowawayUser, loginViaUI, ThrowawayUser } from './helpers/auth';
+import { HERO } from './fixtures/catalog';
 import { cancelOrder, createAddress, findShippedTrackingNumber, placeKhqrOrder } from './helpers/orders';
 
 type Role = 'guest' | 'customer' | 'admin';
@@ -16,7 +17,7 @@ interface Data {
 
 const PAGES: PageSpec[] = [
   { name: 'Home', role: 'guest', path: () => '' },
-  { name: 'Product', role: 'guest', path: () => '/products/laptop-pro-15' },
+  { name: 'Product', role: 'guest', path: () => `/products/${HERO.slug}` },
   { name: 'Cart', role: 'customer', path: () => '/cart' },
   { name: 'Checkout', role: 'customer', path: () => '/checkout' },
   { name: 'KHQR', role: 'customer', path: (d) => `/checkout/pay/${d.pending}` },
@@ -48,13 +49,13 @@ test.describe('Phase 8 — Accessibility (axe) & responsive (360px)', () => {
     const api = await pwRequest.newContext();
     customer = await createThrowawayUser(api);
     const addressId = await createAddress(api, customer);
-    // High-stock laptop variant; the order is cancelled in afterAll so no stock stays reserved
-    const pending = await placeKhqrOrder(api, customer, addressId, { productId: 1001, variantId: 1 });
+    // High-stock hero variant (Ruby Red / Standard); the order is cancelled in afterAll so no stock stays reserved
+    const pending = await placeKhqrOrder(api, customer, addressId, { productId: HERO.id, variantId: HERO.variants.redStandard });
     data = { pending: pending.orderNumber, tracking: await findShippedTrackingNumber(api) };
     // A cart line so /cart and /checkout render their populated states
     await api.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${customer.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     await api.dispose();
   });

@@ -3,7 +3,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { Link } from '@/navigation';
 import {
   ArrowRight,
@@ -18,6 +18,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { HomeDTO, PublicSettingsDTO } from '@/types/api';
+import { getImageUrl } from '@/lib/images';
 import { ProductCard } from '@/components/common/ProductCard';
 import { FlashSaleCountdown } from '@/components/home/FlashSaleCountdown';
 import { HomeSkeleton } from '@/components/home/HomeSkeleton';
@@ -73,8 +74,8 @@ export function HomeView({
       <section className="relative overflow-hidden bg-secondary text-secondary-foreground py-16 sm:py-24">
         {seasonalBanner?.imageUrl && (
           <div className="absolute inset-0 z-0">
-            <Image
-              src={seasonalBanner.imageUrl}
+            <SafeImage
+              src={getImageUrl(seasonalBanner.imageUrl)}
               alt={bannerTitle}
               fill
               priority
@@ -197,13 +198,13 @@ export function HomeView({
               return (
                 <Link
                   key={cat.id}
-                  href={`/products?category=${cat.slug}`}
+                  href={`/category/${cat.slug}`}
                   className="group rounded-card bg-surface border border-border p-3 text-center hover:border-primary hover:shadow-md transition-all flex flex-col items-center justify-center"
                 >
                   <div className="relative w-14 h-14 rounded-full overflow-hidden bg-muted/20 mb-2 border border-border/80 group-hover:scale-105 transition-transform">
                     {cat.imageUrl ? (
-                      <Image
-                        src={cat.imageUrl}
+                      <SafeImage
+                        src={getImageUrl(cat.imageUrl)}
                         alt={catName}
                         fill
                         sizes="56px"

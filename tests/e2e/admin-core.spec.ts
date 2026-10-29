@@ -1,3 +1,4 @@
+import { COCONUT_OIL, CATEGORY, LOW_STOCK } from './fixtures/catalog';
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
@@ -27,7 +28,7 @@ async function createPaidKhqrOrder(request: APIRequestContext) {
   // Add item to cart
   await request.post('http://localhost:4000/api/cart/items', {
     headers: { Authorization: `Bearer ${user.token}` },
-    data: { productId: 1031, variantId: 14, quantity: 1 },
+    data: { productId: COCONUT_OIL.id, quantity: 1 },
   });
 
   // Checkout order
@@ -123,6 +124,13 @@ test.describe('Phase 7A — Admin Core E2E Tests', () => {
 
     const uiPendingPayments = await page.locator('[data-testid="kpi-pending-payments"]').textContent();
     expect(uiPendingPayments?.trim()).toBe(String(dashData.pendingPayments));
+
+    // Seeded low stock: 1027 Silver Box (3 left) and 1004 Table Runner (4 left) fill the "Low stock" table
+    const lowStockCard = page.locator('[data-testid="dashboard-low-stock-card"]');
+    await expect(lowStockCard).toContainText(LOW_STOCK.silverBox.name);
+    await expect(lowStockCard).toContainText(LOW_STOCK.tableRunner.name);
+    await expect(lowStockCard).toContainText(`${LOW_STOCK.silverBox.stock} / 5`);
+    await expect(lowStockCard).toContainText(`${LOW_STOCK.tableRunner.stock} / 5`);
 
     // Capture admin-dashboard-en.png
     await scrollFullPageAndSettle(page);

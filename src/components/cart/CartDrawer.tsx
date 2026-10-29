@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -146,7 +146,7 @@ export function CartDrawer() {
                   {/* Thumbnail */}
                   <div className="relative w-16 h-16 rounded-md overflow-hidden bg-muted/20 shrink-0">
                     {item.imageUrl ? (
-                      <Image
+                      <SafeImage
                         src={getImageUrl(item.imageUrl)}
                         alt={name}
                         fill

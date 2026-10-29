@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
@@ -83,10 +83,15 @@ export default function AccountOrdersPage() {
           icon: Package,
         };
       case 'SHIPPED':
-      case 'OUT_FOR_DELIVERY':
         return {
           label: t('status.SHIPPED'),
           className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+          icon: Truck,
+        };
+      case 'OUT_FOR_DELIVERY':
+        return {
+          label: t('status.OUT_FOR_DELIVERY'),
+          className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
           icon: Truck,
         };
       case 'DELIVERED':
@@ -219,7 +224,7 @@ export default function AccountOrdersPage() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="relative w-10 h-10 rounded bg-muted/10 overflow-hidden shrink-0 border border-border">
                             {item.imageUrl ? (
-                              <Image src={getImageUrl(item.imageUrl)} alt={item.name} fill className="object-cover" />
+                              <SafeImage src={getImageUrl(item.imageUrl)} alt={item.name} fill className="object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-[10px] text-muted">
                                 Item

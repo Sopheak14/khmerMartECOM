@@ -1,4 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
+import { API, CATEGORY, HERO, SEARCH, usd } from './fixtures/catalog';
+import { selectHeroVariant } from './helpers/shop';
 
 async function scrollFullPageAndSettle(page: Page) {
   await page.evaluate(async () => {
@@ -64,15 +66,16 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     // Verify Specification attribute chips
     await expect(filterSidebar.locator('[data-testid^="attr-filter-"]').first()).toBeVisible();
 
-    // Apply Brand filter "Dell"
-    const dellFilter = page.locator('[data-testid="brand-filter-Dell"]');
-    await dellFilter.click();
-    await page.waitForURL('**/products?*brand=Dell*');
+    // Apply a Brand filter taken from the live facets (first brand listed)
+    const brandFilter = filterSidebar.locator('[data-testid^="brand-filter-"]').first();
+    const brand = (await brandFilter.getAttribute('data-testid'))!.replace('brand-filter-', '');
+    await brandFilter.click();
+    await page.waitForURL(/\/products\?.*brand=/);
 
     // Verify active filter chips appear
     const activeChips = page.locator('[data-testid="active-filter-chips"]');
     await expect(activeChips).toBeVisible();
-    await expect(activeChips.locator('text=Dell').first()).toBeVisible();
+    await expect(activeChips.locator(`text=${brand}`).first()).toBeVisible();
 
     // Capture screenshot: products-filters-en.png
     await scrollFullPageAndSettle(page);
@@ -105,49 +108,54 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     }
   });
 
-  test('2: Filters live in the URL and lesson demo query with browser Back support', async ({ page }) => {
-    // Navigate to the lesson demo query:
-    // /en/products?q=laptop&minPrice=500&maxPrice=1000&brand=Dell&attr[ram]=16GB
-    const testUrl = '/en/products?q=laptop&minPrice=500&maxPrice=1000&brand=Dell&attr%5Bram%5D=16GB';
-    await page.goto(testUrl);
+  test('2: Filter demo: search "kampot" then a price range, filters live in the URL, browser Back restores state', async ({ page, request }) => {
+    // Expected result comes from the API with the same filters, not from a hard-coded list
+    const apiRes = await request.get(`${API}/products`, {
+      params: { q: SEARCH.query, minPrice: SEARCH.minDollars, maxPrice: SEARCH.maxDollars, size: 50 },
+    });
+    const expectedNames: string[] = (await apiRes.json()).data.map((p: { name: string }) => p.name);
+    const allRes = await request.get(`${API}/products`, { params: { q: SEARCH.query, size: 50 } });
+    const allNames: string[] = (await allRes.json()).data.map((p: { name: string }) => p.name);
+    expect(expectedNames.length).toBeGreaterThan(0);
+    expect(allNames.length).toBeGreaterThan(expectedNames.length);
 
-    // Verify products count and exact product names
+    // Step 1: search only
+    await page.goto(`/en/products?q=${SEARCH.query}`);
     const productCards = page.locator('[data-testid="product-card"]');
-    await expect(productCards).toHaveCount(2, { timeout: 10000 });
+    await expect(productCards).toHaveCount(allNames.length, { timeout: 10000 });
 
+    // Step 2: add the price range through the URL (the same state the sidebar writes)
+    await page.goto(`/en/products?q=${SEARCH.query}&minPrice=${SEARCH.minDollars}&maxPrice=${SEARCH.maxDollars}`);
+    await expect(productCards).toHaveCount(expectedNames.length, { timeout: 10000 });
     const cardNames = await productCards.locator('h3').allInnerTexts();
     console.log('FILTER DEMO PRODUCTS FOUND:', cardNames);
-    expect(cardNames).toContain('Dell Latitude 5520 Laptop');
-    expect(cardNames).toContain('Dell Inspiron 15 Laptop');
+    expect([...cardNames].sort()).toEqual([...expectedNames].sort());
 
     // Verify active filter chips reflect the URL state
     const chips = page.locator('[data-testid="active-filter-chips"]');
-    await expect(chips).toContainText('laptop');
-    await expect(chips).toContainText('Dell');
-    await expect(chips).toContainText('16GB');
+    await expect(chips).toContainText(SEARCH.query);
 
     // Mutate filter: click "Clear all"
     await chips.locator('button:has-text("Clear all")').click();
-    await page.waitForURL((url) => !url.searchParams.has('brand'));
+    await page.waitForURL((url) => !url.searchParams.has('minPrice'));
     const clearedCount = await page.locator('[data-testid="product-card"]').count();
-    expect(clearedCount).toBeGreaterThan(2);
+    expect(clearedCount).toBeGreaterThan(expectedNames.length);
 
     // Browser Back restores previous filter state
     await page.goBack();
-    await page.waitForURL((url) => url.searchParams.get('brand') === 'Dell');
-    await expect(page.locator('[data-testid="product-card"]')).toHaveCount(2);
-    expect(await page.locator('[data-testid="product-card"]').locator('h3').allInnerTexts()).toContain('Dell Latitude 5520 Laptop');
+    await page.waitForURL((url) => url.searchParams.has('minPrice'));
+    await expect(page.locator('[data-testid="product-card"]')).toHaveCount(expectedNames.length);
   });
 
-  test('3: Header search autocomplete (debounced, /api/search/suggest) for "lap" and Khmer "កុំព្យូទ័រ", with keyboard navigation', async ({ page }) => {
+  test('3: Header search autocomplete (debounced, /api/search/suggest) for "kam" and Khmer "សូត្រ", with keyboard navigation', async ({ page }) => {
     await page.goto('/en');
 
     const searchInput = page.locator('[data-testid="search-input"]').first();
     await expect(searchInput).toBeVisible();
 
-    // 1. Type "lap" using pressSequentially
+    // 1. Type "kam" (Kampot / Kampong products) using pressSequentially
     await searchInput.click();
-    await searchInput.pressSequentially('lap', { delay: 50 });
+    await searchInput.pressSequentially('kam', { delay: 50 });
 
     // Wait for dropdown to show suggestions
     const suggestions = page.locator('[data-testid="search-suggestions"]');
@@ -171,96 +179,73 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     await searchInput.press('Escape');
     await expect(suggestions).not.toBeVisible();
 
-    // 2. Test Khmer search suggestion: "កុំព្យូទ័រ"
+    // 2. Test Khmer search suggestion: "សូត្រ" (silk)
     await page.goto('/km');
     const searchInputKm = page.locator('[data-testid="search-input"]').first();
     await searchInputKm.click();
-    await searchInputKm.pressSequentially('កុំព្យូទ័រ', { delay: 50 });
+    await searchInputKm.pressSequentially('សូត្រ', { delay: 50 });
     const suggestionsKm = page.locator('[data-testid="search-suggestions"]');
     await expect(suggestionsKm).toBeVisible({ timeout: 5000 });
     await expect(suggestionsKm.locator('[data-testid="suggestion-item"]').first()).toBeVisible();
   });
 
-  test('4: /en/category/laptops and sub-category page show correct products and breadcrumbs', async ({ page }) => {
-    // 1. Root Category: Laptops
-    await page.goto('/en/category/laptops');
-    await expect(page.locator('h1').first()).toHaveText(/Laptops/i);
+  test('4: Category page /en/category/silk-textiles shows its products and breadcrumbs, in EN and KM', async ({ page, request }) => {
+    const apiRes = await request.get(`${API}/products`, { params: { categoryId: CATEGORY.silk.id, size: 50 } });
+    const expectedNames: string[] = (await apiRes.json()).data.map((p: { name: string }) => p.name);
+    expect(expectedNames).toContain(HERO.name);
 
-    // Verify breadcrumbs
+    await page.goto(`/en/category/${CATEGORY.silk.slug}`);
+    await expect(page.locator('h1').first()).toHaveText(CATEGORY.silk.name);
+
     const breadcrumbs = page.locator('[data-testid="category-breadcrumbs"]');
     await expect(breadcrumbs).toBeVisible();
     await expect(breadcrumbs).toContainText('Home');
     await expect(breadcrumbs).toContainText('Products');
-    await expect(breadcrumbs).toContainText('Laptops');
+    await expect(breadcrumbs).toContainText(CATEGORY.silk.name);
 
-    // Verify 9 products under laptops
     const cards = page.locator('[data-testid="product-card"]');
-    await expect(cards).toHaveCount(9);
+    await expect(cards).toHaveCount(expectedNames.length);
+    expect([...(await cards.locator('h3').allInnerTexts())].sort()).toEqual([...expectedNames].sort());
 
-    // 2. Sub-Category: Business Laptops
-    await page.goto('/en/category/business-laptops');
-    await expect(page.locator('h1').first()).toHaveText(/Business Laptops/i);
+    await scrollFullPageAndSettle(page);
+    await page.screenshot({ path: 'docs/screenshots/category-silk-en.png', fullPage: true });
 
-    // Verify hierarchical breadcrumbs
-    const subBreadcrumbs = page.locator('[data-testid="category-breadcrumbs"]');
-    await expect(subBreadcrumbs).toBeVisible();
-    await expect(subBreadcrumbs).toContainText('Home');
-    await expect(subBreadcrumbs).toContainText('Products');
-    await expect(subBreadcrumbs).toContainText('Laptops');
-    await expect(subBreadcrumbs).toContainText('Business Laptops');
-
-    // Verify 5 products under business laptops
-    const subCards = page.locator('[data-testid="product-card"]');
-    await expect(subCards).toHaveCount(5);
+    await page.goto(`/km/category/${CATEGORY.silk.slug}`);
+    await expect(page.locator('h1').first()).toHaveText(CATEGORY.silk.nameKm);
+    await expect(page.locator('[data-testid="category-breadcrumbs"]')).toContainText(CATEGORY.silk.nameKm);
   });
 
-  test('5: Product detail /en/products/laptop-pro-15: gallery, flash sale price, variants, stock, reviews, disabled Add to Cart', async ({ page }) => {
-    await page.goto('/en/products/laptop-pro-15');
+  test('5: Product detail: hero Premium $199.00 has no flash sale; Standard $129.00 with $149.00 struck through and a countdown', async ({ page }) => {
+    await page.goto(`/en/products/${HERO.slug}`);
 
     // Verify title and breadcrumbs
-    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
-    await expect(page.locator('[data-testid="product-breadcrumbs"]')).toContainText('Business Laptops');
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(HERO.name);
+    await expect(page.locator('[data-testid="product-breadcrumbs"]')).toContainText(CATEGORY.silk.name);
 
-    // 1. Gallery
-    const gallery = page.locator('[data-testid="product-gallery"]');
-    await expect(gallery).toBeVisible();
-    const thumbs = page.locator('[data-testid^="gallery-thumb-"]');
-    expect(await thumbs.count()).toBeGreaterThanOrEqual(2);
-    // Click second thumbnail
-    await thumbs.nth(1).click();
+    // 1. Gallery (seed has a single image per product: no thumbnails strip)
+    await expect(page.locator('[data-testid="product-gallery"]')).toBeVisible();
 
-    // 2. Flash Sale Price $899.00 with $999.00 struck through + KHR
-    const price = page.locator('[data-testid="product-price"]');
-    await expect(price).toHaveText('$899.00');
-    const originalPrice = page.locator('[data-testid="original-price"]');
-    await expect(originalPrice).toHaveText('$999.00');
-    await expect(page.locator('[data-testid="khr-price"]')).toBeVisible();
+    // 2. Variants: Add to Cart disabled until color + grade chosen
+    const addToCartBtn = page.locator('[data-testid="add-to-cart-button"]');
+    await expect(addToCartBtn).toBeDisabled();
 
-    // Countdown timer & Flash Sale badge visible
-    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
-    await expect(page.locator('[data-testid="badge-flash_sale"]')).toBeVisible();
-
-    // 3. Variant selection:
-    // Select 32GB RAM
-    await page.click('[data-testid="variant-chip-ram-32GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-
-    // Verify unavailable combination is disabled (512GB is unavailable with 32GB)
-    const chip512 = page.locator('[data-testid="variant-chip-storage-512GB"]');
-    await expect(chip512).toBeDisabled();
-
-    // Select 1TB Storage
-    await page.click('[data-testid="variant-chip-storage-1TB"]');
-
-    // 32GB/1TB is not on flash sale: shows normal price $1,299.00 with no strike-through,
-    // and hides the flash-sale countdown and badge
-    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
+    // 3. Premium: regular price, no flash sale
+    await selectHeroVariant(page, 'Premium');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.premiumCents));
     await expect(page.locator('[data-testid="original-price"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="badge-flash_sale"]')).not.toBeVisible();
-    await expect(page.locator('[data-testid="stock-status"]')).toContainText('10 available');
 
-    // 4. Quantity selector (max = available)
+    // 4. Standard: flash price with the regular price struck through, countdown and badge visible
+    await selectHeroVariant(page, 'Standard');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.flashCents));
+    await expect(page.locator('[data-testid="original-price"]')).toHaveText(usd(HERO.standardCents));
+    await expect(page.locator('[data-testid="khr-price"]')).toBeVisible();
+    await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
+    await expect(page.locator('[data-testid="badge-flash_sale"]')).toBeVisible();
+    await expect(page.locator('[data-testid="stock-status"]')).toBeVisible();
+
+    // 5. Quantity selector (max = available)
     const qtyMinus = page.locator('[data-testid="qty-minus-btn"]');
     const qtyPlus = page.locator('[data-testid="qty-plus-btn"]');
     const qtyDisplay = page.locator('[data-testid="qty-display"]');
@@ -271,38 +256,40 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     await qtyMinus.click();
     await expect(qtyDisplay).toHaveText('1');
 
-    // 5. Add to Cart button is enabled once full combination is selected
-    const addToCartBtn = page.locator('[data-testid="add-to-cart-button"]');
     await expect(addToCartBtn).toBeEnabled();
     await expect(addToCartBtn).toContainText('Add to Cart');
 
-    // 6. Rating summary with 5->1 bars matching ratingBreakdown
-    const ratingSummary = page.locator('[data-testid="rating-summary"]');
-    await expect(ratingSummary).toBeVisible();
+    // 6. Description: only the English paragraph on /en
+    const description = page.locator('.prose');
+    await expect(description).toContainText(HERO.descEn);
+    await expect(description).not.toContainText(HERO.descKm);
+
+    // 7. Rating summary (seed reviews 5, 5, 4)
+    await expect(page.locator('[data-testid="rating-summary"]')).toBeVisible();
     await expect(page.locator('[data-testid="avg-rating"]')).toHaveText('4.7');
     await expect(page.locator('[data-testid="rating-count-5"]')).toHaveText('2');
     await expect(page.locator('[data-testid="rating-count-4"]')).toHaveText('1');
     await expect(page.locator('[data-testid="rating-count-3"]')).toHaveText('0');
-
-    // 7. Approved reviews list
-    const reviewsList = page.locator('[data-testid="approved-reviews-list"]');
-    await expect(reviewsList).toBeVisible();
-    await expect(reviewsList.locator('[data-testid="review-item"]')).toHaveCount(3);
+    await expect(page.locator('[data-testid="approved-reviews-list"] [data-testid="review-item"]')).toHaveCount(3);
 
     // 8. Related products
     const related = page.locator('[data-testid="related-products-section"]');
     await expect(related).toBeVisible();
     expect(await related.locator('[data-testid="product-card"]').count()).toBeGreaterThan(0);
 
-    // Capture screenshot: product-1001-en.png
     await scrollFullPageAndSettle(page);
     await page.screenshot({ path: 'docs/screenshots/product-1001-en.png', fullPage: true });
   });
 
   test('6: Khmer locale displays nameKm everywhere and non-existent slug returns 404', async ({ page }) => {
     // 1. Visit product in Khmer
-    await page.goto('/km/products/laptop-pro-15');
-    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText('កុំព្យូទ័រយួរដៃ Laptop Pro 15');
+    await page.goto(`/km/products/${HERO.slug}`);
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(HERO.nameKm);
+
+    // Description shows only the Khmer paragraph
+    const description = page.locator('.prose');
+    await expect(description).toContainText(HERO.descKm);
+    await expect(description).not.toContainText(HERO.descEn);
 
     // Capture screenshot: product-1001-km.png
     await scrollFullPageAndSettle(page);
@@ -317,8 +304,8 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     await expect(page.locator('h1')).toHaveText(/រកមិនឃើញទំព័រ/i);
   });
 
-  test('7: Zero console errors or hydration mismatch on /en, /en/products, and /en/products/laptop-pro-15', async ({ page }) => {
-    const routes = ['/en', '/en/products', '/en/products/laptop-pro-15'];
+  test('7: Zero console errors or hydration mismatch on /en, /en/products, and the hero product page', async ({ page }) => {
+    const routes = ['/en', '/en/products', `/en/products/${HERO.slug}`];
 
     for (const route of routes) {
       const consoleErrors: string[] = [];
@@ -355,67 +342,55 @@ test.describe('Phase 3 — Catalog & Search E2E against Real Backend', () => {
     }
   });
 
-  test('8: Flash sale variant pricing E2E: select 32GB/1TB -> page $1,299.00 -> add to cart -> CartDTO total 129900 (assert UI == API); select 16GB/512GB -> $899.00 -> cart 89900', async ({ page, context }) => {
-    // 1. Fresh guest cart session for 32GB / 1TB
+  test('8: Flash sale variant pricing E2E: Premium -> $199.00 -> cart 19900 (assert UI == API); Standard -> $129.00 -> cart 12900', async ({ page, context }) => {
+    // 1. Fresh guest cart session for Premium
     await context.clearCookies();
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(HERO.name);
 
     const addBtn = page.locator('[data-testid="add-to-cart-button"]');
     await expect(addBtn).toBeDisabled();
 
-    // Select 32GB / Space Gray / 1TB
-    await page.click('[data-testid="variant-chip-ram-32GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-1TB"]');
-
-    // Page shows $1,299.00 with no strike-through
-    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
+    await selectHeroVariant(page, 'Premium');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.premiumCents));
     await expect(page.locator('[data-testid="original-price"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).not.toBeVisible();
     await expect(addBtn).toBeEnabled();
 
-    // Add to cart and assert CartDTO total 129900 and UI matches API
-    const [cartRes32] = await Promise.all([
+    const [cartResPremium] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
       addBtn.click(),
     ]);
-    const cart32 = await cartRes32.json();
-    expect(cart32.success).toBe(true);
-    expect(cart32.data.totalCents).toBe(129900);
+    const cartPremium = await cartResPremium.json();
+    expect(cartPremium.success).toBe(true);
+    expect(cartPremium.data.totalCents).toBe(HERO.premiumCents);
 
     const drawer = page.locator('[data-testid="cart-drawer"]');
     await expect(drawer).toBeVisible();
-    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText('$1,299.00');
+    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText(usd(HERO.premiumCents));
 
-    // 2. Clear cart session to test 16GB / 512GB
+    // 2. Clear cart session to test Standard
     await context.clearCookies();
-    await page.goto('/en/products/laptop-pro-15');
-    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
+    await page.goto(`/en/products/${HERO.slug}`);
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(HERO.name);
 
-    // Select 16GB / Space Gray / 512GB
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
-
-    // Page shows $899.00 with $999.00 struck through
-    await expect(page.locator('[data-testid="product-price"]')).toHaveText('$899.00');
-    await expect(page.locator('[data-testid="original-price"]')).toHaveText('$999.00');
+    await selectHeroVariant(page, 'Standard');
+    await expect(page.locator('[data-testid="product-price"]')).toHaveText(usd(HERO.flashCents));
+    await expect(page.locator('[data-testid="original-price"]')).toHaveText(usd(HERO.standardCents));
     await expect(page.locator('[data-testid="flash-sale-countdown-box"]')).toBeVisible();
     await expect(addBtn).toBeEnabled();
 
-    // Add to cart and assert CartDTO total 89900 and UI matches API
-    const [cartRes16] = await Promise.all([
+    const [cartResStandard] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
       addBtn.click(),
     ]);
-    const cart16 = await cartRes16.json();
-    expect(cart16.success).toBe(true);
-    expect(cart16.data.totalCents).toBe(89900);
+    const cartStandard = await cartResStandard.json();
+    expect(cartStandard.success).toBe(true);
+    expect(cartStandard.data.totalCents).toBe(HERO.flashCents);
 
     await expect(drawer).toBeVisible();
-    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText('$899.00');
+    await expect(drawer.locator('[data-testid="drawer-total-usd"]')).toHaveText(usd(HERO.flashCents));
   });
 
 });

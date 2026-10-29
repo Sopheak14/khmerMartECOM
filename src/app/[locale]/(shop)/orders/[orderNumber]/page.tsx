@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -137,10 +137,15 @@ export default function OrderDetailPage() {
           icon: Package,
         };
       case 'SHIPPED':
-      case 'OUT_FOR_DELIVERY':
         return {
           label: t('status.SHIPPED'),
           className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+          icon: Truck,
+        };
+      case 'OUT_FOR_DELIVERY':
+        return {
+          label: t('status.OUT_FOR_DELIVERY'),
+          className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
           icon: Truck,
         };
       case 'DELIVERED':
@@ -298,7 +303,7 @@ export default function OrderDetailPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative w-14 h-14 rounded-lg bg-muted/10 overflow-hidden shrink-0 border border-border">
                     {item.imageUrl ? (
-                      <Image src={getImageUrl(item.imageUrl)} alt={item.name} fill className="object-cover" />
+                      <SafeImage src={getImageUrl(item.imageUrl)} alt={item.name} fill className="object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[10px] text-muted">
                         Item
@@ -430,11 +435,8 @@ export default function OrderDetailPage() {
 
               {order.discountCents > 0 && (
                 <div className="flex justify-between text-green-800 dark:text-green-400 font-medium">
-                  <span>
-                    {t('discount')}
-                    {order.couponCode ? ` (${order.couponCode})` : ''}
-                  </span>
-                  <span>-{formatUsd(order.discountCents)}</span>
+                  <span data-testid="order-discounts-label">{t('discounts')}</span>
+                  <span data-testid="order-discounts-amount">-{formatUsd(order.discountCents)}</span>
                 </div>
               )}
 

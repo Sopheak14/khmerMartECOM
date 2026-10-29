@@ -17,6 +17,7 @@ import {
 } from '@/types/api';
 import { formatUsd } from '@/lib/money';
 import { getImageUrl } from '@/lib/images';
+import { SafeImage } from '@/components/common/SafeImage';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import {
   Package,
@@ -657,12 +658,9 @@ export default function AdminProductsPage() {
                     className="hover:bg-muted/5 transition-colors"
                   >
                     <td className="py-3 px-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={getImageUrl(item.imageUrl) || 'https://placehold.co/60x60'}
-                        alt={item.name}
-                        className="w-10 h-10 rounded-lg object-cover border border-border"
-                      />
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-border">
+                        <SafeImage src={getImageUrl(item.imageUrl)} alt={item.name} fill sizes="40px" className="object-cover" />
+                      </div>
                     </td>
                     <td className="py-3 px-4 max-w-xs truncate font-medium text-foreground">
                       <div>{item.name}</div>
@@ -784,7 +782,7 @@ export default function AdminProductsPage() {
                       data-testid="input-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Dell XPS 15"
+                      placeholder="e.g. Kampot Black Pepper 100 g"
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-lg"
                       required
                     />
@@ -802,7 +800,7 @@ export default function AdminProductsPage() {
                       data-testid="input-name-km"
                       value={nameKm}
                       onChange={(e) => setNameKm(e.target.value)}
-                      placeholder="e.g. កុំព្យូទ័រយួរដៃ Dell XPS 15"
+                      placeholder="e.g. ម្រេចខ្មៅកំពត ១០០ ក្រាម"
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-lg"
                     />
                   </div>
@@ -816,7 +814,7 @@ export default function AdminProductsPage() {
                       data-testid="input-sku"
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
-                      placeholder="e.g. DELL-XPS-15"
+                      placeholder="e.g. SPC-1006"
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-lg font-mono"
                     />
                     {fieldErrors.sku && (
@@ -833,7 +831,7 @@ export default function AdminProductsPage() {
                       data-testid="input-brand"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
-                      placeholder="e.g. Dell, Apple, Samsung"
+                      placeholder="e.g. Kampot Farms, Takeo Weavers"
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-background border border-border rounded-lg"
                     />
                   </div>
@@ -1153,8 +1151,9 @@ export default function AdminProductsPage() {
                           data-testid="image-item"
                           className="relative group border border-border rounded-xl overflow-hidden bg-background"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img.url} alt="Product media" className="w-full h-28 object-cover" />
+                          <div className="relative w-full h-28">
+                            <SafeImage src={getImageUrl(img.url)} alt="Product media" fill sizes="200px" className="object-cover" />
+                          </div>
                           {idx === 0 && (
                             <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary text-white">
                               {t('primaryImage')}

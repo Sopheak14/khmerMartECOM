@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
+import { selectHeroVariant } from './helpers/shop';
+import { API, COUPON, HERO, RICE, usd } from './fixtures/catalog';
 
 test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real Backend', () => {
 
@@ -9,25 +11,21 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
   });
 
   test('1: Guest cart: variant required, button disabled until full combination, drawer opens, reload persists km_guest', async ({ page }) => {
-    // 1. Visit Laptop Pro 15
-    await page.goto('/en/products/laptop-pro-15');
-    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
+    // 1. Visit the hero product
+    await page.goto(`/en/products/${HERO.slug}`);
+    await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(new RegExp(HERO.name, 'i'));
 
     // Verify Add to Cart button is initially disabled because no full variant combination is chosen
     const addToCartBtn = page.locator('[data-testid="add-to-cart-button"]');
     await expect(addToCartBtn).toBeDisabled();
     await expect(addToCartBtn).toHaveText(/Choose a variant first/i);
 
-    // Select only RAM (partial combination) -> button still disabled
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
+    // Select only the color (partial combination) -> button still disabled
+    await page.click(`[data-testid="variant-chip-color-${HERO.color}"]`);
     await expect(addToCartBtn).toBeDisabled();
 
-    // Select Color
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await expect(addToCartBtn).toBeDisabled();
-
-    // Select Storage (Full combination selected: 16GB / Space Gray / 512GB)
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    // Select the grade (full combination: Ruby Red / Standard)
+    await page.click('[data-testid="variant-chip-grade-Standard"]');
 
     // Button is now enabled!
     await expect(addToCartBtn).toBeEnabled();
@@ -40,7 +38,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     const drawer = page.locator('[data-testid="cart-drawer"]');
     await expect(drawer).toBeVisible({ timeout: 5000 });
     await expect(drawer.locator('[data-testid="cart-drawer-item"]').first()).toBeVisible();
-    await expect(drawer).toContainText('Laptop Pro 15');
+    await expect(drawer).toContainText(HERO.name);
 
     // Verify Header cart count is updated to 1
     const headerCount = page.locator('[data-testid="header-cart-count"]');
@@ -60,23 +58,21 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     // Open cart drawer from header
     await page.click('[data-testid="header-cart-button"]');
     await expect(drawer).toBeVisible();
-    await expect(drawer).toContainText('Laptop Pro 15');
+    await expect(drawer).toContainText(HERO.name);
   });
 
   test('2: Cart page: quantity stepper increase/decrease, remove item with confirmation, Khmer empty state', async ({ page }) => {
-    // 1. Visit /en/cart (cart has 1 Laptop Pro 15 from previous test or add one)
+    // 1. Visit /en/cart (cart has the hero product from previous test or add one)
     await page.goto('/en/cart');
     await page.waitForLoadState('networkidle');
 
     // If empty, add item via detail page
     const cartItems = page.locator('[data-testid="cart-item"]');
     if ((await cartItems.count()) === 0) {
-      await page.goto('/en/products/laptop-pro-15');
+      await page.goto(`/en/products/${HERO.slug}`);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(/Laptop Pro 15/i);
-      await page.click('[data-testid="variant-chip-ram-16GB"]');
-      await page.click('[data-testid="variant-chip-color-Space Gray"]');
-      await page.click('[data-testid="variant-chip-storage-512GB"]');
+      await expect(page.locator('[data-testid="product-detail-title"]')).toHaveText(new RegExp(HERO.name, 'i'));
+      await selectHeroVariant(page);
       const addBtn = page.locator('[data-testid="add-to-cart-button"]');
       await expect(addBtn).toBeEnabled();
       await addBtn.click();
@@ -127,18 +123,15 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
 
   test('2b: Cart stepper at max stock shows OUT_OF_STOCK message in EN and KM', async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
 
     // Raise the line to its full available stock through the real API, then press "+" once more
-    const available = await page.evaluate(async () => {
-      const api = 'http://localhost:4000/api';
+    const available = await page.evaluate(async (api) => {
       const cart = (await (await fetch(`${api}/cart`, { credentials: 'include' })).json()).data;
       const item = cart.items[0];
       await fetch(`${api}/cart/items/${item.id}`, {
@@ -148,7 +141,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
         body: JSON.stringify({ quantity: item.available }),
       });
       return item.available as number;
-    });
+    }, API);
 
     for (const [locale, expected] of [
       ['en', `Only ${available} left in stock (OUT_OF_STOCK)`],
@@ -163,13 +156,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
   });
 
   test('3: Coupons (SAVE5, WELCOME10, FREESHIP, invalid) and promotion lines in CartDTO', async ({ page }) => {
-    // 1. Add Angkor Jasmine Rice 5kg ($12.00 subtotal < $35)
-    await page.goto('/en/products/angkor-jasmine-rice-5kg');
-    // Rice only has 1 variant (weight 5kg)
-    const weightChip = page.locator('[data-testid^="variant-chip-weight-"]').first();
-    if (await weightChip.isVisible()) {
-      await weightChip.click();
-    }
+    // 1. Add Phka Rumduol Jasmine Rice 5 kg ($12.00 subtotal < $35)
+    await page.goto(`/en/products/${RICE.slug}`);
+    await page.click('[data-testid="variant-chip-weight-5 kg"]');
     await page.click('[data-testid="add-to-cart-button"]');
     await page.click('[data-testid="cart-drawer-close"]');
 
@@ -186,13 +175,11 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     // Fails with COUPON_MIN_ORDER
     const couponError = page.locator('[data-testid="coupon-error"]');
     await expect(couponError).toBeVisible();
-    await expect(couponError).toContainText('$35.00');
+    await expect(couponError).toContainText(usd(COUPON.save5MinOrderCents));
 
-    // Now add Laptop Pro 15 to make cart subtotal >= $35
-    await page.goto('/en/products/laptop-pro-15');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    // Now add the hero silk sampot to make cart subtotal >= $35
+    await page.goto(`/en/products/${HERO.slug}`);
+    await selectHeroVariant(page);
     await page.click('[data-testid="add-to-cart-button"]');
     await page.click('[data-testid="cart-drawer-close"]');
 
@@ -214,10 +201,10 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await expect(couponLineAmount).toHaveText('-$5.00');
 
     // Fetch and log CartDTO numbers
-    const cartRes = await page.evaluate(async () => {
-      const res = await fetch('http://localhost:4000/api/cart', { credentials: 'include' });
+    const cartRes = await page.evaluate(async (api) => {
+      const res = await fetch(`${api}/cart`, { credentials: 'include' });
       return await res.json();
-    });
+    }, API);
     console.log('CART DTO WITH SAVE5:', JSON.stringify(cartRes.data, null, 2));
     expect(cartRes.data.coupon.code).toBe('SAVE5');
     expect(cartRes.data.discountCents).toBeGreaterThanOrEqual(500);
@@ -232,10 +219,10 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await expect(appliedBadge).toBeVisible();
     await expect(appliedBadge).toContainText('WELCOME10');
 
-    const cartWelcome = await page.evaluate(async () => {
-      const res = await fetch('http://localhost:4000/api/cart', { credentials: 'include' });
+    const cartWelcome = await page.evaluate(async (api) => {
+      const res = await fetch(`${api}/cart`, { credentials: 'include' });
       return await res.json();
-    });
+    }, API);
     console.log('CART DTO WITH WELCOME10:', JSON.stringify(cartWelcome.data, null, 2));
     expect(cartWelcome.data.coupon.code).toBe('WELCOME10');
     // Verify capped at $20 (2000 cents) plus promotions
@@ -249,10 +236,10 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await applyBtn.click();
     await expect(appliedBadge).toBeVisible();
 
-    const cartFreeShip = await page.evaluate(async () => {
-      const res = await fetch('http://localhost:4000/api/cart', { credentials: 'include' });
+    const cartFreeShip = await page.evaluate(async (api) => {
+      const res = await fetch(`${api}/cart`, { credentials: 'include' });
       return await res.json();
-    });
+    }, API);
     console.log('CART DTO WITH FREESHIP:', JSON.stringify(cartFreeShip.data, null, 2));
     expect(cartFreeShip.data.coupon.code).toBe('FREESHIP');
     expect(cartFreeShip.data.shippingEstimateCents).toBe(0);
@@ -289,11 +276,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
   test('4: Guest cart merge on login: POST /api/cart/merge transfers items to user cart and clears km_guest', async ({ page, request, context }) => {
     // 1. In a clean guest session, add an item
     await context.clearCookies();
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -312,7 +297,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await page.goto('/en/cart');
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="cart-item"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="cart-item-name"]')).toHaveText(/Laptop Pro 15/i);
+    await expect(page.locator('[data-testid="cart-item-name"]')).toHaveText(new RegExp(HERO.name, 'i'));
 
     // 4. Verify km_guest cookie is cleared (Max-Age=0 / deleted)
     const cookiesAfter = await context.cookies();
@@ -325,12 +310,10 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     const throwaway = await createThrowawayUser(request);
     await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
-    // Add Laptop Pro 15 to cart
-    await page.goto('/en/products/laptop-pro-15');
+    // Add the hero product to the cart
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -409,7 +392,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await page.screenshot({ path: 'docs/screenshots/checkout-review.png', fullPage: true });
 
     // Query orders count before placing
-    const ordersBefore = await request.get('http://localhost:4000/api/orders', {
+    const ordersBefore = await request.get(`${API}/orders`, {
       headers: { Authorization: `Bearer ${throwaway.token}` },
     });
     const ordersBeforeJson = await ordersBefore.json();
@@ -440,7 +423,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await page.screenshot({ path: 'docs/screenshots/order-success-cod.png' });
 
     // Verify GET /api/orders total after: EXACTLY ONE new order created!
-    const ordersAfter = await request.get('http://localhost:4000/api/orders', {
+    const ordersAfter = await request.get(`${API}/orders`, {
       headers: { Authorization: `Bearer ${throwaway.token}` },
     });
     const ordersAfterJson = await ordersAfter.json();
@@ -449,7 +432,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     expect(countAfter).toBe(countBefore + 1);
 
     // CRITICAL TEST DATA RULE: Cancel the created order so stock reservations are released!
-    const cancelRes = await request.post(`http://localhost:4000/api/orders/${orderNumber}/cancel`, {
+    const cancelRes = await request.post(`${API}/orders/${orderNumber}/cancel`, {
       headers: {
         Authorization: `Bearer ${throwaway.token}`,
         'Content-Type': 'application/json',
@@ -467,11 +450,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
     // Add item to cart
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -495,11 +476,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
     // Add item to cart for clean preview
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await expect(page.locator('[data-testid="add-to-cart-button"]')).toBeEnabled();
     await page.click('[data-testid="add-to-cart-button"]');
     await expect(page.locator('[data-testid="cart-drawer"]')).toBeVisible();
@@ -576,11 +555,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 
     // Add item to cart for checkout
-    await page.goto('/en/products/laptop-pro-15');
+    await page.goto(`/en/products/${HERO.slug}`);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="variant-chip-ram-16GB"]');
-    await page.click('[data-testid="variant-chip-color-Space Gray"]');
-    await page.click('[data-testid="variant-chip-storage-512GB"]');
+    await selectHeroVariant(page);
     await page.click('[data-testid="add-to-cart-button"]');
     await page.click('[data-testid="cart-drawer-close"]');
 
@@ -618,7 +595,7 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
 
     // Cancel order to release stock
     const orderNumber = await page.locator('[data-testid="order-success-number"]').innerText();
-    await request.post(`http://localhost:4000/api/orders/${orderNumber}/cancel`, {
+    await request.post(`${API}/orders/${orderNumber}/cancel`, {
       headers: {
         Authorization: `Bearer ${throwaway.token}`,
         'Content-Type': 'application/json',
@@ -632,9 +609,9 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
 test.describe('Phase 8 — Session restore race', () => {
   test('slow /auth/refresh on page load keeps the user signed in and the checkout address step reachable', async ({ page, request }) => {
     const throwaway = await createThrowawayUser(request);
-    await request.post('http://localhost:4000/api/cart/items', {
+    await request.post(`${API}/cart/items`, {
       headers: { Authorization: `Bearer ${throwaway.token}` },
-      data: { productId: 1001, variantId: 1, quantity: 1 },
+      data: { productId: HERO.id, variantId: HERO.variants.redStandard, quantity: 1 },
     });
     await loginViaUI(page, throwaway.email, throwaway.password, 'en');
 

@@ -1,3 +1,4 @@
+import { COCONUT_OIL, CATEGORY, LOW_STOCK } from './fixtures/catalog';
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { scrollFullPageAndSettle } from './helpers/screenshot';
@@ -27,7 +28,7 @@ async function createPaidKhqrOrder(request: APIRequestContext) {
   // Add item to cart
   await request.post('http://localhost:4000/api/cart/items', {
     headers: { Authorization: `Bearer ${user.token}` },
-    data: { productId: 1031, variantId: 14, quantity: 1 },
+    data: { productId: COCONUT_OIL.id, quantity: 1 },
   });
 
   // Checkout order
@@ -248,13 +249,31 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
     // Screenshot 4: admin-categories.png
     await page.screenshot({ path: 'docs/screenshots/admin-categories.png' });
 
-    // Assert tree structure has root and indented child nodes
+    // The 8 seeded categories are roots: assert them, then add a temporary child to assert the indented node
     await expect(page.locator('[data-testid="category-tree-node"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid="category-child-node"]').first()).toBeVisible();
+    await expect(page.getByText(CATEGORY.silk.name).first()).toBeVisible();
+    await expect(page.getByText(CATEGORY.books.name).first()).toBeVisible();
 
-    // Category with products: attempting to delete category 9 (Audio & Accessories) shows 409 conflict
     const adminToken = await getAdminToken(request);
-    const deleteRes = await request.delete('http://localhost:4000/api/admin/categories/9', {
+    const ts = Date.now();
+    const childRes = await request.post('http://localhost:4000/api/admin/categories', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      data: { name: `E2E Sub ${ts}`, nameKm: `ក្រុមរង E2E ${ts}`, slug: `e2e-sub-${ts}`, parentId: CATEGORY.silk.id, sortOrder: 99 },
+    });
+    expect(childRes.ok()).toBe(true);
+    const childId = (await childRes.json()).data.id;
+    try {
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="category-child-node"]').first()).toBeVisible();
+    } finally {
+      await request.delete(`http://localhost:4000/api/admin/categories/${childId}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+    }
+
+    // Category with products: attempting to delete Silk & Textiles (5 products) shows 409 conflict
+    const deleteRes = await request.delete(`http://localhost:4000/api/admin/categories/${CATEGORY.silk.id}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(deleteRes.status()).toBe(409);
@@ -275,7 +294,7 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
         code: couponCode,
         type: 'FIXED',
         value: 300, // $3.00
-        minOrderCents: 1000, // $10.00
+        minOrderCents: 500, // $5.00
         active: true,
       },
     });
@@ -299,10 +318,10 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
     // Throwaway customer adds item to cart and applies coupon
     const customer = await createThrowawayUser(request);
 
-    // Add item to cart ($12.99)
+    // Add item to cart (Virgin Coconut Oil, $7.00)
     await request.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${customer.token}` },
-      data: { productId: 1031, variantId: 14, quantity: 1 },
+      data: { productId: COCONUT_OIL.id, quantity: 1 },
     });
 
     await loginViaUI(page, customer.email, customer.password, 'en');
@@ -364,7 +383,7 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
     const ts = Date.now();
     const reviewTitle = `E2E Review ${ts}`;
     const reviewBody = `This item is wonderful ${ts}`;
-    const reviewRes = await request.post('http://localhost:4000/api/products/1031/reviews', {
+    const reviewRes = await request.post(`http://localhost:4000/api/products/${COCONUT_OIL.id}/reviews`, {
       headers: { Authorization: `Bearer ${user.token}` },
       data: {
         rating: 5,
@@ -397,7 +416,7 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
     });
 
     // 6. Check product storefront page shows approved review
-    await page.goto('/en/products/1031?t=' + Date.now());
+    await page.goto(`/en/products/${COCONUT_OIL.id}?t=` + Date.now());
     await page.waitForLoadState('networkidle');
     await expect(page.locator(`text=${reviewTitle}`)).toBeVisible();
   });
@@ -546,11 +565,11 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
       });
 
       // Verify storefront shows updated rate calculation
-      const prodRes = await request.get('http://localhost:4000/api/products/1031');
+      const prodRes = await request.get(`http://localhost:4000/api/products/${COCONUT_OIL.id}`);
       const prodJson = await prodRes.json();
-      const currentCents = prodJson.data?.salePriceCents || prodJson.data?.priceCents || 990;
+      const currentCents = prodJson.data?.salePriceCents || prodJson.data?.priceCents || COCONUT_OIL.cents;
 
-      await page.goto('/en/products/1031?t=' + Date.now());
+      await page.goto(`/en/products/${COCONUT_OIL.id}?t=` + Date.now());
       await page.waitForLoadState('networkidle');
       const expectedKhr = formatKhr(currentCents, 4250);
       await expect(page.locator(`text=${expectedKhr}`)).toBeVisible();

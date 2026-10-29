@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { HERO, PEPPER, SEASONAL } from './fixtures/catalog';
 
 async function scrollFullPageAndSettle(page: Page) {
   await page.evaluate(async () => {
@@ -48,9 +49,13 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     await expect(page.locator('text=Free standard delivery on orders over $50').first()).toBeVisible();
 
     // Verify real backend seasonal banner title and seed products loaded
-    await expect(page.locator('text=Khmer New Year Mega Sale').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Laptop Pro 15').first()).toBeVisible();
-    await expect(page.locator('text=Dell Latitude 5520').first()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(SEASONAL.name, { timeout: 10000 });
+    await expect(page.locator(`text=${HERO.name}`).first()).toBeVisible();
+    await expect(page.locator(`text=${PEPPER.name}`).first()).toBeVisible();
+
+    // Hero copy fits a Khmer marketplace: no electronics left over from the old catalog
+    const heroText = await page.locator('section').first().innerText();
+    expect(heroText).not.toMatch(/laptop|phone|electronic|fashion/i);
 
     // Verify "Explore Flash Sale" outline button with transparent background & white text
     const exploreBtn = page.locator('a:has-text("Explore Flash Sale")').first();
@@ -69,9 +74,9 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     await page.waitForURL('**/km**');
 
     // Verify real backend data in Khmer
-    await expect(page.locator('text=ការបញ្ចុះតម្លៃពិធីបុណ្យចូលឆ្នាំថ្មីប្រពៃណីជាតិ').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=កុំព្យូទ័រយួរដៃ Laptop Pro 15').first()).toBeVisible();
-    await expect(page.locator('text=កុំព្យូទ័រយួរដៃ Dell Latitude 5520').first()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(SEASONAL.nameKm, { timeout: 10000 });
+    await expect(page.locator(`text=${HERO.nameKm}`).first()).toBeVisible();
+    await expect(page.locator(`text=${PEPPER.nameKm}`).first()).toBeVisible();
     await expect(page.locator('text=ដឹកជញ្ជូនធម្មតាឥតគិតថ្លៃសម្រាប់ការបញ្ជាទិញលើសពី $50').first()).toBeVisible();
 
     // Verify that known English keys DO NOT appear on the Khmer page
@@ -113,7 +118,7 @@ test.describe('Phase 1 Foundation Shell & Real Backend Integration', () => {
     await expect(page.locator('text=KhmerMart').first()).toBeVisible();
 
     // Real backend product should be loaded
-    await expect(page.locator('text=Laptop Pro 15').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`text=${HERO.name}`).first()).toBeVisible({ timeout: 10000 });
 
     // Mobile nav bar at bottom should be visible
     const mobileNav = page.locator('nav.sm\\:hidden');

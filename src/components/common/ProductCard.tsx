@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { Link } from '@/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Price } from '@/components/common/Price';
@@ -56,7 +56,7 @@ export function ProductCard({ product, khrRate = 4100, locale = 'en' }: ProductC
         {/* Product Image */}
         <Link href={`/products/${product.slug}`} className="block relative aspect-square w-full rounded-btn overflow-hidden bg-muted/10 group-hover:opacity-95 transition-opacity">
           {product.imageUrl ? (
-            <Image
+            <SafeImage
               src={getImageUrl(product.imageUrl)}
               alt={name}
               fill

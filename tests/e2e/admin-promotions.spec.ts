@@ -1,7 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
 import { loginViaUI } from './helpers/auth';
+import { selectHeroVariant } from './helpers/shop';
+import { API, HERO, usd } from './fixtures/catalog';
 
-const API = 'http://localhost:4000/api';
+// Royal Blue / Premium has no seeded flash sale, so the suite can sell it on promotion without overlapping the seed.
+const VARIANT = HERO.variants.bluePremium;
+const VARIANT_CENTS = HERO.premiumCents;
+const SALE_CENTS = 17900;
+const dollars = (cents: number) => (cents / 100).toFixed(2);
 
 async function adminToken(request: import('@playwright/test').APIRequestContext) {
   const res = await request.post(`${API}/auth/login`, {
@@ -15,19 +21,20 @@ async function pickVariantInForm(page: Page, price: string, name: string) {
   await page.click('[data-testid="add-promotion-btn"]');
   await expect(page.locator('[data-testid="promotion-form-modal"]')).toBeVisible();
   await page.fill('[data-testid="promotion-name-input"]', name);
-  await page.fill('[data-testid="promotion-form-modal"] input[placeholder="Filter products..."]', 'Laptop Pro 15');
-  await page.click('[data-testid="picker-toggle-1001"]');
+  await page.fill('[data-testid="promotion-form-modal"] input[placeholder="Filter products..."]', HERO.name);
+  await page.click(`[data-testid="picker-toggle-${HERO.id}"]`);
   // Variants are listed with attributes, SKU and price
-  const row = page.locator('[data-testid="variant-row-3"]');
-  await expect(row).toContainText('32GB');
-  await expect(row).toContainText('LP15-GRY-32-1TB');
-  await expect(row).toContainText('$1,299.00');
-  await page.check('[data-testid="variant-checkbox-3"]');
-  await page.fill('[data-testid="variant-sale-price-3"]', price);
+  const row = page.locator(`[data-testid="variant-row-${VARIANT}"]`);
+  await expect(row).toContainText('Royal Blue');
+  await expect(row).toContainText('Premium');
+  await expect(row).toContainText('HOL-SAMPOT-BLU-PRM');
+  await expect(row).toContainText(usd(VARIANT_CENTS));
+  await page.check(`[data-testid="variant-checkbox-${VARIANT}"]`);
+  await page.fill(`[data-testid="variant-sale-price-${VARIANT}"]`, price);
 }
 
 test.describe('Phase 8 — Admin per-variant flash sale', () => {
-  test('flash sale on 1001 variant 3 at $1,199.00 -> storefront, cart (UI == API), conflict + validation messages, cleanup', async ({
+  test('flash sale on Royal Blue Premium at $179.00 -> storefront, cart (UI == API), conflict + validation messages, cleanup', async ({
     page,
     browser,
     request,
@@ -44,57 +51,55 @@ test.describe('Phase 8 — Admin per-variant flash sale', () => {
       await page.waitForLoadState('networkidle');
 
       // Client validation: sale price must be > 0 and < variant price
-      await pickVariantInForm(page, '1299.00', name);
+      await pickVariantInForm(page, dollars(VARIANT_CENTS), name);
       await page.click('[data-testid="promotion-submit-btn"]');
-      await expect(page.locator('[data-testid="variant-row-3"] [data-testid="picker-item-error"]')).toContainText(
-        'below $1,299.00'
+      await expect(page.locator(`[data-testid="variant-row-${VARIANT}"] [data-testid="picker-item-error"]`)).toContainText(
+        `below ${usd(VARIANT_CENTS)}`
       );
-      await page.fill('[data-testid="variant-sale-price-3"]', '0');
+      await page.fill(`[data-testid="variant-sale-price-${VARIANT}"]`, '0');
       await page.click('[data-testid="promotion-submit-btn"]');
-      await expect(page.locator('[data-testid="variant-row-3"] [data-testid="picker-item-error"]')).toContainText(
+      await expect(page.locator(`[data-testid="variant-row-${VARIANT}"] [data-testid="picker-item-error"]`)).toContainText(
         'greater than $0.00'
       );
 
       // Valid price -> created with items[]
-      await page.fill('[data-testid="variant-sale-price-3"]', '1199.00');
+      await page.fill(`[data-testid="variant-sale-price-${VARIANT}"]`, dollars(SALE_CENTS));
       const [createRes] = await Promise.all([
         page.waitForResponse((r) => r.url().endsWith('/api/admin/promotions') && r.request().method() === 'POST'),
         page.click('[data-testid="promotion-submit-btn"]'),
       ]);
       expect(createRes.status()).toBe(200);
       const sent = createRes.request().postDataJSON();
-      expect(sent.items).toEqual([{ productId: 1001, variantId: 3, salePriceCents: 119900 }]);
+      expect(sent.items).toEqual([{ productId: HERO.id, variantId: VARIANT, salePriceCents: SALE_CENTS }]);
       promoId = (await createRes.json()).data.id;
       await expect(page.locator('[data-testid="promotion-form-modal"]')).toBeHidden();
 
-      // Storefront (fresh guest): variant 32GB / 1TB shows $1,199.00 with $1,299.00 struck through
+      // Storefront (fresh guest): Royal Blue Premium shows the sale price with the regular price struck through
       const guestCtx = await browser.newContext();
       const shop = await guestCtx.newPage();
       await shop.setViewportSize({ width: 1280, height: 800 });
-      await shop.goto('/en/products/laptop-pro-15');
+      await shop.goto(`/en/products/${HERO.slug}`);
       await shop.waitForLoadState('networkidle');
-      await shop.click('[data-testid="variant-chip-ram-32GB"]');
-      await shop.click('[data-testid="variant-chip-color-Space Gray"]');
-      await shop.click('[data-testid="variant-chip-storage-1TB"]');
-      await expect(shop.locator('[data-testid="product-price"]')).toHaveText('$1,199.00');
-      await expect(shop.locator('[data-testid="original-price"]')).toHaveText('$1,299.00');
+      await selectHeroVariant(shop, 'Premium', 'Royal Blue');
+      await expect(shop.locator('[data-testid="product-price"]')).toHaveText(usd(SALE_CENTS));
+      await expect(shop.locator('[data-testid="original-price"]')).toHaveText(usd(VARIANT_CENTS));
 
       const [cartRes] = await Promise.all([
         shop.waitForResponse((r) => r.url().includes('/api/cart/items') && r.request().method() === 'POST'),
         shop.click('[data-testid="add-to-cart-button"]'),
       ]);
       const cart = (await cartRes.json()).data;
-      expect(cart.totalCents).toBe(119900);
-      await expect(shop.locator('[data-testid="drawer-total-usd"]')).toHaveText('$1,199.00');
+      expect(cart.totalCents).toBe(SALE_CENTS);
+      await expect(shop.locator('[data-testid="drawer-total-usd"]')).toHaveText(usd(SALE_CENTS));
       await guestCtx.close();
 
       // Overlapping flash sale on the same variant -> 409 message shown under that variant row
       await page.reload();
       await page.waitForLoadState('networkidle');
-      await pickVariantInForm(page, '1100.00', `${name} overlap`);
+      await pickVariantInForm(page, dollars(SALE_CENTS - 1000), `${name} overlap`);
       await page.click('[data-testid="promotion-submit-btn"]');
       await expect(page.locator('[data-testid="promotion-form-error"]')).toBeVisible();
-      await expect(page.locator('[data-testid="variant-row-3"] [data-testid="picker-item-error"]')).toBeVisible();
+      await expect(page.locator(`[data-testid="variant-row-${VARIANT}"] [data-testid="picker-item-error"]`)).toBeVisible();
     } finally {
       if (promoId) {
         await request.delete(`${API}/admin/promotions/${promoId}`, {
@@ -103,15 +108,13 @@ test.describe('Phase 8 — Admin per-variant flash sale', () => {
       }
     }
 
-    // After deleting the promotion the storefront is back to $1,299.00
+    // After deleting the promotion the storefront is back to the regular Premium price
     const ctx = await browser.newContext();
     const shop2 = await ctx.newPage();
-    await shop2.goto('/en/products/laptop-pro-15');
+    await shop2.goto(`/en/products/${HERO.slug}`);
     await shop2.waitForLoadState('networkidle');
-    await shop2.click('[data-testid="variant-chip-ram-32GB"]');
-    await shop2.click('[data-testid="variant-chip-color-Space Gray"]');
-    await shop2.click('[data-testid="variant-chip-storage-1TB"]');
-    await expect(shop2.locator('[data-testid="product-price"]')).toHaveText('$1,299.00');
+    await selectHeroVariant(shop2, 'Premium', 'Royal Blue');
+    await expect(shop2.locator('[data-testid="product-price"]')).toHaveText(usd(VARIANT_CENTS));
     await expect(shop2.locator('[data-testid="original-price"]')).not.toBeVisible();
     await ctx.close();
   });

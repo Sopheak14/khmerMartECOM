@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { ImageDTO } from '@/types/api';
 import { getImageUrl } from '@/lib/images';
 
@@ -14,7 +14,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   const currentImage = images[selectedIdx] || images[0] || {
-    url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
+    url: '',
     id: 0,
   };
 
@@ -22,7 +22,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
     <div className="space-y-4" data-testid="product-gallery">
       {/* Main Image */}
       <div className="relative aspect-square w-full rounded-card overflow-hidden bg-muted/20 border border-border shadow-xs">
-        <Image
+        <SafeImage
           src={getImageUrl(currentImage.url)}
           alt={productName}
           fill
@@ -47,7 +47,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   : 'border-border/70 opacity-70 hover:opacity-100 hover:border-primary/40'
               }`}
             >
-              <Image
+              <SafeImage
                 src={getImageUrl(img.url)}
                 alt={`${productName} thumbnail ${idx + 1}`}
                 fill

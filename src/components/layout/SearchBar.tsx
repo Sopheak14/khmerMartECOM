@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { Search, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { formatUsd } from '@/lib/money';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 
 interface SuggestItem {
@@ -231,7 +231,7 @@ export function SearchBar() {
                     >
                       <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0 bg-muted/20">
                         {p.imageUrl ? (
-                          <Image
+                          <SafeImage
                             src={getImageUrl(p.imageUrl)}
                             alt={displayName}
                             fill

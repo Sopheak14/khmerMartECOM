@@ -1,7 +1,9 @@
 // Minimum available stock per fixture variant. The suite buys from the finite seeded stock (paid orders cannot be
 // undone), so without a top-up repeated runs would eventually fail checkout with OUT_OF_STOCK. Values are the
 // seeded quantities (or higher for the variants the tests buy most). Only ever restocks; never lowers stock.
-const STOCK_FLOORS: Record<number, number> = { 1: 60, 2: 15, 3: 10, 4: 10, 6: 20, 10: 20, 11: 15, 14: 100 };
+// Never listed: 1004 and 1027, whose seeded low stock (4 and 3) is what the dashboard "Low stock" table asserts.
+const VARIANT_FLOORS: Record<number, number> = { 1: 60, 2: 20, 3: 20, 4: 20, 5: 150, 6: 150 };
+const PRODUCT_FLOORS: Record<number, number> = { 1031: 100, 1033: 150 };
 
 async function ensureFixtureStock(api: string) {
   const login = await fetch(`${api}/auth/login`, {
@@ -14,9 +16,9 @@ async function ensureFixtureStock(api: string) {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   const res = await fetch(`${api}/admin/inventory?size=200`, { headers });
-  const rows: { id: number; variantId?: number; available: number }[] = (await res.json()).data ?? [];
+  const rows: { id: number; productId?: number; variantId?: number; available: number }[] = (await res.json()).data ?? [];
   for (const row of rows) {
-    const floor = row.variantId ? STOCK_FLOORS[row.variantId] : undefined;
+    const floor = row.variantId ? VARIANT_FLOORS[row.variantId] : PRODUCT_FLOORS[(row as { productId?: number }).productId ?? 0];
     if (floor && row.available < floor) {
       await fetch(`${api}/admin/inventory/${row.id}/restock`, {
         method: 'POST',

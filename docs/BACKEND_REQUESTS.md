@@ -77,3 +77,14 @@
   allowing `List<PromotionItemRequest> items` so the admin can specify individual variants and their promotional prices.
 - **Frontend Action Taken:** As per instruction, the UI was built with a product picker for all products, ready to bind variant IDs once the backend DTO is updated.
 
+
+## Order discount breakdown (OrderDTO)
+- **Observation:** `OrderDTO` only exposes a single `discountCents` (plus an optional `couponCode`). It mixes automatic promotions (flash sale, BOGO, seasonal) with the coupon, so the order summary cannot show them separately the way the cart does (`CartDTO.promotionDiscounts[]` + coupon line).
+- **Request (additive):** return the same breakdown on `OrderDTO` (customer and admin endpoints):
+  ```json
+  "promotionDiscounts": [{ "promotionId": 1, "name": "Flash Sale 24H", "nameKm": "...", "amountCents": 2000 }],
+  "couponDiscountCents": 500,
+  "couponCode": "SAVE5"
+  ```
+  with `discountCents == sum(promotionDiscounts[].amountCents) + couponDiscountCents`.
+- **Frontend meanwhile:** the customer and admin order detail pages show a single "Discounts" / «ការបញ្ចុះតម្លៃ» line, without the coupon code. Once the fields exist, render one line per promotion plus a separate "Coupon Discount (CODE)" line, as in `cart/page.tsx`.

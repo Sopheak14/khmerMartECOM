@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -207,7 +207,7 @@ export default function CartPage() {
                       {/* Image */}
                       <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-card overflow-hidden bg-muted/20 shrink-0 border border-border/50">
                         {item.imageUrl ? (
-                          <Image
+                          <SafeImage
                             src={getImageUrl(item.imageUrl)}
                             alt={name}
                             fill

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import { localizedDescription } from '@/lib/description';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@/navigation';
 import { ProductDetailDTO, ReviewDTO, VariantDTO, CartDTO } from '@/types/api';
@@ -407,7 +408,7 @@ export function ProductDetailView({ product, reviews = [], khrRate }: ProductDet
       <div className="border-t border-border pt-8 space-y-4">
         <h2 className="text-xl font-bold text-foreground">{t('description')}</h2>
         <div className="prose dark:prose-invert max-w-none text-sm text-muted leading-relaxed">
-          <p>{product.description}</p>
+          <p>{localizedDescription(product.description, locale)}</p>
         </div>
       </div>
 

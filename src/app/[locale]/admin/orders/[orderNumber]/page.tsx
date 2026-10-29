@@ -9,6 +9,9 @@ import { apiClient, ApiError } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { OrderDTO, OrderStatus, ShipmentStatus, TrackingDTO } from '@/types/api';
 import { formatUsd, formatKhr } from '@/lib/money';
+import { SafeImage } from '@/components/common/SafeImage';
+import { getImageUrl } from '@/lib/images';
+import { useOrderStatusLabel } from '@/hooks/useOrderStatusLabel';
 import {
   ArrowLeft,
   Truck,
@@ -43,6 +46,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 export default function AdminOrderDetailPage() {
   const t = useTranslations('admin.orders');
   const commonT = useTranslations('admin.common');
+  const orderStatusLabel = useOrderStatusLabel();
   const locale = useLocale();
   const params = useParams();
   const router = useRouter();
@@ -312,12 +316,9 @@ export default function AdminOrderDetailPage() {
                   className="py-3.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.imageUrl || 'https://placehold.co/80x80'}
-                      alt={item.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-border shrink-0"
-                    />
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border shrink-0">
+                      <SafeImage src={getImageUrl(item.imageUrl)} alt={item.name} fill sizes="48px" className="object-cover" />
+                    </div>
                     <div className="min-w-0 space-y-0.5">
                       <p className="text-xs font-bold text-foreground truncate">{item.name}</p>
                       {item.attributes && Object.keys(item.attributes).length > 0 && (
@@ -355,8 +356,8 @@ export default function AdminOrderDetailPage() {
               </div>
               {order.discountCents > 0 && (
                 <div className="flex justify-between text-emerald-700 font-medium">
-                  <span>Discount:</span>
-                  <span className="font-mono">-{formatUsd(order.discountCents)}</span>
+                  <span data-testid="admin-order-discounts-label">{t('discounts')}:</span>
+                  <span className="font-mono" data-testid="admin-order-discounts-amount">-{formatUsd(order.discountCents)}</span>
                 </div>
               )}
               <div className="flex justify-between text-muted">
@@ -387,7 +388,7 @@ export default function AdminOrderDetailPage() {
                 <div key={idx} className="relative group space-y-1" data-testid="admin-timeline-event">
                   <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-surface bg-primary" />
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-foreground">{evt.status}</span>
+                    <span className="text-xs font-bold text-foreground" data-testid="admin-timeline-status">{orderStatusLabel(evt.status)}</span>
                     <span className="text-[11px] text-muted">
                       {new Date(evt.at).toLocaleString(locale === 'km' ? 'km-KH' : 'en-US', {
                         dateStyle: 'short',

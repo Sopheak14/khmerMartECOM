@@ -4,7 +4,6 @@ import { Link } from '@/navigation';
 import { ProductsCatalogView } from '@/components/catalog/ProductsCatalogView';
 import { CategoryDTO, ProductCardDTO, ProductFacets, PaginationMeta } from '@/types/api';
 import { ChevronRight, Home, LayoutGrid } from 'lucide-react';
-import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
 

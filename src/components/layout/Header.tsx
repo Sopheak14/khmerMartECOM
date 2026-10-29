@@ -128,7 +128,7 @@ export function Header() {
 
                       {(user.role === 'ADMIN' || user.role === 'STAFF') && (
                         <Link
-                          href="/admin/dashboard"
+                          href="/admin"
                           onClick={() => setAccountMenuOpen(false)}
                           className="flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted/10"
                         >
