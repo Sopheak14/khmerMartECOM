@@ -31,6 +31,7 @@ import com.khmermart.model.request.CartItemRequest;
 import com.khmermart.model.response.AddressDto;
 import com.khmermart.model.response.AppUserDto;
 import com.khmermart.model.response.CartDto;
+import com.khmermart.model.response.DiscountBreakdownDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
@@ -711,7 +712,8 @@ public class OrderServiceImpl implements OrderService {
         canCancel,
         canReview,
         "/api/orders/" + order.getOrderNumber() + "/invoice.pdf",
-        customer);
+        customer,
+        DiscountBreakdownDto.fromSnapshot(order.getDiscountBreakdown(), objectMapper));
   }
 
   @Override

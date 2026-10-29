@@ -52,7 +52,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 
 ## 4. Orders & Public Payments
 - `GET /api/orders`: List customer purchase history.
-- `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline.
+- `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline. `OrderDTO.discountBreakdown` = `{ "promotions": [{ "label", "amountCents" }], "coupon": { "code", "amountCents" } | null }`, read from the checkout snapshot (never recalculated); `discountCents` = sum(promotions) + coupon. Orders without a snapshot return `promotions: []`, `coupon: null`. Also returned by `POST /api/checkout` and the admin order endpoints.
 - `POST /api/orders/{orderNumber}/cancel`: Customer order cancellation.
 - `GET /api/orders/{orderNumber}/invoice.pdf`: Download PDF tax invoice.
 - `GET /api/payments/{id}`: Fetch payment status and KHQR payload.
@@ -115,7 +115,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 
 ### 7.6 Orders Management
 - `GET /api/admin/orders`: Filter by status, payment status, date range, search query.
-- `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, and items.
+- `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, items and `discountBreakdown` (same shape as the customer endpoint).
 - `PATCH /api/admin/orders/{orderNumber}/status`: Update order status obeying state machine, recording reason `note` in timeline.
 - `POST /api/admin/orders/{orderNumber}/ship`: Ship order with carrier and generate `KMTRK` tracking number.
 

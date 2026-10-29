@@ -36,6 +36,7 @@ import com.khmermart.model.response.AddressDto;
 import com.khmermart.model.response.CartItemDto;
 import com.khmermart.model.response.CheckoutPreviewDto;
 import com.khmermart.model.response.CheckoutResponseDto;
+import com.khmermart.model.response.DiscountBreakdownDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
@@ -829,7 +830,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             timeline,
             canCancel,
             false,
-            "/api/orders/" + order.getOrderNumber() + "/invoice.pdf");
+            "/api/orders/" + order.getOrderNumber() + "/invoice.pdf",
+            DiscountBreakdownDto.fromSnapshot(order.getDiscountBreakdown(), objectMapper));
 
     CheckoutResponseDto responseDto = new CheckoutResponseDto(orderDto, nextAction);
 

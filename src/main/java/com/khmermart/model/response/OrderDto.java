@@ -35,7 +35,8 @@ public record OrderDto(
     boolean canCancel,
     boolean canReview,
     String invoiceUrl,
-    AppUserDto customer) {
+    AppUserDto customer,
+    DiscountBreakdownDto discountBreakdown) {
 
   public OrderDto(
       Long id,
@@ -63,7 +64,8 @@ public record OrderDto(
       List<OrderTimelineDto> timeline,
       boolean canCancel,
       boolean canReview,
-      String invoiceUrl) {
+      String invoiceUrl,
+      DiscountBreakdownDto discountBreakdown) {
     this(
         id,
         orderNumber,
@@ -91,6 +93,7 @@ public record OrderDto(
         canCancel,
         canReview,
         invoiceUrl,
-        null);
+        null,
+        discountBreakdown);
   }
 }

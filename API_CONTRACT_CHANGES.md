@@ -27,3 +27,9 @@
 - **Change**: Several `FLASH_SALE` promotions can now be active at the same time (previously a second active one broke product pricing). Product/search/home/cart/checkout use all of them; `PublicSettingsDto.flashSale` and `HomeDto.flashSale` headline the soonest-ending one (home lists products from all).
 - **Pricing rule**: each cart line gets at most one automatic promotion; among flash sales covering that variant (or product without variants) the lowest sale price wins.
 - **Admin guard** (additive error): creating/updating an active `FLASH_SALE` whose items overlap in time with another active `FLASH_SALE` on the same variant (or product without variants) returns `409 CONFLICT` with `error.details["items[i]"]` naming the variant and the other promotion.
+
+## 6. OrderDTO.discountBreakdown
+- **Change** (additive): `OrderDTO.discountBreakdown: { promotions: [{ label, amountCents }], coupon: { code, amountCents } | null }` on `POST /api/checkout`, `GET /api/orders`, `GET /api/orders/{orderNumber}` and the admin order endpoints. It is parsed from the checkout snapshot (`orders.discount_breakdown`, the same data the invoice prints) and never recalculated, so `discountCents == sum(promotions[].amountCents) + coupon.amountCents`.
+- **Old orders** without a snapshot return `promotions: []` and `coupon: null` (the field is always present).
+- **Example** (demo order: hero Standard on Flash Sale + `SAVE5`): `discountCents: 2500`, `discountBreakdown: { "promotions": [{ "label": "Flash Sale Discount", "amountCents": 2000 }], "coupon": { "code": "SAVE5", "amountCents": 500 } }`.
+- **Note for the frontend**: this is the shape requested in this task; `Fronted/docs/BACKEND_REQUESTS.md` sketches a different one (`promotionDiscounts[]` with `promotionId`/`name`/`nameKm`, `couponDiscountCents`). The snapshot stores only `label` and `amountCents`, so no promotion id or Khmer name is available.
