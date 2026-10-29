@@ -9,6 +9,7 @@ import com.khmermart.model.entity.PromotionProduct;
 import com.khmermart.model.enumerate.PromotionType;
 import com.khmermart.repository.ProductVariantRepository;
 import com.khmermart.repository.PromotionProductRepository;
+import com.khmermart.seed.SeedCatalog;
 import com.khmermart.service.impl.FlashSalePriceResolver;
 import java.util.List;
 import java.util.Optional;
@@ -34,13 +35,19 @@ class FlashSalePriceResolverTest {
         .build();
   }
 
+  private static final long HERO = SeedCatalog.HERO_ID;
+  private static final long RED_STD = SeedCatalog.HERO_RED_STANDARD;
+  private static final long RED_PREMIUM = SeedCatalog.HERO_RED_PREMIUM;
+  private static final long BLUE_PREMIUM = SeedCatalog.HERO_BLUE_PREMIUM;
+  private static final long FLASH = SeedCatalog.HERO_FLASH_CENTS;
+
   @Test
   @DisplayName("Variant in two active flash sales: the lowest sale price (best discount) wins")
   void lowestPriceAcrossActiveFlashSalesWins() {
-    when(rows.findByPromotionIdAndProductIdAndVariantId(1L, 1001L, 3L))
-        .thenReturn(Optional.of(row(1, 1001, 3L, 120000)));
-    when(rows.findByPromotionIdAndProductIdAndVariantId(2L, 1001L, 3L))
-        .thenReturn(Optional.of(row(2, 1001, 3L, 119900)));
+    when(rows.findByPromotionIdAndProductIdAndVariantId(1L, HERO, RED_STD))
+        .thenReturn(Optional.of(row(1, HERO, RED_STD, FLASH)));
+    when(rows.findByPromotionIdAndProductIdAndVariantId(2L, HERO, RED_STD))
+        .thenReturn(Optional.of(row(2, HERO, RED_STD, FLASH - 1000L)));
 
     Long price =
         resolver.resolve(
@@ -48,34 +55,35 @@ class FlashSalePriceResolverTest {
                 promo(1, PromotionType.FLASH_SALE),
                 promo(2, PromotionType.FLASH_SALE),
                 promo(3, PromotionType.SEASONAL)),
-            1001L,
-            3L);
+            HERO,
+            RED_STD);
 
-    assertThat(price).isEqualTo(119900L);
+    assertThat(price).isEqualTo(FLASH - 1000L);
   }
 
   @Test
   @DisplayName("Different variants in different flash sales each resolve to their own price")
   void differentVariantsResolveIndependently() {
-    when(rows.findByPromotionIdAndProductIdAndVariantId(1L, 1001L, 1L))
-        .thenReturn(Optional.of(row(1, 1001, 1L, 89900)));
-    when(rows.findByPromotionIdAndProductIdAndVariantId(2L, 1001L, 3L))
-        .thenReturn(Optional.of(row(2, 1001, 3L, 119900)));
+    long premiumSale = SeedCatalog.HERO_PREMIUM_CENTS - 2000L;
+    when(rows.findByPromotionIdAndProductIdAndVariantId(1L, HERO, RED_STD))
+        .thenReturn(Optional.of(row(1, HERO, RED_STD, FLASH)));
+    when(rows.findByPromotionIdAndProductIdAndVariantId(2L, HERO, RED_PREMIUM))
+        .thenReturn(Optional.of(row(2, HERO, RED_PREMIUM, premiumSale)));
     List<Promotion> active =
         List.of(promo(1, PromotionType.FLASH_SALE), promo(2, PromotionType.FLASH_SALE));
 
-    assertThat(resolver.resolve(active, 1001L, 1L)).isEqualTo(89900L);
-    assertThat(resolver.resolve(active, 1001L, 3L)).isEqualTo(119900L);
-    assertThat(resolver.resolve(active, 1001L, 4L)).isNull();
+    assertThat(resolver.resolve(active, HERO, RED_STD)).isEqualTo(FLASH);
+    assertThat(resolver.resolve(active, HERO, RED_PREMIUM)).isEqualTo(premiumSale);
+    assertThat(resolver.resolve(active, HERO, BLUE_PREMIUM)).isNull();
   }
 
   @Test
   @DisplayName("A product-wide row never applies to a product that has variants")
   void productWideSaleIgnoredWhenProductHasVariants() {
-    when(variants.existsByProductId(1001L)).thenReturn(true);
-    when(rows.findByPromotionIdAndProductIdAndVariantIdIsNull(1L, 1001L))
-        .thenReturn(Optional.of(row(1, 1001, null, 50000)));
+    when(variants.existsByProductId(HERO)).thenReturn(true);
+    when(rows.findByPromotionIdAndProductIdAndVariantIdIsNull(1L, HERO))
+        .thenReturn(Optional.of(row(1, HERO, null, FLASH)));
 
-    assertThat(resolver.resolve(List.of(promo(1, PromotionType.FLASH_SALE)), 1001L, null)).isNull();
+    assertThat(resolver.resolve(List.of(promo(1, PromotionType.FLASH_SALE)), HERO, null)).isNull();
   }
 }

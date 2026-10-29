@@ -20,27 +20,27 @@ sequenceDiagram
     Frontend->>Backend: POST /api/auth/login
     Backend-->>Frontend: JWT Access Token + HttpOnly Refresh Cookie
 
-    Customer->>Frontend: 2. Search "Laptop" (Brand: Dell)
-    Frontend->>Backend: GET /api/products?q=Laptop&brand=Dell
+    Customer->>Frontend: 2. Search "Silk" (Brand: Takeo Weavers)
+    Frontend->>Backend: GET /api/products?q=Silk&brand=Takeo Weavers
     Backend-->>Frontend: Product cards + Facets
 
-    Customer->>Frontend: 3. View detail of "dell-inspiron-15" (ID 1003)
-    Frontend->>Backend: GET /api/products/dell-inspiron-15
+    Customer->>Frontend: 3. View detail of "takeo-hol-silk-sampot" (ID 1001)
+    Frontend->>Backend: GET /api/products/takeo-hol-silk-sampot
     Backend-->>Frontend: Full product details + Variants
 
-    Customer->>Frontend: 4. Add to cart (Variant ID 6, qty 1, $850.00)
+    Customer->>Frontend: 4. Add to cart (Variant ID 1 = Ruby Red / Standard, qty 1, $149.00)
     Frontend->>Backend: POST /api/cart/items
-    Backend-->>Frontend: Cart with items & subtotal (85000 cents)
+    Backend-->>Frontend: Cart with items & subtotal (14900 cents)
 
     Customer->>Frontend: 5. Apply coupon "SAVE5"
     Frontend->>Backend: POST /api/cart/coupon {"code":"SAVE5"}
-    Backend-->>Frontend: Cart recalculated: 17500 cents discount (20% KNY Sale + $5 coupon)
+    Backend-->>Frontend: Cart recalculated: 2500 cents discount ($20 Flash Sale + $5 coupon)
 
     Customer->>Frontend: 6. Checkout with KHQR + Idempotency-Key
     Frontend->>Backend: POST /api/checkout (Idempotency-Key: UUID)
     Backend->>DB: Atomic stock reservation (InventoryRepository.tryReserve)
     Backend->>DB: Insert Order (PENDING_PAYMENT, KM-YYYYMMDD-NNNNNN) & Payment (PENDING, MD5)
-    Backend-->>Frontend: Order placed (Total: $675.00 / 67500 cents) + KHQR payload
+    Backend-->>Frontend: Order placed (Total: $124.00 / 12400 cents = 508,400 ៛) + KHQR payload
 
     Customer->>Frontend: 7. Scan & Pay via Bakong App
     Bakong->>Backend: POST /api/payments/{id}/simulate-paid (or polling)
@@ -55,7 +55,7 @@ sequenceDiagram
     Admin->>Backend: 11. Courier Delivers (PATCH /api/admin/orders/{no}/status)
     Backend->>DB: Status -> DELIVERED, set delivered_at = now()
 
-    Customer->>Backend: 12. Submit Verified Review (POST /api/products/1003/reviews)
+    Customer->>Backend: 12. Submit Verified Review (POST /api/products/1001/reviews)
     Admin->>Backend: Admin Moderation (PATCH /api/admin/reviews/{id} -> APPROVED)
     Backend-->>Customer: Review Approved with Admin Reply
 ```
@@ -72,22 +72,22 @@ sequenceDiagram
   - 7-day rotating refresh token in `HttpOnly`, `SameSite=Strict` cookie (`km_rt`).
 
 ### Step 2: Catalog Search & Filter
-- **Endpoint**: `GET /api/products?q=Laptop&brand=Dell`
+- **Endpoint**: `GET /api/products?q=Silk&brand=Takeo Weavers`
 - **Behavior**: Uses PostgreSQL full-text search vector and pg_trgm similarity indexes. Returns matching product cards with real-time stock and price facets.
 
 ### Step 3: Product Detail by Slug
-- **Endpoint**: `GET /api/products/dell-inspiron-15`
-- **Behavior**: Fetches complete product entity (ID 1003, "Dell Inspiron 15 Laptop"), all available variants (Variant ID 6, SKU `DELL-INSP-16-512`, price 85,000 cents = $850.00), active promotional discounts (Khmer New Year Mega Sale, 20% discount on orders over 5,000 cents), and category breadcrumbs.
+- **Endpoint**: `GET /api/products/takeo-hol-silk-sampot`
+- **Behavior**: Fetches the complete product entity (ID 1001, "Takeo Hol Silk Sampot"), its 4 variants (color Ruby Red / Royal Blue x grade Standard 14,900 cents / Premium 19,900 cents; Variant ID 1 = Ruby Red Standard, SKU `HOL-SAMPOT-RED-STD`), the active per-variant Flash Sale 24H price (`salePriceCents` 12,900 on the two Standard variants only), and category breadcrumbs (Silk & Textiles).
 
 ### Step 4: Add to Cart
 - **Endpoint**: `POST /api/cart/items`
-- **Request**: `{"productId": 1003, "variantId": 6, "quantity": 1}`
-- **Behavior**: Merges items into authenticated user cart (or guest session cart). Subtotal: 85,000 cents ($850.00).
+- **Request**: `{"productId": 1001, "variantId": 1, "quantity": 1}`
+- **Behavior**: Merges items into authenticated user cart (or guest session cart). Subtotal: 14,900 cents ($149.00); the cart already shows the Flash Sale 24H discount of 2,000 cents (14,900 → 12,900).
 
 ### Step 5: Apply Promotional Coupon
 - **Endpoint**: `POST /api/cart/coupon`
 - **Request**: `{"code": "SAVE5"}`
-- **Behavior**: Validates coupon active date window, per-user usage limits, and minimum cart spend. Applies fixed $5.00 (`500 cents`) discount on top of the active 20% seasonal promotion (`17000 cents`), totaling `17500 cents` discount ($175.00 off), leaving net cart subtotal `67500 cents` ($675.00).
+- **Behavior**: Validates coupon active date window, per-user usage limits, and minimum cart spend. Applies fixed $5.00 (`500 cents`) discount on top of the Flash Sale 24H discount (`2000 cents`), totaling `2500 cents` discount ($25.00 off), leaving a net total of `12400 cents` ($124.00 = 508,400 ៛ at the 4,100 ៛/$ rate).
 
 ### Step 6: Idempotent Checkout with KHQR
 - **Endpoint**: `POST /api/checkout`
@@ -101,7 +101,7 @@ sequenceDiagram
     WHERE id = :id AND quantity_on_hand - quantity_reserved >= :qty
     ```
   - Creates `orders` row in `PENDING_PAYMENT` status with format `KM-YYYYMMDD-NNNNNN` (e.g. `KM-20261024-000001`).
-  - Order breakdown: Subtotal $850.00 (85000 cents), Discount $175.00 (17500 cents), STANDARD Shipping $0.00 (0 cents, free over $50 threshold), Total $675.00 (67500 cents).
+  - Order breakdown: Subtotal $149.00 (14900 cents), Discount $25.00 (2500 cents: 2000 flash + 500 coupon), STANDARD Shipping $0.00 (0 cents, free over $50 threshold), Total $124.00 (12400 cents = 508,400 ៛).
   - Generates Bakong KHQR EMV payload and QR string, storing 32-character hexadecimal MD5 hash in `payments`.
 
 ### Step 7: Payment Settlement
@@ -118,7 +118,7 @@ sequenceDiagram
 - **Behavior**: Asynchronous `@TransactionalEventListener(phase = AFTER_COMMIT)` triggers:
   - Order Confirmation Email to customer.
   - Payment Receipt Email with invoice link.
-  - Payment Confirmation SMS: `"Your payment of $675.00 was successful"`.
+  - Payment Confirmation SMS: `"Your payment of $124.00 was successful"`.
   - In-App notification stored in `notifications`.
   - Web Push notification dispatched via VAPID.
 
@@ -144,4 +144,4 @@ sequenceDiagram
   - Creates review in `PENDING` status.
 - **Admin Endpoint**: `PATCH /api/admin/reviews/{id}`
   - Updates review to `APPROVED` and adds admin reply: `"Thank you for your feedback!"`.
-  - Recomputes average rating and review count on product 1003.
+  - Recomputes average rating and review count on product 1001.

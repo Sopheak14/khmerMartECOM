@@ -8,6 +8,7 @@ import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.model.request.ApplyCouponRequest;
 import com.khmermart.model.request.AuthRequest;
 import com.khmermart.model.request.CartItemRequest;
+import com.khmermart.seed.SeedCatalog;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,17 +47,17 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     HttpHeaders headers = new HttpHeaders();
     headers.add(HttpHeaders.COOKIE, rawCookie);
 
-    // Add item 1: Product 1001 (Laptop Pro 15, $999.00 = 99900c) qty 1
-    CartItemRequest item1 = new CartItemRequest(1001L, null, 1);
+    // Add item 1: Product 1001 (Takeo Hol Silk Sampot, $149.00 = 14900c) qty 1
+    CartItemRequest item1 = new CartItemRequest(SeedCatalog.HERO_ID, null, 1);
     ResponseEntity<String> addRes1 =
         restTemplate.exchange(
             "/api/cart/items", HttpMethod.POST, new HttpEntity<>(item1, headers), String.class);
     assertThat(addRes1.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode cart1 = objectMapper.readTree(addRes1.getBody()).get("data");
     assertThat(cart1.get("items").size()).isEqualTo(1);
-    assertThat(cart1.get("subtotalCents").asLong()).isEqualTo(99900L);
+    assertThat(cart1.get("subtotalCents").asLong()).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
 
-    // Add item 2: Product 1005 (Dell Vostro 14, $599.00 = 59900c) qty 2
+    // Add item 2: Product 1005 (Phamuong Silk Fabric 2 m, $65.00 = 6500c) qty 2
     CartItemRequest item2 = new CartItemRequest(1005L, null, 2);
     ResponseEntity<String> addRes2 =
         restTemplate.exchange(
@@ -65,7 +66,8 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     JsonNode cart2 = objectMapper.readTree(addRes2.getBody()).get("data");
     assertThat(cart2.get("items").size()).isEqualTo(2);
     assertThat(cart2.get("itemCount").asInt()).isEqualTo(3);
-    assertThat(cart2.get("subtotalCents").asLong()).isEqualTo(99900L + (59900L * 2));
+    assertThat(cart2.get("subtotalCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_STANDARD_CENTS + (SeedCatalog.product(1005L).priceCents() * 2));
   }
 
   @Test
@@ -75,8 +77,9 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     HttpHeaders headers = new HttpHeaders();
     headers.add(HttpHeaders.COOKIE, "km_guest=stock-test-token");
 
-    // Product 1001 has available = 50. Requesting 100 should fail with 409 OUT_OF_STOCK
-    CartItemRequest req = new CartItemRequest(1001L, null, 100);
+    // Product 1001 has 4 variants x 50 = 200 available. Requesting one more should fail with 409
+    CartItemRequest req =
+        new CartItemRequest(SeedCatalog.HERO_ID, null, 4 * SeedCatalog.HERO_VARIANT_STOCK + 1);
     ResponseEntity<String> res =
         restTemplate.exchange(
             "/api/cart/items", HttpMethod.POST, new HttpEntity<>(req, headers), String.class);
@@ -95,8 +98,8 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     HttpHeaders headers = new HttpHeaders();
     headers.add(HttpHeaders.COOKIE, "km_guest=coupon-test-token");
 
-    // Initially add cheap item: Product 1038 (Atomic Habits book, $14.00 = 1400c, below SAVE5 min
-    // order of $35 = 3500c)
+    // Initially add cheap item: Product 1038 (Khmer-English Dictionary, $18.00 = 1800c, below SAVE5
+    // min order of $35 = 3500c)
     CartItemRequest cheapItem = new CartItemRequest(1038L, null, 1);
     restTemplate.exchange(
         "/api/cart/items", HttpMethod.POST, new HttpEntity<>(cheapItem, headers), String.class);
@@ -112,7 +115,7 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     assertThat(objectMapper.readTree(invRes.getBody()).get("error").get("code").asText())
         .isEqualTo("COUPON_INVALID");
 
-    // B. SAVE5 with subtotal 1400c < 3500c -> 422 COUPON_MIN_ORDER
+    // B. SAVE5 with subtotal 1800c < 3500c -> 422 COUPON_MIN_ORDER
     ResponseEntity<String> minOrderRes =
         restTemplate.exchange(
             "/api/cart/coupon",
@@ -134,8 +137,7 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     assertThat(objectMapper.readTree(expRes.getBody()).get("error").get("code").asText())
         .isEqualTo("COUPON_EXPIRED");
 
-    // Add 2 more units of Product 1038 ($14.00 * 3 = $42.00 = 4200c, >= $35 min order and < $50
-    // seasonal promo threshold)
+    // Add 2 more units of Product 1038 ($18.00 * 3 = $54.00 = 5400c, >= $35 min order)
     CartItemRequest moreItems = new CartItemRequest(1038L, null, 2);
     restTemplate.exchange(
         "/api/cart/items", HttpMethod.POST, new HttpEntity<>(moreItems, headers), String.class);
@@ -170,7 +172,7 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     HttpHeaders guestHeaders = new HttpHeaders();
     guestHeaders.add(HttpHeaders.COOKIE, "km_guest=" + guestToken);
 
-    // Add Product 1005 qty 2 to guest cart
+    // Add Product 1005 (Phamuong Silk Fabric) qty 2 to guest cart
     restTemplate.exchange(
         "/api/cart/items",
         HttpMethod.POST,
@@ -208,70 +210,86 @@ class CartIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "5. Per-variant flash sale: variant 3 in cart -> total 129900 (no flash discount); variant 1 -> total 89900; mixed -> only variant 1 discounted")
+      "5. Per-variant flash sale: Premium variant -> no flash discount; Standard variant -> flash price; mixed -> only Standard discounted")
   void testPerVariantFlashSalePricingInCart() throws Exception {
-    // A. Variant 3 in cart -> no flash discount, total 129900
-    HttpHeaders v3Headers = new HttpHeaders();
-    v3Headers.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-v3");
+    long standard = SeedCatalog.HERO_STANDARD_CENTS;
+    long premium = SeedCatalog.HERO_PREMIUM_CENTS;
+    long flashDiscount = standard - SeedCatalog.HERO_FLASH_CENTS;
 
-    CartItemRequest reqV3 = new CartItemRequest(1001L, 3L, 1);
-    ResponseEntity<String> resV3 =
+    // A. Premium variant (Ruby Red) in cart -> no flash discount
+    HttpHeaders premiumHeaders = new HttpHeaders();
+    premiumHeaders.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-premium");
+
+    CartItemRequest reqPremium =
+        new CartItemRequest(SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_PREMIUM, 1);
+    ResponseEntity<String> resPremium =
         restTemplate.exchange(
-            "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV3, v3Headers), String.class);
-    assertThat(resV3.getStatusCode()).isEqualTo(HttpStatus.OK);
-    JsonNode cartV3 = objectMapper.readTree(resV3.getBody()).get("data");
+            "/api/cart/items",
+            HttpMethod.POST,
+            new HttpEntity<>(reqPremium, premiumHeaders),
+            String.class);
+    assertThat(resPremium.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode cartPremium = objectMapper.readTree(resPremium.getBody()).get("data");
 
-    assertThat(cartV3.get("subtotalCents").asLong()).isEqualTo(129900L);
-    assertThat(cartV3.get("discountCents").asLong()).isEqualTo(0L);
-    assertThat(cartV3.get("totalCents").asLong()).isEqualTo(129900L);
-    assertThat(cartV3.get("promotionDiscounts").size()).isEqualTo(0);
+    assertThat(cartPremium.get("subtotalCents").asLong()).isEqualTo(premium);
+    assertThat(cartPremium.get("discountCents").asLong()).isEqualTo(0L);
+    assertThat(cartPremium.get("totalCents").asLong()).isEqualTo(premium);
+    assertThat(cartPremium.get("promotionDiscounts").size()).isEqualTo(0);
 
-    // B. Variant 1 in cart -> flash discount applied, total 89900
-    HttpHeaders v1Headers = new HttpHeaders();
-    v1Headers.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-v1");
+    // B. Standard variant (Ruby Red) in cart -> flash discount applied
+    HttpHeaders standardHeaders = new HttpHeaders();
+    standardHeaders.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-standard");
 
-    CartItemRequest reqV1 = new CartItemRequest(1001L, 1L, 1);
-    ResponseEntity<String> resV1 =
+    CartItemRequest reqStandard =
+        new CartItemRequest(SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_STANDARD, 1);
+    ResponseEntity<String> resStandard =
         restTemplate.exchange(
-            "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV1, v1Headers), String.class);
-    assertThat(resV1.getStatusCode()).isEqualTo(HttpStatus.OK);
-    JsonNode cartV1 = objectMapper.readTree(resV1.getBody()).get("data");
+            "/api/cart/items",
+            HttpMethod.POST,
+            new HttpEntity<>(reqStandard, standardHeaders),
+            String.class);
+    assertThat(resStandard.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode cartStandard = objectMapper.readTree(resStandard.getBody()).get("data");
 
-    assertThat(cartV1.get("subtotalCents").asLong()).isEqualTo(99900L);
-    assertThat(cartV1.get("discountCents").asLong()).isEqualTo(10000L);
-    assertThat(cartV1.get("totalCents").asLong()).isEqualTo(89900L);
-    assertThat(cartV1.get("promotionDiscounts").size()).isEqualTo(1);
-    assertThat(cartV1.get("promotionDiscounts").get(0).get("label").asText())
+    assertThat(cartStandard.get("subtotalCents").asLong()).isEqualTo(standard);
+    assertThat(cartStandard.get("discountCents").asLong()).isEqualTo(flashDiscount);
+    assertThat(cartStandard.get("totalCents").asLong()).isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
+    assertThat(cartStandard.get("promotionDiscounts").size()).isEqualTo(1);
+    assertThat(cartStandard.get("promotionDiscounts").get(0).get("label").asText())
         .isEqualTo("Flash Sale Discount");
 
-    // C. Mixed cart (Variant 1 + Variant 3) -> only Variant 1 discounted
+    // C. Mixed cart (Standard + Premium) -> only Standard discounted
     HttpHeaders mixedHeaders = new HttpHeaders();
     mixedHeaders.add(HttpHeaders.COOKIE, "km_guest=flash-sale-test-mixed");
 
     restTemplate.exchange(
-        "/api/cart/items", HttpMethod.POST, new HttpEntity<>(reqV1, mixedHeaders), String.class);
+        "/api/cart/items",
+        HttpMethod.POST,
+        new HttpEntity<>(reqStandard, mixedHeaders),
+        String.class);
     ResponseEntity<String> resMixed =
         restTemplate.exchange(
             "/api/cart/items",
             HttpMethod.POST,
-            new HttpEntity<>(reqV3, mixedHeaders),
+            new HttpEntity<>(reqPremium, mixedHeaders),
             String.class);
     assertThat(resMixed.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode cartMixed = objectMapper.readTree(resMixed.getBody()).get("data");
 
-    assertThat(cartMixed.get("subtotalCents").asLong()).isEqualTo(99900L + 129900L); // 229800
-    assertThat(cartMixed.get("discountCents").asLong()).isEqualTo(10000L); // only variant 1
-    assertThat(cartMixed.get("totalCents").asLong()).isEqualTo(219800L);
+    assertThat(cartMixed.get("subtotalCents").asLong()).isEqualTo(standard + premium);
+    assertThat(cartMixed.get("discountCents").asLong()).isEqualTo(flashDiscount); // only Standard
+    assertThat(cartMixed.get("totalCents").asLong()).isEqualTo(standard + premium - flashDiscount);
     assertThat(cartMixed.get("promotionDiscounts").size()).isEqualTo(1);
     assertThat(cartMixed.get("promotionDiscounts").get(0).get("amountCents").asLong())
-        .isEqualTo(10000L);
+        .isEqualTo(flashDiscount);
   }
 
   @Test
   @DisplayName(
-      "6. GET /api/products/1001 -> variants[0..1].salePriceCents = 89900, variants[2..3] have no salePriceCents")
-  void testProduct1001VariantSalePrices() throws Exception {
-    ResponseEntity<String> response = restTemplate.getForEntity("/api/products/1001", String.class);
+      "6. GET /api/products/1001 -> Standard variants carry the flash salePriceCents, Premium variants have none")
+  void testHeroVariantSalePrices() throws Exception {
+    ResponseEntity<String> response =
+        restTemplate.getForEntity("/api/products/" + SeedCatalog.HERO_ID, String.class);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
     JsonNode json = objectMapper.readTree(response.getBody());
@@ -281,15 +299,36 @@ class CartIntegrationTest extends AbstractIntegrationTest {
     JsonNode variants = p.get("variants");
     assertThat(variants.size()).isEqualTo(4);
 
-    // Variants 0 and 1 on flash sale
-    assertThat(variants.get(0).get("salePriceCents").asLong()).isEqualTo(89900L);
-    assertThat(variants.get(1).get("salePriceCents").asLong()).isEqualTo(89900L);
+    // Variants 0 and 2 (Standard) on flash sale
+    assertThat(variants.get(0).get("salePriceCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
+    assertThat(variants.get(2).get("salePriceCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
 
-    // Variants 2 and 3 NOT on flash sale (salePriceCents absent/omitted)
-    assertThat(variants.get(2).has("salePriceCents")).isFalse();
+    // Variants 1 and 3 (Premium) NOT on flash sale (salePriceCents absent/omitted)
+    assertThat(variants.get(1).has("salePriceCents")).isFalse();
     assertThat(variants.get(3).has("salePriceCents")).isFalse();
 
     // Product-level salePriceCents is the lowest active variant sale price
-    assertThat(p.get("salePriceCents").asLong()).isEqualTo(89900L);
+    assertThat(p.get("salePriceCents").asLong()).isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
+  }
+
+  @Test
+  @DisplayName(
+      "7. Product-wide flash sale: Kampot Black Pepper and Dried Mango carry their flash prices without variants")
+  void testProductWideFlashPrices() throws Exception {
+    for (long[] flash :
+        new long[][] {
+          {SeedCatalog.PEPPER_ID, SeedCatalog.PEPPER_FLASH_CENTS},
+          {SeedCatalog.MANGO_ID, SeedCatalog.MANGO_FLASH_CENTS}
+        }) {
+      ResponseEntity<String> response =
+          restTemplate.getForEntity("/api/products/" + flash[0], String.class);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      JsonNode p = objectMapper.readTree(response.getBody()).get("data");
+      assertThat(p.get("priceCents").asLong())
+          .isEqualTo(SeedCatalog.product(flash[0]).priceCents());
+      assertThat(p.get("salePriceCents").asLong()).isEqualTo(flash[1]);
+    }
   }
 }

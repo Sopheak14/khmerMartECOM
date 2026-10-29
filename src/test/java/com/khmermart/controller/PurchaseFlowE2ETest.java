@@ -32,6 +32,8 @@ import com.khmermart.repository.NotificationRepository;
 import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ReviewRepository;
+import com.khmermart.seed.SeedCatalog;
+import com.khmermart.service.ReviewService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -57,6 +59,7 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
   @Autowired private InventoryMovementRepository movementRepository;
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private ReviewRepository reviewRepository;
+  @Autowired private ReviewService reviewService;
 
   @Test
   @DisplayName("Full 12-step lesson scenario as ONE comprehensive integration test")
@@ -105,10 +108,10 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     String adminToken =
         "Bearer " + objectMapper.readTree(adminLoginRes).path("data").path("accessToken").asText();
 
-    log.info("=== STEP 2: Search 'Laptop' with filters (brand=Dell) ===");
+    log.info("=== STEP 2: Search 'Silk' with filters (brand=Takeo Weavers) ===");
     String searchRes =
         mockMvc
-            .perform(get("/api/products?q=Laptop&brand=Dell"))
+            .perform(get("/api/products?q=Silk&brand=Takeo Weavers"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(
@@ -117,9 +120,13 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Verify Dell Inspiron 15 (ID 1003) is in results
-    long targetProductId = 1003L;
-    String targetSlug = "dell-inspiron-15";
+    // The hero product (Takeo Hol Silk Sampot) is the target; buy its Ruby Red Standard variant
+    SeedCatalog.Product hero = SeedCatalog.product(SeedCatalog.HERO_ID);
+    long targetProductId = hero.id();
+    String targetSlug = hero.slug();
+    long subtotal = SeedCatalog.HERO_STANDARD_CENTS;
+    long discount = SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS + SeedCatalog.SAVE5_CENTS;
+    long total = SeedCatalog.DEMO_ORDER_TOTAL_CENTS;
 
     log.info("=== STEP 3: Product detail by slug ({}) ===", targetSlug);
     String detailRes =
@@ -128,17 +135,19 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.id").value(targetProductId))
-            .andExpect(jsonPath("$.data.name").value("Dell Inspiron 15 Laptop"))
-            .andExpect(jsonPath("$.data.priceCents").value(85000))
+            .andExpect(jsonPath("$.data.name").value(hero.name()))
+            .andExpect(jsonPath("$.data.priceCents").value(subtotal))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
     JsonNode detailJson = objectMapper.readTree(detailRes).path("data");
     assertThat(detailJson.path("variants").size()).isGreaterThanOrEqualTo(1);
+    assertThat(detailJson.path("variants").size()).isEqualTo(4);
     long variantId = detailJson.path("variants").get(0).path("id").asLong();
     long variantPrice = detailJson.path("variants").get(0).path("priceCents").asLong();
-    assertThat(variantPrice).isEqualTo(85000L);
+    assertThat(variantId).isEqualTo(SeedCatalog.HERO_RED_STANDARD);
+    assertThat(variantPrice).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
 
     log.info(
         "=== STEP 4: Add to Cart (productId: {}, variantId: {}) ===", targetProductId, variantId);
@@ -152,7 +161,7 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
                         new CartItemRequest(targetProductId, variantId, 1))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.subtotalCents").value(85000));
+        .andExpect(jsonPath("$.data.subtotalCents").value(subtotal));
 
     log.info("=== STEP 5: Apply Coupon SAVE5 ===");
     mockMvc
@@ -160,15 +169,17 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             post("/api/cart/coupon")
                 .header("Authorization", customerToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ApplyCouponRequest("SAVE5"))))
+                .content(
+                    objectMapper.writeValueAsString(
+                        new ApplyCouponRequest(SeedCatalog.COUPON_SAVE5))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.subtotalCents").value(85000))
-        .andExpect(jsonPath("$.data.coupon.code").value("SAVE5"))
-        .andExpect(jsonPath("$.data.coupon.value").value(500))
-        .andExpect(
-            jsonPath("$.data.discountCents").value(17500)) // 17000 (20% KNY Promo) + 500 (Coupon)
-        .andExpect(jsonPath("$.data.totalCents").value(67500)); // 85000 - 17500
+        .andExpect(jsonPath("$.data.subtotalCents").value(subtotal))
+        .andExpect(jsonPath("$.data.coupon.code").value(SeedCatalog.COUPON_SAVE5))
+        .andExpect(jsonPath("$.data.coupon.value").value(SeedCatalog.SAVE5_CENTS))
+        // flash sale (14900 -> 12900) + SAVE5 coupon
+        .andExpect(jsonPath("$.data.discountCents").value(discount))
+        .andExpect(jsonPath("$.data.totalCents").value(total));
 
     log.info("=== STEP 6: Checkout with KHQR ===");
     Address address =
@@ -203,13 +214,12 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.order.orderNumber").isNotEmpty())
-            .andExpect(jsonPath("$.data.order.subtotalCents").value(85000))
-            .andExpect(jsonPath("$.data.order.discountCents").value(17500))
+            .andExpect(jsonPath("$.data.order.subtotalCents").value(subtotal))
+            .andExpect(jsonPath("$.data.order.discountCents").value(discount))
             .andExpect(
                 jsonPath("$.data.order.shippingCents")
-                    .value(0)) // STANDARD shipping is free over $50 threshold (5000 cents)
-            .andExpect(
-                jsonPath("$.data.order.totalCents").value(67500)) // 85000 - 17500 + 0 = 67500
+                    .value(0)) // STANDARD shipping is free over the 5000-cent threshold
+            .andExpect(jsonPath("$.data.order.totalCents").value(total)) // subtotal - discount
             .andExpect(jsonPath("$.data.next").isNotEmpty())
             .andReturn()
             .getResponse()
@@ -239,6 +249,9 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     String paymentMd5 = objectMapper.readTree(khqrRes).path("data").path("md5").asText();
     long paymentId = objectMapper.readTree(khqrRes).path("data").path("paymentId").asLong();
     assertThat(paymentMd5).matches("^[a-fA-F0-9]{32}$");
+    // 12400 USD cents -> 508,400 riel at the seeded 4100 rate
+    assertThat(paymentRepository.findById(paymentId).orElseThrow().getAmountKhr())
+        .isEqualTo(SeedCatalog.DEMO_ORDER_TOTAL_KHR);
 
     log.info("=== STEP 7: Simulate Payment Settlement ===");
     mockMvc
@@ -253,7 +266,7 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     Order confirmedOrder = orderRepository.findById(orderId).orElseThrow();
     assertThat(confirmedOrder.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
     assertThat(confirmedOrder.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
-    assertThat(confirmedOrder.getTotalCents()).isEqualTo(67500L);
+    assertThat(confirmedOrder.getTotalCents()).isEqualTo(total);
 
     List<InventoryMovement> movements = movementRepository.findAll();
     assertThat(movements)
@@ -303,7 +316,7 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
         new CreateReviewRequest(
             5,
             "Great product",
-            "Excellent Dell laptop! Performs remarkably well for daily multitasking.");
+            "Beautiful hand-woven silk sampot, the Ruby Red colour is rich and the weave is even.");
     String reviewRes =
         mockMvc
             .perform(
@@ -335,6 +348,10 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
     Review approvedReview = reviewRepository.findById(reviewId).orElseThrow();
     assertThat(approvedReview.getStatus()).isEqualTo(ReviewStatus.APPROVED);
     assertThat(approvedReview.getAdminReply()).isEqualTo("Thank you for your feedback!");
+
+    // The hero product is shared with other test classes: put its seeded rating back
+    reviewRepository.deleteById(reviewId);
+    reviewService.recomputeProductRating(targetProductId);
 
     log.info("=== 12-STEP PURCHASE FLOW COMPLETE: ALL STEPS VERIFIED SUCCESSFULLY ===");
   }

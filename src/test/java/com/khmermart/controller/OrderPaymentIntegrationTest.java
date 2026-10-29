@@ -36,6 +36,7 @@ import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.repository.RefundRepository;
 import com.khmermart.security.JwtService;
+import com.khmermart.seed.SeedCatalog;
 import com.khmermart.service.impl.PaymentExpiryJob;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -611,6 +612,11 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
   @Test
   @DisplayName("Invoice PDF: GET /api/orders/{orderNumber}/invoice.pdf returns valid PDF bytes")
   void testInvoicePdfDownload() throws Exception {
+    // Hero Standard on flash sale, free standard shipping (subtotal after discount >= 5000)
+    SeedCatalog.Product hero = SeedCatalog.product(SeedCatalog.HERO_ID);
+    long subtotal = SeedCatalog.HERO_STANDARD_CENTS;
+    long discount = SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS;
+    long total = subtotal - discount;
     Order order =
         orderRepository.save(
             Order.builder()
@@ -619,10 +625,10 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .status(OrderStatus.CONFIRMED)
                 .paymentStatus(PaymentStatus.PAID)
                 .paymentMethod(PaymentMethod.KHQR)
-                .subtotalCents(99900L)
-                .discountCents(10000L)
-                .shippingCents(150L)
-                .totalCents(90050L)
+                .subtotalCents(subtotal)
+                .discountCents(discount)
+                .shippingCents(0L)
+                .totalCents(total)
                 .shippingAddress(
                     "{\"recipientName\":\"Sopheak Chheang\",\"phone\":\"+85512345678\",\"line1\":\"St 271\",\"district\":\"Chamkarmon\",\"province\":\"Phnom Penh\"}")
                 .shippingMethodCode("STANDARD")
@@ -632,12 +638,12 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
     orderItemRepository.save(
         OrderItem.builder()
             .orderId(order.getId())
-            .productId(1001L)
-            .productNameSnapshot("Laptop Pro 15")
-            .skuSnapshot("LP15-SLV-16")
-            .unitPriceCents(99900L)
+            .productId(hero.id())
+            .productNameSnapshot(hero.name())
+            .skuSnapshot(SeedCatalog.variant(SeedCatalog.HERO_RED_STANDARD).sku())
+            .unitPriceCents(subtotal)
             .quantity(1)
-            .lineTotalCents(99900L)
+            .lineTotalCents(subtotal)
             .build());
 
     paymentRepository.save(
@@ -645,7 +651,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
             .orderId(order.getId())
             .method(PaymentMethod.KHQR)
             .status(PaymentStatus.PAID)
-            .amountCents(90050L)
+            .amountCents(total)
             .bakongHash("MOCK-INVOICE-HASH-123")
             .paidAt(Instant.now())
             .createdAt(Instant.now())

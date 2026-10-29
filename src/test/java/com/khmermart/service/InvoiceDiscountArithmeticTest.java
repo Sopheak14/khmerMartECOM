@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.khmermart.seed.SeedCatalog;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -17,22 +18,32 @@ public class InvoiceDiscountArithmeticTest {
   @DisplayName(
       "Discount Breakdown Arithmetic: Subtotal - promotion lines - coupon + shipping == Total")
   void testDiscountBreakdownArithmetic() throws Exception {
-    long subtotalCents = 99900L; // $999.00
-    long shippingCents = 1500L; // $15.00
+    // Cart: hero Standard (flash sale) + Kampot Red Pepper (Pchum Ben 10% seasonal), SAVE5, Express
+    long redPepper = SeedCatalog.product(1007L).priceCents();
+    long subtotalCents = SeedCatalog.HERO_STANDARD_CENTS + redPepper;
+    long flashCents = SeedCatalog.HERO_STANDARD_CENTS - SeedCatalog.HERO_FLASH_CENTS;
+    long seasonalCents = redPepper * SeedCatalog.SEASONAL_PERCENT / 100;
+    long shippingCents = 300L; // EXPRESS
 
     String discountBreakdownJson =
         """
         {
           "promotions": [
-            {"label": "Flash Sale Discount", "amountCents": 10000},
-            {"label": "Seasonal Promotion (20%)", "amountCents": 500}
+            {"label": "Flash Sale Discount", "amountCents": %d},
+            {"label": "Seasonal Promotion (%d%%)", "amountCents": %d}
           ],
           "coupon": {
-            "code": "SAVE5",
-            "amountCents": 500
+            "code": "%s",
+            "amountCents": %d
           }
         }
-        """;
+        """
+            .formatted(
+                flashCents,
+                SeedCatalog.SEASONAL_PERCENT,
+                seasonalCents,
+                SeedCatalog.COUPON_SAVE5,
+                SeedCatalog.SAVE5_CENTS);
 
     Map<String, Object> breakdown =
         objectMapper.readValue(discountBreakdownJson, new TypeReference<>() {});
@@ -44,17 +55,17 @@ public class InvoiceDiscountArithmeticTest {
       Number amt = (Number) pMap.get("amountCents");
       promoLinesSum += amt.longValue();
     }
-    assertThat(promoLinesSum).isEqualTo(10500L);
+    assertThat(promoLinesSum).isEqualTo(flashCents + seasonalCents);
 
     Map<?, ?> cMap = (Map<?, ?>) breakdown.get("coupon");
     long couponAmount = ((Number) cMap.get("amountCents")).longValue();
-    assertThat(couponAmount).isEqualTo(500L);
+    assertThat(couponAmount).isEqualTo(SeedCatalog.SAVE5_CENTS);
 
     long totalDiscount = promoLinesSum + couponAmount;
-    assertThat(totalDiscount).isEqualTo(11000L); // $110.00
+    assertThat(totalDiscount).isEqualTo(flashCents + seasonalCents + SeedCatalog.SAVE5_CENTS);
 
     long totalCents = subtotalCents - totalDiscount + shippingCents;
-    assertThat(totalCents).isEqualTo(90400L); // $904.00
+    assertThat(totalCents).isEqualTo(13825L); // 14900 + 1250 - (2000 + 125 + 500) + 300
 
     // Strict formula: Subtotal − lines + shipping must equal Total
     assertThat(subtotalCents - (promoLinesSum + couponAmount) + shippingCents)

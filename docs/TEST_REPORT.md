@@ -2,13 +2,13 @@
 
 ## 1. Executive Summary
 
-- **Total Test Classes**: 17
-- **Total Tests Executed**: 88
-- **Passed**: 88 (100%)
+- **Total Test Classes**: 20
+- **Total Tests Executed**: 109 (Khmer-only catalog; expected numbers derive from `SeedCatalog`)
+- **Passed**: 109 (100%)
 - **Failures**: 0
 - **Errors**: 0
 - **Skipped**: 0
-- **Line Coverage (JaCoCo)**: **86.07%** (5,952 / 6,915 lines)
+- **Line Coverage (JaCoCo, last measured before the catalog change)**: **86.07%** (5,952 / 6,915 lines)
 - **Instruction Coverage (JaCoCo)**: **85.14%** (27,713 / 32,551 instructions)
 - **Build Status**: `BUILD SUCCESS` (Verified with OpenJDK 21 via `./mvnw clean verify`)
 
@@ -44,7 +44,7 @@
 ### 3.1. `PurchaseFlowE2ETest` (12-Step Full E2E Scenario)
 Executes the full e-commerce lifecycle in a single end-to-end integration test:
 1. **Login**: Authenticates Customer 1 (`sokha@example.com`) and extracts JWT bearer token.
-2. **Search**: Searches catalog for `"Laptop"` with brand filter (`Dell`).
+2. **Search**: Searches catalog for `"Silk"` with brand filter (`Takeo Weavers`).
 3. **Product Detail**: Retrieves product details and verifies variant options.
 4. **Cart**: Adds variant to cart and checks session state.
 5. **Apply Coupon**: Applies coupon `SAVE5` and validates subtotal, promotion, and coupon discount calculation.

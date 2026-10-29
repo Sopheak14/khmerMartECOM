@@ -13,6 +13,8 @@ import com.khmermart.repository.AppUserRepository;
 import com.khmermart.service.PricingItem;
 import com.khmermart.service.PricingResult;
 import com.khmermart.service.PricingService;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -383,223 +385,11 @@ public class DataSeeder implements CommandLineRunner {
   }
 
   private void seedCategories() {
-    // Exactly 8 ROOT Categories (parent_id = null)
-    insertCategory(
-        1L,
-        "Electronics",
-        "គ្រឿងអេឡិចត្រូនិច",
-        "electronics",
-        null,
-        "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=500",
-        1);
-    insertCategory(
-        2L,
-        "Phones",
-        "ទូរសព្ទ",
-        "phones",
-        null,
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500",
-        2);
-    insertCategory(
-        3L,
-        "Laptops",
-        "កុំព្យូទ័រយួរដៃ",
-        "laptops",
-        null,
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500",
-        3);
-    insertCategory(
-        4L,
-        "Fashion",
-        "សម្លៀកបំពាក់",
-        "fashion",
-        null,
-        "https://images.unsplash.com/photo-1445205170230-053b83016050?w=500",
-        4);
-    insertCategory(
-        5L,
-        "Home & Living",
-        "គេហដ្ឋាន",
-        "home-living",
-        null,
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500",
-        5);
-    insertCategory(
-        6L,
-        "Beauty",
-        "សម្ផស្ស",
-        "beauty",
-        null,
-        "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500",
-        6);
-    insertCategory(
-        7L,
-        "Groceries",
-        "គ្រឿងទេស",
-        "groceries",
-        null,
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?w=500",
-        7);
-    insertCategory(
-        8L,
-        "Books",
-        "សៀវភៅ",
-        "books",
-        null,
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=500",
-        8);
-
-    // Subcategories under Electronics (1)
-    insertCategory(
-        9L,
-        "Audio & Accessories",
-        "ឧបករណ៍បំពងសំឡេង និង កាស",
-        "audio-accessories",
-        1L,
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
-        1);
-    insertCategory(
-        10L,
-        "Cameras & Drones",
-        "ម៉ាស៊ីនថត និង ដ្រូន",
-        "cameras-drones",
-        1L,
-        "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500",
-        2);
-
-    // Subcategories under Phones (2)
-    insertCategory(
-        11L,
-        "Smartphones",
-        "ស្មាតហ្វូន",
-        "smartphones",
-        2L,
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500",
-        1);
-    insertCategory(
-        12L,
-        "Phone Accessories",
-        "គ្រឿងបន្លាស់ទូរសព្ទ",
-        "phone-accessories",
-        2L,
-        "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=500",
-        2);
-
-    // Subcategories under Laptops (3)
-    insertCategory(
-        13L,
-        "Business Laptops",
-        "កុំព្យូទ័រយួរដៃការងារ",
-        "business-laptops",
-        3L,
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=500",
-        1);
-    insertCategory(
-        14L,
-        "Gaming Laptops",
-        "កុំព្យូទ័រយួរដៃហ្គេម",
-        "gaming-laptops",
-        3L,
-        "https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=500",
-        2);
-    insertCategory(
-        15L,
-        "Ultrabooks",
-        "អ៊ុលត្រាប៊ុក",
-        "ultrabooks",
-        3L,
-        "https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=500",
-        3);
-
-    // Subcategories under Fashion (4)
-    insertCategory(
-        16L,
-        "Men's Clothing",
-        "សម្លៀកបំពាក់បុរស",
-        "mens-clothing",
-        4L,
-        "https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=500",
-        1);
-    insertCategory(
-        17L,
-        "Women's Clothing",
-        "សម្លៀកបំពាក់នារី",
-        "womens-clothing",
-        4L,
-        "https://images.unsplash.com/photo-1534126511673-b6899657816a?w=500",
-        2);
-
-    // Subcategories under Home & Living (5)
-    insertCategory(
-        18L,
-        "Kitchen & Dining",
-        "ផ្ទះបាយ និង បន្ទប់ទទួលទានអាហារ",
-        "kitchen-dining",
-        5L,
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500",
-        1);
-    insertCategory(
-        19L,
-        "Bedding & Decor",
-        "ការតុបតែងផ្ទះ និង ពូក",
-        "bedding-decor",
-        5L,
-        "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=500",
-        2);
-
-    // Subcategories under Beauty (6)
-    insertCategory(
-        20L,
-        "Skincare",
-        "ការថែរក្សាស្បែក",
-        "skincare",
-        6L,
-        "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500",
-        1);
-    insertCategory(
-        21L,
-        "Fragrances & Body",
-        "ទឹកអប់ និង ថែរក្សាខ្លួន",
-        "fragrances",
-        6L,
-        "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500",
-        2);
-
-    // Subcategories under Groceries (7)
-    insertCategory(
-        22L,
-        "Rice & Grains",
-        "អង្ករ និង គ្រាប់ធញ្ញជាតិ",
-        "rice-grains",
-        7L,
-        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500",
-        1);
-    insertCategory(
-        23L,
-        "Snacks & Beverages",
-        "អាហារសម្រន់ និង ភេសជ្ជៈ",
-        "snacks-beverages",
-        7L,
-        "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=500",
-        2);
-
-    // Subcategories under Books (8)
-    insertCategory(
-        24L,
-        "Khmer Literature",
-        "អក្សរសិល្ប៍ និង ប្រវត្តិសាស្ត្រខ្មែរ",
-        "khmer-literature",
-        8L,
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=500",
-        1);
-    insertCategory(
-        25L,
-        "Business & Self-Help",
-        "អភិវឌ្ឍខ្លួន និង អាជីវកម្ម",
-        "business-books",
-        8L,
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
-        2);
+    // Exactly 8 ROOT categories (parent_id = null)
+    int sortOrder = 1;
+    for (SeedCatalog.Category c : SeedCatalog.CATEGORIES) {
+      insertCategory(c.id(), c.name(), c.nameKm(), c.slug(), null, c.imageUrl(), sortOrder++);
+    }
   }
 
   private void insertCategory(
@@ -634,49 +424,66 @@ public class DataSeeder implements CommandLineRunner {
   private void seedPromotionsAndCoupons() {
     Instant now = Instant.now();
 
-    // 1. FLASH_SALE: 4 products (1001, 1010, 1015, 1031), live from seed time for 7 days so a demo
-    // right after a reset always shows a running countdown
+    // 1. FLASH_SALE: hero 1001 Standard variants (per-variant), Kampot Black Pepper and Dried Mango
+    // (product-wide). Live from seed time for 7 days so a demo right after a reset always shows a
+    // running countdown
     jdbcTemplate.update(
         """
         INSERT INTO promotions (id, name, name_km, type, discount_percent, threshold_cents, starts_at, ends_at, banner_image, link, is_active)
-        VALUES (1, 'Flash Sale 24H', 'ការលក់បញ្ចុះតម្លៃពិសេស 24 ម៉ោង', 'FLASH_SALE', 15, 0, ?, ?, NULL, '/promotions/flash-sale', true)
+        VALUES (1, ?, 'ការលក់បញ្ចុះតម្លៃពិសេស 24 ម៉ោង', 'FLASH_SALE', 15, 0, ?, ?, NULL, '/promotions/flash-sale', true)
         ON CONFLICT (id) DO NOTHING
         """,
+        SeedCatalog.FLASH_NAME,
         Timestamp.from(now),
         Timestamp.from(now.plus(7, ChronoUnit.DAYS)));
 
-    // 4 products in flash sale (Laptop Pro 15 variants 1 & 2 on sale; variants 3 & 4 not on sale)
-    insertPromotionProduct(1L, 1001L, 1L, 89900L); // Laptop Pro 15 (variant 1)
-    insertPromotionProduct(1L, 1001L, 2L, 89900L); // Laptop Pro 15 (variant 2)
-    insertPromotionProduct(1L, 1010L, 10L, 91900L); // iPhone 15 Pro (variant 10)
-    insertPromotionProduct(1L, 1015L, null, 29900L); // Sony WH-1000XM5 (no variants)
-    insertPromotionProduct(1L, 1031L, 14L, 990L); // Angkor Jasmine Rice 5kg (variant 14)
+    // Only the two Standard variants of 1001 are on sale; the Premium variants are not
+    insertPromotionProduct(
+        1L, SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_STANDARD, SeedCatalog.HERO_FLASH_CENTS);
+    insertPromotionProduct(
+        1L, SeedCatalog.HERO_ID, SeedCatalog.HERO_BLUE_STANDARD, SeedCatalog.HERO_FLASH_CENTS);
+    insertPromotionProduct(1L, SeedCatalog.PEPPER_ID, null, SeedCatalog.PEPPER_FLASH_CENTS);
+    insertPromotionProduct(1L, SeedCatalog.MANGO_ID, null, SeedCatalog.MANGO_FLASH_CENTS);
 
-    // 2. SEASONAL: Khmer New Year Mega Sale
+    // 2. SEASONAL: Pchum Ben Festival Sale, 10% off Spices & Sauces (products 1006..1012)
     jdbcTemplate.update(
         """
         INSERT INTO promotions (id, name, name_km, type, discount_percent, threshold_cents, starts_at, ends_at, banner_image, link, is_active)
-        VALUES (2, 'Khmer New Year Mega Sale', 'ការបញ្ចុះតម្លៃពិធីបុណ្យចូលឆ្នាំថ្មីប្រពៃណីជាតិ', 'SEASONAL', 20, 5000, ?, ?, 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200', '/promotions/kny-sale', true)
+        VALUES (2, ?, ?, 'SEASONAL', ?, 0, ?, ?, ?, '/promotions/pchum-ben-sale', true)
         ON CONFLICT (id) DO NOTHING
         """,
+        SeedCatalog.SEASONAL_NAME,
+        SeedCatalog.SEASONAL_NAME_KM,
+        SeedCatalog.SEASONAL_PERCENT,
         Timestamp.from(now.minus(5, ChronoUnit.DAYS)),
-        Timestamp.from(now.plus(25, ChronoUnit.DAYS)));
-    insertPromotionProduct(2L, 1002L, 60000L);
-    insertPromotionProduct(2L, 1003L, 68000L);
+        Timestamp.from(now.plus(25, ChronoUnit.DAYS)),
+        SeedCatalog.SEASONAL_BANNER);
+    for (long pid = SeedCatalog.FIRST_SPICE_ID; pid <= SeedCatalog.LAST_SPICE_ID; pid++) {
+      insertPromotionProduct(2L, pid, null);
+    }
 
-    // 3. BOGO: Buy 1 Get 1 Free on product 1022 (Women's Floral Chiffon Blouse)
+    // 3. BOGO: Buy 1 Get 1 Lemongrass Soap (no variants), same 7-day window as the flash sale
     jdbcTemplate.update(
         """
         INSERT INTO promotions (id, name, name_km, type, discount_percent, threshold_cents, starts_at, ends_at, banner_image, link, is_active)
-        VALUES (3, 'Fashion Buy 1 Get 1 Free', 'ទិញ ១ ថែម ១ សម្រាប់ម៉ូដសម្លៀកបំពាក់', 'BOGO', 50, 0, ?, ?, NULL, '/promotions/bogo', true)
+        VALUES (3, ?, ?, 'BOGO', 50, 0, ?, ?, NULL, '/promotions/bogo', true)
         ON CONFLICT (id) DO NOTHING
         """,
-        Timestamp.from(now.minus(2, ChronoUnit.DAYS)),
-        Timestamp.from(now.plus(12, ChronoUnit.DAYS)));
-    insertPromotionProduct(3L, 1022L, 2400L);
+        SeedCatalog.BOGO_NAME,
+        SeedCatalog.BOGO_NAME_KM,
+        Timestamp.from(now),
+        Timestamp.from(now.plus(7, ChronoUnit.DAYS)));
+    insertPromotionProduct(3L, SeedCatalog.BOGO_PRODUCT_ID, null);
 
     // Coupons
-    insertCoupon(1L, "SAVE5", "FIXED", 500L, "$5 off on orders over $35", 3500L, null);
+    insertCoupon(
+        1L,
+        SeedCatalog.COUPON_SAVE5,
+        "FIXED",
+        SeedCatalog.SAVE5_CENTS,
+        "$5 off on orders over $35",
+        SeedCatalog.SAVE5_MIN_ORDER_CENTS,
+        null);
     insertCoupon(2L, "WELCOME10", "PERCENT", 10L, "10% off welcome coupon", null, 2000L);
     insertCoupon(3L, "FREESHIP", "FREE_SHIPPING", 0L, "Free standard shipping", 2000L, null);
     insertCoupon(
@@ -761,986 +568,36 @@ public class DataSeeder implements CommandLineRunner {
 
   private void seedProducts() {
     Instant now = Instant.now();
+    for (SeedCatalog.Product p : SeedCatalog.PRODUCTS) {
+      insertProduct(
+          p.id(),
+          p.sku(),
+          p.name(),
+          p.nameKm(),
+          p.slug(),
+          p.description(),
+          p.brand(),
+          p.priceCents(),
+          null,
+          p.categoryId(),
+          0.0,
+          0,
+          p.soldCount(),
+          now.minus(p.ageDays(), ChronoUnit.DAYS));
+      // No verified product photos yet: a clean placeholder until real ones are uploaded in Admin
+      insertProductImages(p.id(), productPlaceholder(p.name()));
+      if (!p.hasVariants()) {
+        insertProductStockNoVariant(p.id(), p.stock());
+      }
+    }
+    for (SeedCatalog.Variant v : SeedCatalog.VARIANTS) {
+      insertVariant(v.id(), v.productId(), v.sku(), v.attributesJson(), v.priceCents(), v.stock());
+    }
+  }
 
-    // ==========================================
-    // Category 3: Laptops -> Subcategories 13, 14, 15
-    // ==========================================
-    // 1001: Laptop Pro 15 (Business Laptops 13) - 50 total units across 4 variants (15+15+10+10)
-    insertProduct(
-        1001L,
-        "PROD-1001",
-        "Laptop Pro 15",
-        "កុំព្យូទ័រយួរដៃ Laptop Pro 15",
-        "laptop-pro-15",
-        "Laptop Pro 15 delivers extreme performance with cutting-edge 15.6 inch retina display, all-day battery life, and powerful multi-core processing for engineers and creators.",
-        "KhmerTech",
-        99900L,
-        119900L,
-        13L,
-        4.7,
-        3,
-        70,
-        now.minus(20, ChronoUnit.DAYS));
-    insertProductImages(
-        1001L,
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-        "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800");
-    insertVariant(
-        1L,
-        1001L,
-        "LP15-GRY-16-512",
-        "{\"ram\": \"16GB\", \"color\": \"Space Gray\", \"storage\": \"512GB\"}",
-        99900L,
-        15);
-    insertVariant(
-        2L,
-        1001L,
-        "LP15-SLV-16-512",
-        "{\"ram\": \"16GB\", \"color\": \"Silver\", \"storage\": \"512GB\"}",
-        99900L,
-        15);
-    insertVariant(
-        3L,
-        1001L,
-        "LP15-GRY-32-1TB",
-        "{\"ram\": \"32GB\", \"color\": \"Space Gray\", \"storage\": \"1TB\"}",
-        129900L,
-        10);
-    insertVariant(
-        4L,
-        1001L,
-        "LP15-SLV-32-1TB",
-        "{\"ram\": \"32GB\", \"color\": \"Silver\", \"storage\": \"1TB\"}",
-        129900L,
-        10);
-
-    // 1002: Dell Latitude 5520 (Dell, 16GB RAM, $750 in $500-$1000 range, NEW)
-    insertProduct(
-        1002L,
-        "DELL-LAT-5520",
-        "Dell Latitude 5520 Laptop",
-        "កុំព្យូទ័រយួរដៃ Dell Latitude 5520",
-        "dell-latitude-5520",
-        "Business-class laptop with 11th Gen Intel Core i7, reliable security features, and express charge support.",
-        "Dell",
-        75000L,
-        89900L,
-        13L,
-        0.0,
-        0,
-        45,
-        now.minus(5, ChronoUnit.DAYS));
-    insertProductImages(
-        1002L,
-        "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=800",
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800");
-    insertVariant(
-        5L,
-        1002L,
-        "DELL-LAT-16-512",
-        "{\"ram\": \"16GB\", \"color\": \"Silver\", \"storage\": \"512GB\"}",
-        75000L,
-        25);
-
-    // 1003: Dell Inspiron 15 (Dell, 16GB RAM, $850 in $500-$1000 range, NEW)
-    insertProduct(
-        1003L,
-        "DELL-INSP-15",
-        "Dell Inspiron 15 Laptop",
-        "កុំព្យូទ័រយួរដៃ Dell Inspiron 15",
-        "dell-inspiron-15",
-        "Stylish laptop built for everyday multitasking with FHD anti-glare narrow border display and fast SSD storage.",
-        "Dell",
-        85000L,
-        95000L,
-        13L,
-        5.0,
-        1,
-        55,
-        now.minus(8, ChronoUnit.DAYS));
-    insertProductImages(
-        1003L,
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800",
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800");
-    insertVariant(
-        6L,
-        1003L,
-        "DELL-INSP-16-512",
-        "{\"ram\": \"16GB\", \"color\": \"Black\", \"storage\": \"512GB\"}",
-        85000L,
-        20);
-
-    // 1004: Dell XPS 15 OLED (Dell, 16GB RAM, $1599 - above $1000 non-matching, NEW)
-    insertProduct(
-        1004L,
-        "DELL-XPS-15",
-        "Dell XPS 15 OLED Laptop",
-        "កុំព្យូទ័រយួរដៃ Dell XPS 15 OLED",
-        "dell-xps-15",
-        "High-performance creator laptop with stunning 3.5K OLED touch display and NVIDIA GeForce RTX graphics.",
-        "Dell",
-        159900L,
-        179900L,
-        13L,
-        4.0,
-        1,
-        65,
-        now.minus(10, ChronoUnit.DAYS));
-    insertProductImages(
-        1004L,
-        "https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=800",
-        "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800");
-    insertVariant(
-        7L,
-        1004L,
-        "DELL-XPS-16-1TB",
-        "{\"ram\": \"16GB\", \"color\": \"Platinum Silver\", \"storage\": \"1TB\"}",
-        159900L,
-        15);
-
-    // 1005: Dell Vostro 14 (Dell, 8GB RAM non-matching, $599, stock 3 <= 5 -> LOW_STOCK)
-    insertProduct(
-        1005L,
-        "DELL-VOSTRO-14",
-        "Dell Vostro 14 Essential Laptop",
-        "កុំព្យូទ័រយួរដៃ Dell Vostro 14",
-        "dell-vostro-14",
-        "Compact 14-inch essential workstation built for small business productivity and easy commute.",
-        "Dell",
-        59900L,
-        69900L,
-        13L,
-        5.0,
-        1,
-        15,
-        now.minus(25, ChronoUnit.DAYS));
-    insertProductImages(
-        1005L,
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800",
-        "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=800");
-    insertVariant(
-        8L,
-        1005L,
-        "DELL-VOST-8-256",
-        "{\"ram\": \"8GB\", \"color\": \"Carbon Gray\", \"storage\": \"256GB\"}",
-        59900L,
-        3);
-
-    // 1006: Asus ROG Strix G16 (Gaming Laptops 14)
-    insertProduct(
-        1006L,
-        "ASUS-ROG-STRIX",
-        "Asus ROG Strix G16 Gaming Laptop",
-        "កុំព្យូទ័រយួរដៃហ្គេម Asus ROG Strix G16",
-        "asus-rog-strix-g16",
-        "Next-gen gaming rig equipped with high refresh rate Nebula display, liquid metal cooling, and RTX graphics.",
-        "Asus",
-        139900L,
-        159900L,
-        14L,
-        0.0,
-        0,
-        28,
-        now.minus(18, ChronoUnit.DAYS));
-    insertProductImages(
-        1006L,
-        "https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800",
-        "https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800");
-    insertProductStockNoVariant(1006L, 12);
-
-    // 1007: MSI Katana 15 (Gaming Laptops 14, stock 0)
-    insertProduct(
-        1007L,
-        "MSI-KATANA-15",
-        "MSI Katana 15 Gaming Laptop",
-        "កុំព្យូទ័រយួរដៃហ្គេម MSI Katana 15",
-        "msi-katana-15",
-        "Sharpen your game with Intel Core i7 and dedicated discrete graphics in a sleek warrior-inspired chassis.",
-        "MSI",
-        109900L,
-        129900L,
-        14L,
-        5.0,
-        1,
-        30,
-        now.minus(35, ChronoUnit.DAYS));
-    insertProductImages(
-        1007L,
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800",
-        "https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800");
-    insertProductStockNoVariant(1007L, 0); // Out of stock
-
-    // 1008: Asus ZenBook 14 (Ultrabooks 15, NEW)
-    insertProduct(
-        1008L,
-        "ASUS-ZENBOOK-14",
-        "Asus ZenBook 14 Laptop",
-        "កុំព្យូទ័រយួរដៃ Asus ZenBook 14",
-        "asus-zenbook-14",
-        "Ultraportable laptop with military-grade durability, OLED nano-edge screen, and lightweight aluminum chassis.",
-        "Asus",
-        89900L,
-        99900L,
-        15L,
-        4.0,
-        1,
-        38,
-        now.minus(4, ChronoUnit.DAYS));
-    insertProductImages(
-        1008L,
-        "https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800",
-        "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800");
-    insertVariant(
-        9L,
-        1008L,
-        "ZEN14-16-512",
-        "{\"ram\": \"16GB\", \"color\": \"Pine Gray\", \"storage\": \"512GB\"}",
-        89900L,
-        18);
-
-    // 1009: Apple MacBook Air M3 (Ultrabooks 15)
-    insertProduct(
-        1009L,
-        "MACBOOK-AIR-M3",
-        "Apple MacBook Air 13 M3",
-        "កុំព្យូទ័រយួរដៃ Apple MacBook Air 13 M3",
-        "macbook-air-m3",
-        "Supercharged by the M3 chip with incredible efficiency, up to 18 hours of battery life, and fanless silent design.",
-        "Apple",
-        109900L,
-        119900L,
-        15L,
-        0.0,
-        0,
-        80,
-        now.minus(22, ChronoUnit.DAYS));
-    insertProductImages(
-        1009L,
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-        "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800");
-    insertProductStockNoVariant(1009L, 22);
-
-    // ==========================================
-    // Category 2: Phones -> Subcategories 11, 12
-    // ==========================================
-    // 1010: iPhone 15 Pro (Smartphones 11, POPULAR, Flash Sale #2)
-    insertProduct(
-        1010L,
-        "APPLE-IPHONE-15PRO",
-        "iPhone 15 Pro Titanium",
-        "ទូរស័ព្ទ iPhone 15 Pro",
-        "iphone-15-pro",
-        "Forged in titanium with aerospace-grade strength, A17 Pro chip, customizable action button, and 48MP pro camera.",
-        "Apple",
-        99900L,
-        109900L,
-        11L,
-        5.0,
-        1,
-        120,
-        now.minus(40, ChronoUnit.DAYS));
-    insertProductImages(
-        1010L,
-        "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=800",
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800");
-    insertVariant(
-        10L,
-        1010L,
-        "IP15P-NAT-128",
-        "{\"color\": \"Natural Titanium\", \"storage\": \"128GB\"}",
-        99900L,
-        20);
-    insertVariant(
-        11L,
-        1010L,
-        "IP15P-BLK-256",
-        "{\"color\": \"Black Titanium\", \"storage\": \"256GB\"}",
-        109900L,
-        15);
-
-    // 1011: Samsung Galaxy S24 Ultra (Smartphones 11, POPULAR)
-    insertProduct(
-        1011L,
-        "SAMSUNG-S24-ULTRA",
-        "Samsung Galaxy S24 Ultra",
-        "ទូរស័ព្ទ Samsung Galaxy S24 Ultra",
-        "samsung-s24-ultra",
-        "Galaxy AI is here with circle to search, live translation, embedded S Pen, and 200MP camera system.",
-        "Samsung",
-        119900L,
-        129900L,
-        11L,
-        0.0,
-        0,
-        110,
-        now.minus(30, ChronoUnit.DAYS));
-    insertProductImages(
-        1011L,
-        "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=800",
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800");
-    insertVariant(
-        12L,
-        1011L,
-        "S24U-GRY-256",
-        "{\"color\": \"Titanium Gray\", \"storage\": \"256GB\"}",
-        119900L,
-        25);
-
-    // 1012: Xiaomi 14 Pro (Smartphones 11)
-    insertProduct(
-        1012L,
-        "XIAOMI-14-PRO",
-        "Xiaomi 14 Pro Leica",
-        "ទូរស័ព្ទ Xiaomi 14 Pro",
-        "xiaomi-14-pro",
-        "Co-engineered with Leica optical lens, Snapdragon 8 Gen 3, and ultra-fast 120W HyperCharge.",
-        "Xiaomi",
-        79900L,
-        89900L,
-        11L,
-        5.0,
-        1,
-        60,
-        now.minus(45, ChronoUnit.DAYS));
-    insertProductImages(
-        1012L,
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800",
-        "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=800");
-    insertProductStockNoVariant(1012L, 15);
-
-    // 1013: Anker PowerCore 20000 (Phone Accessories 12, POPULAR)
-    insertProduct(
-        1013L,
-        "ANKER-POWERBANK-20K",
-        "Anker PowerCore 20000mAh Power Bank",
-        "ថ្មជំនួយសាកទូរស័ព្ទ Anker 20000mAh",
-        "anker-powercore-20000",
-        "Ultra-high capacity power bank with PowerIQ technology for rapid device charging on the go.",
-        "Anker",
-        4500L,
-        5500L,
-        12L,
-        4.0,
-        1,
-        95,
-        now.minus(25, ChronoUnit.DAYS));
-    insertProductImages(
-        1013L,
-        "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=800",
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800");
-    insertProductStockNoVariant(1013L, 40);
-
-    // 1014: Apple MagSafe Wireless Charger (Phone Accessories 12, stock 4 <= 5 -> LOW_STOCK)
-    insertProduct(
-        1014L,
-        "APPLE-MAGSAFE-CHARGER",
-        "Apple MagSafe Wireless Charger",
-        "ឆ្នាំងសាកឥតខ្សែ Apple MagSafe",
-        "apple-magsafe-charger",
-        "Perfectly aligned magnets attach seamlessly to your iPhone for faster wireless charging up to 15W.",
-        "Apple",
-        3900L,
-        4500L,
-        12L,
-        5.0,
-        1,
-        50,
-        now.minus(35, ChronoUnit.DAYS));
-    insertProductImages(
-        1014L,
-        "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=800",
-        "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=800");
-    insertProductStockNoVariant(1014L, 4);
-
-    // ==========================================
-    // Category 1: Electronics -> Subcategories 9, 10
-    // ==========================================
-    // 1015: Sony WH-1000XM5 (Audio 9, NEW, Flash Sale #3)
-    insertProduct(
-        1015L,
-        "SONY-WH1000XM5",
-        "Sony WH-1000XM5 Wireless Headphones",
-        "កាសបំពងសំឡេង Sony WH-1000XM5",
-        "sony-wh1000xm5",
-        "Industry-leading noise canceling with two processors and eight microphones for unprecedented sound purity.",
-        "Sony",
-        34900L,
-        39900L,
-        9L,
-        0.0,
-        0,
-        85,
-        now.minus(12, ChronoUnit.DAYS));
-    insertProductImages(
-        1015L,
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
-        "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800");
-    insertProductStockNoVariant(1015L, 20);
-
-    // 1016: JBL Flip 6 (Audio 9)
-    insertProduct(
-        1016L,
-        "JBL-FLIP-6",
-        "JBL Flip 6 Portable Bluetooth Speaker",
-        "ធុងបាសប៊្លូធូស JBL Flip 6",
-        "jbl-flip-6-speaker",
-        "Bold JBL Original Pro Sound with exceptional clarity, 2-way speaker system, and IP67 waterproof rating.",
-        "JBL",
-        11900L,
-        13900L,
-        9L,
-        5.0,
-        1,
-        75,
-        now.minus(28, ChronoUnit.DAYS));
-    insertProductImages(
-        1016L,
-        "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800",
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800");
-    insertProductStockNoVariant(1016L, 30);
-
-    // 1017: Sony Alpha 7 IV (Cameras 10)
-    insertProduct(
-        1017L,
-        "SONY-ALPHA-A7IV",
-        "Sony Alpha 7 IV Full-frame Camera",
-        "ម៉ាស៊ីនថត Sony Alpha 7 IV",
-        "sony-alpha-a7-iv",
-        "33MP full-frame Exmor R sensor with advanced BIONZ XR processing engine and 4K 60p movie recording.",
-        "Sony",
-        249900L,
-        269900L,
-        10L,
-        0.0,
-        0,
-        18,
-        now.minus(50, ChronoUnit.DAYS));
-    insertProductImages(
-        1017L,
-        "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800",
-        "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=800");
-    insertProductStockNoVariant(1017L, 8);
-
-    // 1018: DJI Mini 4 Pro (Cameras 10, NEW)
-    insertProduct(
-        1018L,
-        "DJI-MINI-4-PRO",
-        "DJI Mini 4 Pro Drone Fly More Combo",
-        "ដ្រូន DJI Mini 4 Pro Combo",
-        "dji-mini-4-pro",
-        "Under 249g lightweight camera drone with omnidirectional obstacle sensing, 4K/60fps HDR video, and 20km transmission.",
-        "DJI",
-        95900L,
-        105900L,
-        10L,
-        4.0,
-        1,
-        22,
-        now.minus(9, ChronoUnit.DAYS));
-    insertProductImages(
-        1018L,
-        "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=800",
-        "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800");
-    insertProductStockNoVariant(1018L, 10);
-
-    // ==========================================
-    // Category 4: Fashion -> Subcategories 16, 17
-    // ==========================================
-    // 1019: Men's Casual Linen Shirt (Men's Clothing 16, POPULAR)
-    insertProduct(
-        1019L,
-        "KM-LINEN-SHIRT",
-        "Men's Casual Linen Shirt",
-        "អាវសាច់ក្រណាត់លីណេនបុរស",
-        "mens-linen-shirt",
-        "Breathable pure linen shirt tailored for tropical comfort and stylish weekend outings in Cambodia.",
-        "KhmerMart",
-        2900L,
-        3500L,
-        16L,
-        5.0,
-        1,
-        90,
-        now.minus(40, ChronoUnit.DAYS));
-    insertProductImages(
-        1019L,
-        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800",
-        "https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800");
-    insertVariant(13L, 1019L, "SHIRT-WHT-L", "{\"color\": \"White\", \"size\": \"L\"}", 2900L, 45);
-
-    // 1020: Men's Slim Fit Chino Pants (Men's Clothing 16, stock 0)
-    insertProduct(
-        1020L,
-        "KM-CHINO-PANTS",
-        "Men's Slim Fit Chino Pants",
-        "ខោខូវប៊យខោជើងវែងបុរស",
-        "mens-slim-chino-pants",
-        "Stretch-cotton chinos providing modern slim silhouette and exceptional flexibility from office to dinner.",
-        "KhmerMart",
-        3200L,
-        3900L,
-        16L,
-        0.0,
-        0,
-        35,
-        now.minus(30, ChronoUnit.DAYS));
-    insertProductImages(
-        1020L,
-        "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800",
-        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800");
-    insertProductStockNoVariant(1020L, 0); // Out of stock
-
-    // 1021: Cambodian Silk Wrap Dress (Women's Clothing 17)
-    insertProduct(
-        1021L,
-        "KM-SILK-DRESS",
-        "Handwoven Cambodian Silk Wrap Dress",
-        "រ៉ូបសូត្រខ្មែរត្បាញដៃប្រណិត",
-        "cambodian-silk-wrap-dress",
-        "Authentic Cambodian handwoven raw silk dress created by artisan weavers in Takeo province.",
-        "KhmerSilk",
-        5900L,
-        6900L,
-        17L,
-        5.0,
-        1,
-        42,
-        now.minus(20, ChronoUnit.DAYS));
-    insertProductImages(
-        1021L,
-        "https://images.unsplash.com/photo-1534126511673-b6899657816a?w=800",
-        "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800");
-    insertProductStockNoVariant(1021L, 16);
-
-    // 1022: Women's Floral Chiffon Blouse (Women's Clothing 17, BOGO product)
-    insertProduct(
-        1022L,
-        "KM-FLORAL-BLOUSE",
-        "Women's Floral Chiffon Blouse",
-        "អាវផ្កាសាច់ក្រណាត់ស៊ីផុននារី",
-        "women-floral-chiffon-blouse",
-        "Delicate floral print chiffon blouse featuring ruffled neckline and lightweight airy drape. Part of Buy 1 Get 1 promotion.",
-        "KhmerMart",
-        2400L,
-        2900L,
-        17L,
-        4.0,
-        1,
-        38,
-        now.minus(15, ChronoUnit.DAYS));
-    insertProductImages(
-        1022L,
-        "https://images.unsplash.com/photo-1551803091-e20673f15770?w=800",
-        "https://images.unsplash.com/photo-1534126511673-b6899657816a?w=800");
-    insertProductStockNoVariant(1022L, 35);
-
-    // ==========================================
-    // Category 5: Home & Living -> Subcategories 18, 19
-    // ==========================================
-    // 1023: Philips Essential Airfryer 4.1L (Kitchen 18, NEW, POPULAR)
-    insertProduct(
-        1023L,
-        "PHILIPS-AIR-FRYER",
-        "Philips Essential Airfryer 4.1L",
-        "ឆ្នាំងបំពងខ្យល់ Philips 4.1L",
-        "philips-airfryer-4l",
-        "Rapid Air technology produces deliciously crispy food with up to 90 percent less fat.",
-        "Philips",
-        8900L,
-        10900L,
-        18L,
-        5.0,
-        1,
-        130,
-        now.minus(7, ChronoUnit.DAYS));
-    insertProductImages(
-        1023L,
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800",
-        "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=800");
-    insertProductStockNoVariant(1023L, 22);
-
-    // 1024: LocknLock Cookware Set (Kitchen 18)
-    insertProduct(
-        1024L,
-        "LOCKNLOCK-POT-SET",
-        "LocknLock Ceramic Non-Stick Cookware Set 3pcs",
-        "ឈុតឆ្នាំងខ្ទះ LocknLock ៣មុខ",
-        "locknlock-cookware-set",
-        "Durable ceramic non-stick coating with induction bottom suitable for all stovetops and healthy low-oil cooking.",
-        "LocknLock",
-        6500L,
-        7900L,
-        18L,
-        0.0,
-        0,
-        25,
-        now.minus(25, ChronoUnit.DAYS));
-    insertProductImages(
-        1024L,
-        "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=800",
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800");
-    insertProductStockNoVariant(1024L, 14);
-
-    // 1025: Artisanal Khmer Cotton Blanket Throw (Decor 19)
-    insertProduct(
-        1025L,
-        "KM-KROMAR-THROWS",
-        "Artisanal Khmer Cotton Blanket Throw",
-        "ភួយក្រណាត់កប្បាសប្រពៃណីខ្មែរ",
-        "artisanal-khmer-cotton-throw",
-        "Cozy handloom checkered cotton blanket throw inspired by heritage Cambodian kroma patterns.",
-        "KhmerCraft",
-        1800L,
-        2200L,
-        19L,
-        0.0,
-        0,
-        32,
-        now.minus(33, ChronoUnit.DAYS));
-    insertProductImages(
-        1025L,
-        "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=800",
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800");
-    insertProductStockNoVariant(1025L, 28);
-
-    // 1026: Ultrasonic Aromatherapy Diffuser 500ml (Decor 19, stock 2 <= 5 -> LOW_STOCK)
-    insertProduct(
-        1026L,
-        "AROMA-DIFFUSER-500ML",
-        "Ultrasonic Aromatherapy Diffuser 500ml",
-        "ម៉ាស៊ីនបាញ់ក្លិនក្រអូប 500ml",
-        "ultrasonic-essential-oil-diffuser",
-        "Quiet ultrasonic cool mist humidifier and fragrance diffuser with 7 ambient LED mood lighting colors.",
-        "HomeSpa",
-        2800L,
-        3500L,
-        19L,
-        0.0,
-        0,
-        40,
-        now.minus(29, ChronoUnit.DAYS));
-    insertProductImages(
-        1026L,
-        "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=800",
-        "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=800");
-    insertProductStockNoVariant(1026L, 2);
-
-    // ==========================================
-    // Category 6: Beauty -> Subcategories 20, 21
-    // ==========================================
-    // 1027: COSRX Advanced Snail 96 Essence (Skincare 20, POPULAR)
-    insertProduct(
-        1027L,
-        "COSRX-SNAIL-MUCIN",
-        "COSRX Advanced Snail 96 Mucin Power Essence",
-        "សេរ៉ូមខ្យង COSRX Snail 96 Mucin",
-        "cosrx-advanced-snail-96-essence",
-        "Formulated with 96% snail secretion filtrate to deeply hydrate, repair damaged barrier, and boost elasticity.",
-        "COSRX",
-        1900L,
-        2400L,
-        20L,
-        0.0,
-        0,
-        88,
-        now.minus(24, ChronoUnit.DAYS));
-    insertProductImages(
-        1027L,
-        "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800",
-        "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800");
-    insertProductStockNoVariant(1027L, 50);
-
-    // 1028: Anua Heartleaf 77% Soothing Toner (Skincare 20)
-    insertProduct(
-        1028L,
-        "ANUA-HEARTLEAF-TONER",
-        "Anua Heartleaf 77% Soothing Toner 250ml",
-        "ទឹកតប់ស្បែក Anua Heartleaf 77%",
-        "anua-heartleaf-77-soothing-toner",
-        "Gentle calming toner enriched with 77% heartleaf extract to soothe troubled skin and maintain moisture-oil balance.",
-        "Anua",
-        2100L,
-        2600L,
-        20L,
-        0.0,
-        0,
-        65,
-        now.minus(16, ChronoUnit.DAYS));
-    insertProductImages(
-        1028L,
-        "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800",
-        "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800");
-    insertProductStockNoVariant(1028L, 35);
-
-    // 1029: Chanel Chance Eau Tendre 100ml (Fragrances 21)
-    insertProduct(
-        1029L,
-        "CHANEL-CHANCE-100ML",
-        "Chanel Chance Eau Tendre Eau de Parfum 100ml",
-        "ទឹកអប់ Chanel Chance Eau Tendre 100ml",
-        "chanel-chance-eau-tendre-100ml",
-        "Delicate fruity-floral fragrance revealing an intensified feminine whirlwind of tenderness.",
-        "Chanel",
-        16500L,
-        18500L,
-        21L,
-        0.0,
-        0,
-        26,
-        now.minus(48, ChronoUnit.DAYS));
-    insertProductImages(
-        1029L,
-        "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=800",
-        "https://images.unsplash.com/photo-1541643600914-78b084683601?w=800");
-    insertProductStockNoVariant(1029L, 10);
-
-    // 1030: L'Oreal Paris Revitalift Serum (Fragrances & Body 21)
-    insertProduct(
-        1030L,
-        "LOREAL-REVITALIFT-SERUM",
-        "L'Oreal Paris Revitalift 1.5% Hyaluronic Acid Serum",
-        "សេរ៉ូម L'Oreal Paris Revitalift Hyaluronic Acid",
-        "loreal-revitalift-hyaluronic-acid-serum",
-        "Dermatologist validated formula with concentrated macro and micro hyaluronic acid for visibly plumped skin.",
-        "L'Oreal",
-        2600L,
-        3200L,
-        21L,
-        0.0,
-        0,
-        72,
-        now.minus(38, ChronoUnit.DAYS));
-    insertProductImages(
-        1030L,
-        "https://images.unsplash.com/photo-1541643600914-78b084683601?w=800",
-        "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=800");
-    insertProductStockNoVariant(1030L, 40);
-
-    // ==========================================
-    // Category 7: Groceries -> Subcategories 22, 23
-    // ==========================================
-    // 1031: Angkor Jasmine Rice 5kg (Rice 22, POPULAR #1, Flash Sale #4)
-    insertProduct(
-        1031L,
-        "ANGKOR-RICE-5KG",
-        "Angkor Premium Phka Rumduol Jasmine Rice 5kg",
-        "អង្ករផ្ការំដួលប្រណិតអង្គរ ៥គីឡូក្រាម",
-        "angkor-jasmine-rice-5kg",
-        "Award-winning authentic Cambodian fragrant Jasmine rice, harvest-fresh and naturally aromatic.",
-        "Angkor Harvest",
-        1200L,
-        1500L,
-        22L,
-        0.0,
-        0,
-        320,
-        now.minus(55, ChronoUnit.DAYS));
-    insertProductImages(
-        1031L,
-        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800",
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800");
-    insertVariant(14L, 1031L, "RICE-5KG", "{\"weight\": \"5kg\"}", 1200L, 150);
-
-    // 1032: Organic Khmer Jasmine Brown Rice 2kg (Rice 22)
-    insertProduct(
-        1032L,
-        "KHMER-BROWN-RICE-2KG",
-        "Organic Khmer Jasmine Brown Rice 2kg",
-        "អង្ករសម្រូបផ្ការំដួលសរីរាង្គ ២គីឡូក្រាម",
-        "organic-khmer-brown-rice-2kg",
-        "Nutritious whole grain brown jasmine rice high in fiber and minerals, grown without chemical pesticides in Battambang.",
-        "Angkor Harvest",
-        650L,
-        800L,
-        22L,
-        0.0,
-        0,
-        45,
-        now.minus(35, ChronoUnit.DAYS));
-    insertProductImages(
-        1032L,
-        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800",
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800");
-    insertProductStockNoVariant(1032L, 60);
-
-    // 1033: Mondulkiri Highland Coffee Beans 500g (Snacks 23)
-    insertProduct(
-        1033L,
-        "MONDULKIRI-COFFEE-500G",
-        "Mondulkiri Highland Roasted Arabica Coffee Beans 500g",
-        "កាហ្វេគ្រាប់អារ៉ាប៊ីកាមណ្ឌលគិរី ៥០០ក្រាម",
-        "mondulkiri-roasted-coffee-beans-500g",
-        "100% pure high-altitude roasted Arabica beans cultivated in the cool volcanic highlands of Mondulkiri province.",
-        "Mondulkiri Roast",
-        950L,
-        1200L,
-        23L,
-        0.0,
-        0,
-        78,
-        now.minus(19, ChronoUnit.DAYS));
-    insertProductImages(
-        1033L,
-        "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800",
-        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800");
-    insertProductStockNoVariant(1033L, 45);
-
-    // 1034: Kampot Black Pepper GI 100g (Snacks 23, stock 5 <= 5 -> LOW_STOCK, POPULAR)
-    insertProduct(
-        1034L,
-        "KAMPOT-PEPPER-BLACK-100G",
-        "Authentic Kampot Black Pepper GI Certified 100g",
-        "ម្រេចខ្មៅកំពតពិតៗ GI ១០០ក្រាម",
-        "kampot-black-pepper-gi-100g",
-        "World-renowned Geographical Indication Kampot black peppercorns offering complex floral aroma and lingering heat.",
-        "Kampot Jewels",
-        550L,
-        700L,
-        23L,
-        0.0,
-        0,
-        92,
-        now.minus(42, ChronoUnit.DAYS));
-    insertProductImages(
-        1034L,
-        "https://images.unsplash.com/photo-1509358271058-acd22cc93898?w=800",
-        "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800");
-    insertProductStockNoVariant(1034L, 5);
-
-    // 1035: Cambodian Dried Mango Slices 200g (Snacks 23)
-    insertProduct(
-        1035L,
-        "DRIED-MANGO-CAMBODIA-200G",
-        "Natural Cambodian Dried Mango Slices 200g",
-        "ដំណាប់ស្វាយកែវរមៀតធម្មជាតិ ២០០ក្រាម",
-        "natural-cambodian-dried-mango-slices",
-        "Sweet and tangy dried Keo Romeat mango slices with zero added sugar or artificial preservatives.",
-        "Angkor Treats",
-        380L,
-        480L,
-        23L,
-        0.0,
-        0,
-        82,
-        now.minus(27, ChronoUnit.DAYS));
-    insertProductImages(
-        1035L,
-        "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800",
-        "https://images.unsplash.com/photo-1509358271058-acd22cc93898?w=800");
-    insertProductStockNoVariant(1035L, 80);
-
-    // ==========================================
-    // Category 8: Books -> Subcategories 24, 25
-    // ==========================================
-    // 1036: Angkor and the Khmer Civilization (Khmer Literature 24)
-    insertProduct(
-        1036L,
-        "BOOK-ANGKOR-EMPIRE",
-        "Angkor and the Khmer Civilization",
-        "សៀវភៅ អង្គរ និង អរិយធម៌ខ្មែរ",
-        "angkor-and-the-khmer-civilization-book",
-        "Comprehensive illustrated guide to the history, architecture, and religious symbolism of the Angkorian empire.",
-        "River Books",
-        2800L,
-        3200L,
-        24L,
-        0.0,
-        0,
-        34,
-        now.minus(45, ChronoUnit.DAYS));
-    insertProductImages(
-        1036L,
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800",
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800");
-    insertProductStockNoVariant(1036L, 25);
-
-    // 1037: Treasury of Cambodian Folk Tales (Khmer Literature 24)
-    insertProduct(
-        1037L,
-        "BOOK-KHMER-TALES",
-        "Treasury of Cambodian Folk Tales (Bilingual)",
-        "សៀវភៅ រឿងព្រេងនិទានខ្មែរបុរាណ",
-        "classic-cambodian-folk-tales",
-        "Rich illustrated bilingual compilation of classic Cambodian folktales passed down through generations of oral history.",
-        "Phnom Penh Publishing",
-        1500L,
-        1800L,
-        24L,
-        0.0,
-        0,
-        28,
-        now.minus(32, ChronoUnit.DAYS));
-    insertProductImages(
-        1037L,
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800",
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800");
-    insertProductStockNoVariant(1037L, 30);
-
-    // 1038: Atomic Habits Khmer Edition (Business 25, NEW)
-    insertProduct(
-        1038L,
-        "BOOK-ATOMIC-HABITS-KM",
-        "Atomic Habits (Khmer Translation Edition)",
-        "សៀវភៅ ទម្លាប់ផ្លាស់ប្តូរជីវិត (Atomic Habits)",
-        "atomic-habits-khmer-edition",
-        "The definitive guide to breaking bad behaviors and adopting good habits with tiny, proven lifestyle tweaks.",
-        "Mindset Books",
-        1400L,
-        1600L,
-        25L,
-        0.0,
-        0,
-        85,
-        now.minus(11, ChronoUnit.DAYS));
-    insertProductImages(
-        1038L,
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800",
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800");
-    insertProductStockNoVariant(1038L, 50);
-
-    // 1039: The Psychology of Money Khmer Edition (Business 25)
-    insertProduct(
-        1039L,
-        "BOOK-PSYCHOLOGY-MONEY-KM",
-        "The Psychology of Money (Khmer Translation Edition)",
-        "សៀវភៅ ចិត្តវិទ្យានៃលុយ (Psychology of Money)",
-        "the-psychology-of-money-khmer-edition",
-        "Timeless lessons on wealth, greed, and happiness exploring how people make sense of financial freedom.",
-        "Wealth Media",
-        1400L,
-        1600L,
-        25L,
-        0.0,
-        0,
-        70,
-        now.minus(21, ChronoUnit.DAYS));
-    insertProductImages(
-        1039L,
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800",
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800");
-    insertProductStockNoVariant(1039L, 45);
-
-    // 1040: Start With Why Khmer Edition (Business 25, stock 0)
-    insertProduct(
-        1040L,
-        "BOOK-START-WITH-WHY-KM",
-        "Start With Why (Khmer Translation Edition)",
-        "សៀវភៅ ចាប់ផ្តើមដោយសំណួរថា ហេតុអ្វី",
-        "start-with-why-khmer-edition",
-        "Discover how great leaders inspire everyone to take action by uncovering their core organizational purpose.",
-        "Leader Books",
-        1350L,
-        1550L,
-        25L,
-        0.0,
-        0,
-        15,
-        now.minus(52, ChronoUnit.DAYS));
-    insertProductImages(
-        1040L,
-        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800",
-        "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800");
-    insertProductStockNoVariant(1040L, 0); // Out of stock
+  private static String productPlaceholder(String name) {
+    return "https://placehold.co/800x800/F3EBDD/5B4636/png?text="
+        + URLEncoder.encode(name, StandardCharsets.UTF_8);
   }
 
   private void insertProduct(
@@ -1810,11 +667,12 @@ public class DataSeeder implements CommandLineRunner {
     jdbcTemplate.update(
         """
         INSERT INTO inventory (product_id, variant_id, quantity_on_hand, quantity_reserved, low_stock_threshold, low_stock_alerted, version, updated_at)
-        VALUES (?, NULL, ?, 0, 5, false, 0, now())
+        VALUES (?, NULL, ?, 0, ?, false, 0, now())
         ON CONFLICT (product_id, COALESCE(variant_id, 0)) DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand
         """,
         productId,
-        quantity);
+        quantity,
+        SeedCatalog.LOW_STOCK_THRESHOLD);
   }
 
   private void insertVariant(
@@ -1852,7 +710,16 @@ public class DataSeeder implements CommandLineRunner {
       Long variantPriceCents,
       Long flashSalePriceCents) {}
 
-  private record SeedOrderItemSpec(long productId, int quantity) {}
+  /** variantId is null for products without variants. */
+  private record SeedOrderItemSpec(long productId, Long variantId, int quantity) {}
+
+  private static SeedOrderItemSpec item(long productId, int quantity) {
+    return new SeedOrderItemSpec(productId, null, quantity);
+  }
+
+  private static SeedOrderItemSpec variantItem(long productId, long variantId, int quantity) {
+    return new SeedOrderItemSpec(productId, variantId, quantity);
+  }
 
   private record OrderItemToInsert(
       long productId,
@@ -1863,20 +730,21 @@ public class DataSeeder implements CommandLineRunner {
       int quantity,
       long lineTotalCents) {}
 
+  private record SeedReview(
+      long productId, long userId, int rating, String title, String body, boolean pending) {}
+
   private void seedOrdersAndReviews() {
     Instant now = Instant.now();
 
-    // 1. Fetch real product details, variants, and active promotional prices from DB
-    Map<Long, SeedProductLookup> catalog = new HashMap<>();
+    // 1. Fetch product details, every variant and the active flash-sale price of each from the DB
+    Map<String, SeedProductLookup> catalog = new HashMap<>();
     jdbcTemplate.query(
         """
         SELECT p.id, p.name, p.sku, p.price_cents,
                pv.id AS v_id, pv.sku AS v_sku, pv.price_cents AS v_price,
                pp.sale_price_cents AS flash_price
         FROM products p
-        LEFT JOIN LATERAL (
-          SELECT id, sku, price_cents FROM product_variants WHERE product_id = p.id ORDER BY id ASC LIMIT 1
-        ) pv ON true
+        LEFT JOIN product_variants pv ON pv.product_id = p.id
         LEFT JOIN promotion_products pp ON pp.product_id = p.id AND pp.promotion_id = 1
           AND (pp.variant_id IS NULL OR pp.variant_id = pv.id)
         """,
@@ -1890,15 +758,15 @@ public class DataSeeder implements CommandLineRunner {
           Long vPrice = rs.getObject("v_price") != null ? rs.getLong("v_price") : null;
           Long flashPrice = rs.getObject("flash_price") != null ? rs.getLong("flash_price") : null;
           catalog.put(
-              pId,
+              pId + ":" + (vId == null ? 0L : vId),
               new SeedProductLookup(pId, name, sku, priceCents, vId, vSku, vPrice, flashPrice));
         });
 
     // Configure standard shipping method and active promotion entities for PricingService
     ShippingMethod standardShipping = new ShippingMethod();
     standardShipping.setCode("STANDARD");
-    standardShipping.setFeeCents(150L);
-    standardShipping.setFreeOverCents(5000L);
+    standardShipping.setFeeCents(SeedCatalog.STANDARD_SHIPPING_CENTS);
+    standardShipping.setFreeOverCents(SeedCatalog.FREE_SHIPPING_OVER_CENTS);
 
     List<Promotion> promotions = new ArrayList<>();
     Promotion promoFlash = new Promotion();
@@ -1908,8 +776,8 @@ public class DataSeeder implements CommandLineRunner {
 
     Promotion promoSeasonal = new Promotion();
     promoSeasonal.setType(PromotionType.SEASONAL);
-    promoSeasonal.setDiscountPercent(20);
-    promoSeasonal.setThresholdCents(5000L);
+    promoSeasonal.setDiscountPercent(SeedCatalog.SEASONAL_PERCENT);
+    promoSeasonal.setThresholdCents(0L);
     promoSeasonal.setActive(true);
     promotions.add(promoSeasonal);
 
@@ -1955,57 +823,72 @@ public class DataSeeder implements CommandLineRunner {
       OrderStatus.REFUNDED // 32
     };
 
+    long hero = SeedCatalog.HERO_ID;
+    long rice = SeedCatalog.RICE_ID;
     List<List<SeedOrderItemSpec>> orderSpecs =
         List.of(
-            List.of(new SeedOrderItemSpec(1001L, 1)), // 1: Laptop Pro 15
-            List.of(new SeedOrderItemSpec(1010L, 1)), // 2: iPhone 15 Pro Titanium
             List.of(
-                new SeedOrderItemSpec(1015L, 1),
-                new SeedOrderItemSpec(1014L, 1)), // 3: Sony Headphones + MagSafe
+                variantItem(
+                    hero,
+                    SeedCatalog.HERO_RED_STANDARD,
+                    1)), // 1: Hol Silk Sampot, Ruby Red Standard (flash)
+            List.of(item(1006L, 2), item(1007L, 1)), // 2: Black Pepper 2x + Red Pepper
+            List.of(item(1002L, 2), item(1003L, 1)), // 3: Cotton Krama 2x + Silk Krama Gift Box
             List.of(
-                new SeedOrderItemSpec(1031L, 2),
-                new SeedOrderItemSpec(1033L, 1)), // 4: Angkor Rice 2x + Coffee
-            List.of(new SeedOrderItemSpec(1019L, 2)), // 5: Casual Linen Shirt 2x
-            List.of(new SeedOrderItemSpec(1003L, 1)), // 6: Dell Inspiron 15
-            List.of(new SeedOrderItemSpec(1023L, 1)), // 7: Philips Airfryer
-            List.of(new SeedOrderItemSpec(1028L, 2)), // 8: Anua Heartleaf Toner 2x
+                variantItem(rice, SeedCatalog.RICE_5KG_VARIANT, 1),
+                item(1017L, 1)), // 4: Jasmine Rice 5 kg + Arabica
             List.of(
-                new SeedOrderItemSpec(1034L, 3),
-                new SeedOrderItemSpec(1035L, 2)), // 9: Kampot Pepper 3x + Dried Mango 2x
-            List.of(new SeedOrderItemSpec(1011L, 1)), // 10: Samsung Galaxy S24 Ultra
+                item(1021L, 2),
+                item(1022L, 3),
+                item(1010L, 3)), // 5: Cashews, Dried Mango, Palm Sugar (SAVE5)
+            List.of(item(1005L, 1)), // 6: Phamuong Silk Fabric
             List.of(
-                new SeedOrderItemSpec(1020L, 1),
-                new SeedOrderItemSpec(1019L, 1)), // 11: Chino Pants + Linen Shirt
-            List.of(new SeedOrderItemSpec(1022L, 2)), // 12: Floral Chiffon Blouse 2x (BOGO)
-            List.of(new SeedOrderItemSpec(1029L, 1)), // 13: Chanel Chance Eau Tendre
-            List.of(new SeedOrderItemSpec(1013L, 2)), // 14: Anker PowerBank 2x
+                item(1010L, 2),
+                item(1011L, 2),
+                item(1012L, 1)), // 7: Palm Sugar, Kroeung, Fish Sauce
+            List.of(item(1031L, 1), item(1033L, 3)), // 8: Coconut Oil + Lemongrass Soap 3x
+            List.of(item(1036L, 1), item(1037L, 1)), // 9: Angkor book + Folk Tales
             List.of(
-                new SeedOrderItemSpec(1038L, 2),
-                new SeedOrderItemSpec(1039L, 1)), // 15: Atomic Habits 2x + Psychology of Money
-            List.of(new SeedOrderItemSpec(1005L, 1)), // 16: Dell Vostro 14
-            List.of(new SeedOrderItemSpec(1016L, 1)), // 17: JBL Flip 6 Speaker
-            List.of(new SeedOrderItemSpec(1027L, 2)), // 18: COSRX Snail Mucin 2x
-            List.of(new SeedOrderItemSpec(1024L, 1)), // 19: LocknLock Cookware Set
-            List.of(new SeedOrderItemSpec(1008L, 1)), // 20: Asus ZenBook 14
-            List.of(new SeedOrderItemSpec(1021L, 1)), // 21: Silk Wrap Dress
+                variantItem(rice, SeedCatalog.RICE_10KG_VARIANT, 1),
+                item(1014L, 2)), // 10: Jasmine Rice 10 kg + Red Rice 2x (SAVE5)
             List.of(
-                new SeedOrderItemSpec(1033L, 3),
-                new SeedOrderItemSpec(1034L, 2)), // 22: Mondulkiri Coffee 3x + Kampot Pepper 2x
-            List.of(new SeedOrderItemSpec(1012L, 1)), // 23: Xiaomi 14 Pro Leica
+                variantItem(
+                    hero,
+                    SeedCatalog.HERO_BLUE_PREMIUM,
+                    1)), // 11: Hol Silk Sampot, Royal Blue Premium
+            List.of(item(1026L, 1), item(1028L, 1)), // 12: Clay Pot + Rattan Basket
+            List.of(item(1027L, 1)), // 13: Silver Box
+            List.of(item(1018L, 2), item(1019L, 1)), // 14: Robusta 2x + Lotus Tea
+            List.of(item(1008L, 1), item(1012L, 1)), // 15: Pepper Gift Set + Fish Sauce (SAVE5)
+            List.of(item(1004L, 1), item(1002L, 1)), // 16: Table Runner + Cotton Krama
+            List.of(item(1024L, 2), item(1023L, 2)), // 17: Num Akor 2 boxes + Banana Chips 2x
+            List.of(item(1038L, 1), item(1040L, 1)), // 18: Dictionary + Home Cooking
+            List.of(item(1015L, 2), item(1016L, 3)), // 19: Sticky Rice 2x + Num Banh Chok 3x
             List.of(
-                new SeedOrderItemSpec(1026L, 1),
-                new SeedOrderItemSpec(1025L, 1)), // 24: Diffuser + Blanket
-            List.of(new SeedOrderItemSpec(1018L, 1)), // 25: DJI Mini 4 Pro Drone
-            List.of(new SeedOrderItemSpec(1028L, 1)), // 26: Anua Heartleaf Toner 250ml (PENDING)
+                variantItem(
+                    hero,
+                    SeedCatalog.HERO_BLUE_STANDARD,
+                    1)), // 20: Hol Silk Sampot, Royal Blue Standard (SAVE5)
+            List.of(item(1029L, 1), item(1030L, 3)), // 21: Apsara Replica + Palm Leaf Bookmark 3x
+            List.of(item(1020L, 2), item(1009L, 1)), // 22: Lemongrass Tea 2x + Salt Flower
+            List.of(item(1006L, 1), item(1022L, 2)), // 23: Black Pepper + Dried Mango 2x
+            List.of(item(1034L, 1), item(1035L, 2)), // 24: Moringa Powder + Herbal Balm 2x
+            List.of(item(1003L, 2)), // 25: Silk Krama Gift Box 2x (SAVE5)
+            List.of(item(1017L, 1), item(1018L, 1)), // 26: Arabica + Robusta (PENDING)
             List.of(
-                new SeedOrderItemSpec(1036L, 1),
-                new SeedOrderItemSpec(1037L, 1)), // 27: Angkor Empire Book + Tales (PENDING)
+                variantItem(
+                    hero,
+                    SeedCatalog.HERO_RED_STANDARD,
+                    1)), // 27: Hol Silk Sampot, Ruby Red Standard (PENDING)
+            List.of(item(1025L, 2)), // 28: Durian Candy 2x (PENDING)
+            List.of(item(1005L, 1)), // 29: Phamuong Silk Fabric (CANCELLED)
             List.of(
-                new SeedOrderItemSpec(1014L, 1)), // 28: Apple MagSafe Wireless Charger (PENDING)
-            List.of(new SeedOrderItemSpec(1002L, 1)), // 29: Dell Latitude 5520 (CANCELLED)
-            List.of(new SeedOrderItemSpec(1020L, 2)), // 30: Chino Pants 2x (CANCELLED)
-            List.of(new SeedOrderItemSpec(1010L, 1)), // 31: iPhone 15 Pro Titanium (EXPIRED)
-            List.of(new SeedOrderItemSpec(1007L, 1)) // 32: MSI Katana 15 (REFUNDED)
+                variantItem(
+                    rice,
+                    SeedCatalog.RICE_10KG_VARIANT,
+                    2)), // 30: Jasmine Rice 10 kg 2x (CANCELLED, SAVE5)
+            List.of(item(1039L, 2), item(1037L, 1)), // 31: Alphabet book 2x + Folk Tales (EXPIRED)
+            List.of(item(1027L, 1)) // 32: Silver Box (REFUNDED)
             );
 
     long orderItemId = 1L;
@@ -2047,8 +930,12 @@ public class DataSeeder implements CommandLineRunner {
       List<OrderItemToInsert> itemsToInsert = new ArrayList<>();
 
       for (SeedOrderItemSpec spec : specs) {
-        SeedProductLookup prod = catalog.get(spec.productId());
-        if (prod == null) continue;
+        SeedProductLookup prod =
+            catalog.get(
+                spec.productId() + ":" + (spec.variantId() == null ? 0L : spec.variantId()));
+        if (prod == null) {
+          throw new IllegalStateException("Seed order " + i + " references unknown " + spec);
+        }
 
         Long varId = prod.variantId();
         // Use variant SKU if variant exists, or exact product SKU
@@ -2061,12 +948,18 @@ public class DataSeeder implements CommandLineRunner {
                 ? prod.variantPriceCents()
                 : prod.priceCents();
         Long flashPrice = prod.flashSalePriceCents();
-        boolean isBogo = (prod.productId() == 1022L);
-        Integer seasonal = (prod.productId() == 1002L || prod.productId() == 1003L) ? 20 : null;
+        // Same rule as checkout: linked products get the seasonal percent, others 0
+        Integer seasonal = SeedCatalog.isSpice(prod.productId()) ? SeedCatalog.SEASONAL_PERCENT : 0;
 
         pricingItems.add(
             new PricingItem(
-                prod.productId(), varId, unitPrice, spec.quantity(), flashPrice, isBogo, seasonal));
+                prod.productId(),
+                varId,
+                unitPrice,
+                spec.quantity(),
+                flashPrice,
+                prod.productId() == SeedCatalog.BOGO_PRODUCT_ID,
+                seasonal));
 
         itemsToInsert.add(
             new OrderItemToInsert(
@@ -2082,10 +975,10 @@ public class DataSeeder implements CommandLineRunner {
       Coupon coupon = null;
       if (i % 5 == 0) {
         coupon = new Coupon();
-        coupon.setCode("SAVE5");
+        coupon.setCode(SeedCatalog.COUPON_SAVE5);
         coupon.setType(CouponType.FIXED);
-        coupon.setValue(500L);
-        coupon.setMinOrderCents(3500L);
+        coupon.setValue(SeedCatalog.SAVE5_CENTS);
+        coupon.setMinOrderCents(SeedCatalog.SAVE5_MIN_ORDER_CENTS);
         coupon.setActive(true);
       }
 
@@ -2244,26 +1137,163 @@ public class DataSeeder implements CommandLineRunner {
       }
     }
 
-    // Seed 3 realistic approved reviews specifically on product 1001 (Laptop Pro 15)
-    // Ratings: 5, 5, 4 => total = 3 reviews, sum = 14, avg = 4.67
-    int reviewId = 1;
-    Long[] prod1001Users = {3L, 4L, 5L};
-    int[] prod1001Ratings = {5, 5, 4};
-    String[] prod1001Bodies = {
-      "Best laptop for developers and creatives. Handles heavy workloads with ease.",
-      "Remarkable battery life and vivid display. Highly recommended for work.",
-      "Flawless performance, silent operation, and stunning build quality."
-    };
+    // Reviews: 3 on the hero product (avg 4.67), then 21 on products customers bought
+    List<SeedReview> reviews =
+        List.of(
+            new SeedReview(
+                1001,
+                3,
+                5,
+                "Verified Purchase Review",
+                "Beautiful hand-woven sampot. The Ruby Red colour is rich and the silk feels luxurious.",
+                false),
+            new SeedReview(
+                1001,
+                4,
+                5,
+                "Verified Purchase Review",
+                "Perfect for my sister's wedding. The Premium grade is worth the upgrade.",
+                false),
+            new SeedReview(
+                1001,
+                5,
+                4,
+                "Verified Purchase Review",
+                "Lovely Takeo craftsmanship and quick delivery to Phnom Penh.",
+                false),
+            new SeedReview(
+                1002,
+                3,
+                5,
+                "Everyday essential",
+                "Soft cotton krama, I use it every day in the sun.",
+                false),
+            new SeedReview(
+                1006,
+                3,
+                5,
+                "Real Kampot pepper",
+                "Strong aroma, a pinch is enough for a whole steak.",
+                false),
+            new SeedReview(
+                1010,
+                3,
+                4,
+                "Sweet and natural",
+                "Good palm sugar for my curries, a little hard to scoop.",
+                false),
+            new SeedReview(
+                1013,
+                3,
+                5,
+                "Best jasmine rice",
+                "Fragrant and soft, my family finished the 5 kg bag in two weeks.",
+                false),
+            new SeedReview(
+                1017, 3, 4, "Smooth arabica", "Mild and fruity, great as a pour-over.", true),
+            new SeedReview(
+                1026,
+                3,
+                5,
+                "Cooks rice beautifully",
+                "The clay pot gives the rice a lovely flavour.",
+                false),
+            new SeedReview(
+                1036,
+                3,
+                5,
+                "Excellent photos",
+                "Clear history of Angkor, perfect gift for visitors.",
+                false),
+            new SeedReview(
+                1003,
+                4,
+                5,
+                "Great gift",
+                "Arrived in a nice box, my aunt loved the silk krama.",
+                false),
+            new SeedReview(
+                1007,
+                4,
+                4,
+                "Sweet heat",
+                "Red pepper is milder and fruitier than the black one.",
+                false),
+            new SeedReview(
+                1011,
+                4,
+                5,
+                "Makes amok easy",
+                "Fresh kroeung paste, saves an hour of pounding.",
+                true),
+            new SeedReview(
+                1014,
+                4,
+                4,
+                "Nutty and filling",
+                "Good organic red rice, cooks in 35 minutes.",
+                false),
+            new SeedReview(
+                1021,
+                4,
+                5,
+                "Crunchy cashews",
+                "Fresh and lightly salted, gone in two days.",
+                false),
+            new SeedReview(
+                1028,
+                4,
+                4,
+                "Sturdy basket",
+                "Well woven, carries my market shopping easily.",
+                false),
+            new SeedReview(
+                1037, 4, 5, "Lovely for kids", "Nice bilingual stories to read at bedtime.", false),
+            new SeedReview(
+                1005, 5, 4, "Smooth silk", "Even weave, tailor was happy to work with it.", false),
+            new SeedReview(
+                1009,
+                5,
+                5,
+                "Delicate crystals",
+                "Perfect on grilled fish and fresh tomatoes.",
+                true),
+            new SeedReview(
+                1012,
+                5,
+                5,
+                "Clean fish sauce",
+                "Rich but not too salty, the best I have bought.",
+                false),
+            new SeedReview(
+                1015,
+                5,
+                4,
+                "Good sticky rice",
+                "Steams well and holds together for mango sticky rice.",
+                false),
+            new SeedReview(
+                1022,
+                5,
+                5,
+                "Sweet and chewy",
+                "Tastes like real mango, no added sugar needed.",
+                false),
+            new SeedReview(
+                1038,
+                5,
+                5,
+                "Handy dictionary",
+                "Clear entries, helpful for my Khmer lessons.",
+                false));
 
-    for (int i = 0; i < prod1001Users.length; i++) {
-      String adminReply =
-          (i == 0 || i == 5)
-              ? "Thank you for shopping with KhmerMart! We appreciate your support."
-              : null;
+    int reviewId = 1;
+    for (SeedReview r : reviews) {
+      boolean replied = !r.pending() && reviewId % 3 == 0;
       jdbcTemplate.update(
           """
           INSERT INTO reviews (id, product_id, user_id, rating, title, body, status, admin_reply, created_at, updated_at)
-          VALUES (?, 1001, ?, ?, 'Verified Purchase Review', ?, 'APPROVED', ?, now() - interval '5 days', now() - interval '5 days')
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, now() - interval '5 days', now() - interval '5 days')
           ON CONFLICT (user_id, product_id) DO UPDATE SET
               rating = EXCLUDED.rating,
               body = EXCLUDED.body,
@@ -2271,42 +1301,13 @@ public class DataSeeder implements CommandLineRunner {
               admin_reply = EXCLUDED.admin_reply
           """,
           (long) (reviewId++),
-          prod1001Users[i],
-          prod1001Ratings[i],
-          prod1001Bodies[i],
-          adminReply);
-    }
-
-    // Seed additional reviews by the first 3 customers on products 1002..1017
-    Long[] customerIds = {3L, 4L, 5L};
-    for (int cIdx = 0; cIdx < customerIds.length; cIdx++) {
-      Long uid = customerIds[cIdx];
-      for (int pIdx = 2; pIdx <= 8; pIdx++) {
-        Long prodId = 1000L + (long) (cIdx * 8 + pIdx);
-        int rating = 4 + ((reviewId % 2));
-        String reviewStatus = (reviewId % 4 == 0) ? "PENDING" : "APPROVED";
-        String adminReply =
-            (reviewId % 3 == 0)
-                ? "Thank you for shopping with KhmerMart! We appreciate your support."
-                : null;
-
-        jdbcTemplate.update(
-            """
-            INSERT INTO reviews (id, product_id, user_id, rating, title, body, status, admin_reply, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'Exceptional Experience', 'Authentic product with prompt delivery in Cambodia. Exceeded expectations!', ?, ?, now() - interval '5 days', now() - interval '5 days')
-            ON CONFLICT (user_id, product_id) DO UPDATE SET
-                rating = EXCLUDED.rating,
-                body = EXCLUDED.body,
-                status = EXCLUDED.status,
-                admin_reply = EXCLUDED.admin_reply
-            """,
-            (long) (reviewId++),
-            prodId,
-            uid,
-            rating,
-            reviewStatus,
-            adminReply);
-      }
+          r.productId(),
+          r.userId(),
+          r.rating(),
+          r.title(),
+          r.body(),
+          r.pending() ? "PENDING" : "APPROVED",
+          replied ? "Thank you for shopping with KhmerMart! We appreciate your support." : null);
     }
   }
 

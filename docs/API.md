@@ -5,10 +5,10 @@
 ### Disjunctive Faceting Behavior
 In the KhmerMart Catalog API (`GET /api/products`), facet calculations are **disjunctive** with respect to user-selected filters:
 - **Disjunctive Filtering**: Each facet calculates counts based on the base search query (`q`) and category tree hierarchy (`categoryId`), but **ignores its own facet filter constraints** (such as selected brand, attribute filters, or price range).
-- **Rationale**: This allows users to see the available counts for alternative values within the same facet (e.g. seeing how many laptops exist for Asus and Apple even when filtering by Dell), preventing facets from collapsing to a single selected value with count 1.
+- **Rationale**: This allows users to see the available counts for alternative values within the same facet (e.g. seeing how many silk products exist for Kandal Silk House and Kampong Cham Weavers even when filtering by Takeo Weavers), preventing facets from collapsing to a single selected value with count 1.
 - **Combined Scope**:
   - `brands`: Lists all brands with active product counts in the current search query and category scope.
-  - `attributes`: Aggregates all variant attributes (`ram`, `color`, `storage`, `size`, `capacity`, `weight`) for products in the current search/category scope.
+  - `attributes`: Aggregates all variant attributes (`color`, `grade`, `weight`) for products in the current search/category scope.
   - `priceRange`: Reports the minimum (`minCents`) and maximum (`maxCents`) price among all products matching the search query and category scope.
 
 ---

@@ -9,7 +9,7 @@
 
 ### Prerequisites
 - Backend running and reachable (default `http://localhost:4000`, override with `BASE=http://host:port`), **current build** (the script checks this in STEP 0 and stops if it is old), KHQR in **MOCK** mode.
-- Seed data present: product 1001 (Laptop Pro 15, variants 1–4), the active "Flash Sale 24H" (promotion 1, variants 1–2 at 89900), coupon `SAVE5`, admin `admin@khmermart.local` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+- Seed data present: product 1001 (Takeo Hol Silk Sampot, variants 1–4 = Ruby Red / Royal Blue × Standard 14900 / Premium 19900), the active "Flash Sale 24H" (promotion 1: the two Standard variants 1 and 3 at 12900, plus Kampot Black Pepper 1006 at 790 and Dried Mango 1022 at 320), the "Pchum Ben Festival Sale" banner, coupon `SAVE5`, admin `admin@khmermart.local` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 - Tools: `bash`, `curl`, `jq`, `pdftotext` (package `poppler-utils`), GNU `date`.
 
 ### How to run
@@ -19,7 +19,7 @@ BASE=http://192.168.1.10:4000 scripts/smoke_test.sh
 ```
 Each step prints `STEP n — name`, the HTTP status of every call, the key JSON fields, `✔` per assertion and `=> PASS`/`=> FAIL`; a summary table is printed at the end. The script stops at the **first** failure with exit code 1 (0 = all passed).
 
-Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@khmermart.local` (plus 10 more for the race test), never touches the seeded demo accounts, never starts/stops/restarts anything, and puts back any stock it changes (it tops up variants 1 and 3 by +20 through the admin API if fewer than 5 are available, so repeated runs do not run out of stock).
+Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@khmermart.local` (plus 10 more for the race test), never touches the seeded demo accounts, never starts/stops/restarts anything, and puts back any stock it changes (it tops up variants 1 and 4 by +20 through the admin API if fewer than 5 are available, so repeated runs do not run out of stock).
 
 ### What each step proves (teacher's 12 steps)
 
@@ -28,11 +28,11 @@ Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@
 | (pre) | 0 | Backend reachable and is the current build (`GET /admin/promotions/1` returns per-variant `items`), flash sale still active. |
 | 1 System health | 1 | `/api/health`: `db` ok, `redis` ok, `khqrMode` = MOCK. |
 | 2 Register / login | 2 | New customer registers and logs in; `accessToken` is a JWT; `km_rt` refresh cookie is `HttpOnly`. |
-| 3 Browse / search | 3 | Category tree; `products?q=laptop`; product 1001: variants 1–2 `salePriceCents` 89900, variants 3–4 have none (per-variant flash sale). |
-| 4 Add to cart | 4 | Variant 1 priced 89900; adding variant 3 gives a 129900 line with no extra flash discount. |
-| 5 Coupon | 5 | `SAVE5` gives the 500-cent coupon (total discount 10500 = 10000 flash + 500); `INVALIDCODE` → 422 `COUPON_INVALID`. |
+| 3 Browse / search | 3 | 8 root categories (first `silk-textiles`); `products?q=silk` finds product 1001; product 1001: Standard variants 1 and 3 have `salePriceCents` 12900, Premium variants 2 and 4 have none (per-variant flash sale); products 1006 and 1022 carry their product-wide flash prices 790 and 320; the seasonal banner is "Pchum Ben Festival Sale". |
+| 4 Add to cart | 4 | Variant 1 (Ruby Red Standard) costs 12900 after the 2000 flash discount; adding the Premium variant 2 gives a 19900 line with no extra flash discount; the Premium line is then removed so the cart holds the demo order (Standard ×1). |
+| 5 Coupon | 5 | `SAVE5` gives the 500-cent coupon (total discount 2500 = 2000 flash + 500, cart total 12400); `INVALIDCODE` → 422 `COUPON_INVALID`. |
 | 6 Address | 6 | Khmer recipient `សុភាព` and street `ផ្លូវ ២០០៤ ខណ្ឌពោធិ៍សែនជ័យ` are stored and returned unchanged (UTF-8). |
-| 7 Shipping / preview | 7 | Shipping methods listed; `checkout/preview`: subtotal − discounts + shipping = total, and `totalKhr` = total/100 × `khrRate`. |
+| 7 Shipping / preview | 7 | Shipping methods listed; `checkout/preview`: subtotal − discounts + shipping = total, and `totalKhr` = total/100 × `khrRate` (12400 → 508,400 ៛). |
 | 8 Checkout | 8 | KHQR checkout with `Idempotency-Key` → `PENDING_PAYMENT`, stock reserved once; replay with the same key returns the **same** `orderNumber` and reserves nothing more. |
 | 9 Pay with KHQR | 9 | QR string starts `000201`, md5 is 32 hex, `expiresAt` ≈ now + 10 min, status `PENDING`; `simulate-paid` → `PAID` / order `CONFIRMED`; a `SALE` inventory movement exists and available stock dropped by the quantity bought. |
 | 10 Admin ships | 10 | Admin ships the order → `SHIPPED` + `KMTRK…` tracking number; tracking event added; public `GET /api/track/{number}` shows it. |
@@ -46,7 +46,7 @@ Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@
 
 ### Troubleshooting
 - `STEP 0` fails with "promotion 1 returns per-variant items[]": the running backend is an old build — restart it from the latest commit, then re-run.
-- `variant 1 on flash sale` fails: the seeded flash sale has ended (it lasts 7 days from seeding); run `scripts/reset_demo.sh` (see below) or create a new flash sale for variants 1–2 at 89900.
+- `variant 1 on flash sale` fails: the seeded flash sale has ended (it lasts 7 days from seeding); run `scripts/reset_demo.sh` (see below) or create a new flash sale for the Standard variants 1 and 3 at 12900.
 - A failed run can leave a few cancelled/pending orders for throwaway users; they are harmless.
 
 ---
@@ -55,7 +55,7 @@ Safe to re-run: every run registers a new throwaway customer `smoke+<timestamp>@
 
 ### តម្រូវការជាមុន
 - Backend កំពុងរត់ និងអាចចូលបាន (លំនាំដើម `http://localhost:4000` ប្តូរបានដោយ `BASE=http://host:port`) ជា **build ចុងក្រោយ** (ស្គ្រីបពិនិត្យនៅ STEP 0 ហើយឈប់ប្រសិនបើជា build ចាស់) និង KHQR ក្នុងរបៀប **MOCK**។
-- មានទិន្នន័យ seed៖ ផលិតផល 1001 (Laptop Pro 15, variant 1–4), "Flash Sale 24H" ដែលកំពុងសកម្ម (promotion 1, variant 1–2 តម្លៃ 89900), កូប៉ុង `SAVE5`, admin `admin@khmermart.local` (ប្តូរបានដោយ `ADMIN_EMAIL` / `ADMIN_PASSWORD`)។
+- មានទិន្នន័យ seed៖ ផលិតផល 1001 (សំពត់ហូលសូត្រ តាកែវ, variant 1–4 = ក្រហមរ៉ូប៊ី / ខៀវរាជា × Standard 14900 / Premium 19900), "Flash Sale 24H" ដែលកំពុងសកម្ម (promotion 1៖ variant Standard 1 និង 3 តម្លៃ 12900 ម្រេចខ្មៅកំពត 1006 តម្លៃ 790 និងស្វាយក្រៀម 1022 តម្លៃ 320), បដា "ពិធីបុណ្យភ្ជុំបិណ្ឌ", កូប៉ុង `SAVE5`, admin `admin@khmermart.local` (ប្តូរបានដោយ `ADMIN_EMAIL` / `ADMIN_PASSWORD`)។
 - ឧបករណ៍៖ `bash`, `curl`, `jq`, `pdftotext` (កញ្ចប់ `poppler-utils`), `date` របស់ GNU។
 
 ### របៀបដំណើរការ
@@ -65,7 +65,7 @@ BASE=http://192.168.1.10:4000 scripts/smoke_test.sh
 ```
 ជំហាននីមួយៗបង្ហាញ `STEP n — ឈ្មោះ`, HTTP status នៃគ្រប់ការហៅ, ផ្នែក JSON សំខាន់ៗ, `✔` សម្រាប់ការត្រួតពិនិត្យនីមួយៗ និង `=> PASS`/`=> FAIL` ហើយមានតារាងសង្ខេបនៅចុងបញ្ចប់។ ស្គ្រីបឈប់នៅ **ការបរាជ័យដំបូង** ដោយ exit code 1 (0 = ជោគជ័យទាំងអស់)។
 
-អាចដំណើរការឡើងវិញបានដោយសុវត្ថិភាព៖ រាល់ដងចុះឈ្មោះអតិថិជនបណ្តោះអាសន្នថ្មី `smoke+<timestamp>@khmermart.local` (និងបន្ថែម ១០ នាក់ទៀតសម្រាប់តេស្តប្រណាំងគ្នា) មិនប៉ះពាល់គណនី demo ដែលមានស្រាប់ មិនចាប់ផ្តើម/បិទ/ចាប់ផ្តើមឡើងវិញនូវអ្វីទាំងអស់ ហើយបូកស្តុកត្រឡប់មកវិញដែលវាបានប្តូរ (វាបន្ថែម +20 តាម admin API ប្រសិនបើ variant 1 និង 3 នៅសល់តិចជាង 5 ដើម្បីកុំឲ្យអស់ស្តុកពេលរត់ច្រើនដង)។
+អាចដំណើរការឡើងវិញបានដោយសុវត្ថិភាព៖ រាល់ដងចុះឈ្មោះអតិថិជនបណ្តោះអាសន្នថ្មី `smoke+<timestamp>@khmermart.local` (និងបន្ថែម ១០ នាក់ទៀតសម្រាប់តេស្តប្រណាំងគ្នា) មិនប៉ះពាល់គណនី demo ដែលមានស្រាប់ មិនចាប់ផ្តើម/បិទ/ចាប់ផ្តើមឡើងវិញនូវអ្វីទាំងអស់ ហើយបូកស្តុកត្រឡប់មកវិញដែលវាបានប្តូរ (វាបន្ថែម +20 តាម admin API ប្រសិនបើ variant 1 និង 4 នៅសល់តិចជាង 5 ដើម្បីកុំឲ្យអស់ស្តុកពេលរត់ច្រើនដង)។
 
 ### អ្វីដែលជំហាននីមួយៗបញ្ជាក់ (១២ ជំហានរបស់លោកគ្រូ)
 
@@ -74,11 +74,11 @@ BASE=http://192.168.1.10:4000 scripts/smoke_test.sh
 | (មុន) | 0 | Backend អាចចូលបាន និងជា build ចុងក្រោយ (`GET /admin/promotions/1` ត្រឡប់ `items` តាម variant) ហើយ flash sale នៅសកម្ម។ |
 | 1 សុខភាពប្រព័ន្ធ | 1 | `/api/health`៖ `db` ok, `redis` ok, `khqrMode` = MOCK។ |
 | 2 ចុះឈ្មោះ / ចូល | 2 | អតិថិជនថ្មីចុះឈ្មោះ និងចូលបាន; `accessToken` ជា JWT; cookie `km_rt` មាន `HttpOnly`។ |
-| 3 រកមើល / ស្វែងរក | 3 | ដើមឈើប្រភេទ; `products?q=laptop`; ផលិតផល 1001៖ variant 1–2 `salePriceCents` 89900, variant 3–4 គ្មាន (flash sale តាម variant)។ |
-| 4 ដាក់ក្នុងកន្ត្រក | 4 | Variant 1 តម្លៃ 89900; បន្ថែម variant 3 ជាបន្ទាត់ 129900 គ្មានការបញ្ចុះតម្លៃ flash បន្ថែម។ |
-| 5 កូប៉ុង | 5 | `SAVE5` ឲ្យ ៥០០ សេន (បញ្ចុះសរុប 10500 = 10000 flash + 500); `INVALIDCODE` → 422 `COUPON_INVALID`។ |
+| 3 រកមើល / ស្វែងរក | 3 | ប្រភេទឫសចំនួន ៨ (ទីមួយ `silk-textiles`); `products?q=silk` រកឃើញផលិតផល 1001; ផលិតផល 1001៖ variant Standard 1 និង 3 មាន `salePriceCents` 12900, variant Premium 2 និង 4 គ្មាន (flash sale តាម variant); ផលិតផល 1006 និង 1022 មានតម្លៃ flash ទាំងមូល 790 និង 320; បដារដូវកាលគឺ "ពិធីបុណ្យភ្ជុំបិណ្ឌ"។ |
+| 4 ដាក់ក្នុងកន្ត្រក | 4 | Variant 1 (ក្រហមរ៉ូប៊ី Standard) តម្លៃ 12900 បន្ទាប់ពីបញ្ចុះ flash 2000; បន្ថែម variant Premium 2 ជាបន្ទាត់ 19900 គ្មានការបញ្ចុះតម្លៃ flash បន្ថែម; បន្ទាប់មកដកបន្ទាត់ Premium ចេញ ដើម្បីឲ្យកន្ត្រកនៅសល់ការបញ្ជាទិញ demo (Standard ×1)។ |
+| 5 កូប៉ុង | 5 | `SAVE5` ឲ្យ ៥០០ សេន (បញ្ចុះសរុប 2500 = 2000 flash + 500 សរុបកន្ត្រក 12400); `INVALIDCODE` → 422 `COUPON_INVALID`។ |
 | 6 អាសយដ្ឋាន | 6 | អ្នកទទួល `សុភាព` និងផ្លូវ `ផ្លូវ ២០០៤ ខណ្ឌពោធិ៍សែនជ័យ` ត្រូវបានរក្សាទុក និងត្រឡប់មកវិញដូចដើម (UTF-8)។ |
-| 7 ដឹកជញ្ជូន / មើលជាមុន | 7 | បញ្ជីវិធីដឹកជញ្ជូន; `checkout/preview`៖ សរុបរង − បញ្ចុះតម្លៃ + ដឹកជញ្ជូន = សរុប ហើយ `totalKhr` = សរុប/100 × `khrRate`។ |
+| 7 ដឹកជញ្ជូន / មើលជាមុន | 7 | បញ្ជីវិធីដឹកជញ្ជូន; `checkout/preview`៖ សរុបរង − បញ្ចុះតម្លៃ + ដឹកជញ្ជូន = សរុប ហើយ `totalKhr` = សរុប/100 × `khrRate` (12400 → 508,400 ៛)។ |
 | 8 បង់ប្រាក់ (Checkout) | 8 | Checkout KHQR ជាមួយ `Idempotency-Key` → `PENDING_PAYMENT` រក្សាស្តុកម្តង; ហៅម្តងទៀតដោយ key ដដែលបាន `orderNumber` **ដដែល** ហើយមិនរក្សាស្តុកបន្ថែម។ |
 | 9 បង់ដោយ KHQR | 9 | QR ចាប់ផ្តើមដោយ `000201`, md5 ៣២ តួ hex, `expiresAt` ≈ ឥឡូវ + ១០ នាទី, status `PENDING`; `simulate-paid` → `PAID` / ការបញ្ជាទិញ `CONFIRMED`; មាន movement `SALE` ហើយស្តុកដែលមានបានថយចុះតាមចំនួនទិញ។ |
 | 10 Admin ដឹកជញ្ជូន | 10 | Admin ដឹកជញ្ជូន → `SHIPPED` + លេខតាមដាន `KMTRK…`; បន្ថែមព្រឹត្តិការណ៍តាមដាន; `GET /api/track/{លេខ}` សាធារណៈបង្ហាញវា។ |
@@ -92,7 +92,7 @@ BASE=http://192.168.1.10:4000 scripts/smoke_test.sh
 
 ### ដោះស្រាយបញ្ហា
 - `STEP 0` បរាជ័យ "promotion 1 returns per-variant items[]"៖ backend ដែលកំពុងរត់ជា build ចាស់ — សូមចាប់ផ្តើមឡើងវិញពី commit ចុងក្រោយ រួចដំណើរការម្តងទៀត។
-- `variant 1 on flash sale` បរាជ័យ៖ flash sale ដែល seed ទុកបានផុតកំណត់ (មានរយៈពេល ៧ ថ្ងៃចាប់ពីពេល seed); សូមរត់ `scripts/reset_demo.sh` (មើលខាងក្រោម) ឬបង្កើត flash sale ថ្មីសម្រាប់ variant 1–2 តម្លៃ 89900។
+- `variant 1 on flash sale` បរាជ័យ៖ flash sale ដែល seed ទុកបានផុតកំណត់ (មានរយៈពេល ៧ ថ្ងៃចាប់ពីពេល seed); សូមរត់ `scripts/reset_demo.sh` (មើលខាងក្រោម) ឬបង្កើត flash sale ថ្មីសម្រាប់ variant Standard 1 និង 3 តម្លៃ 12900។
 - ការរត់ដែលបរាជ័យអាចទុកការបញ្ជាទិញដែលបានលុបចោល/កំពុងរង់ចាំខ្លះសម្រាប់អ្នកប្រើបណ្តោះអាសន្ន ហើយវាមិនមានគ្រោះថ្នាក់ទេ។
 
 ---

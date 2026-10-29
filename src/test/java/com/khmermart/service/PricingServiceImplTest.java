@@ -7,6 +7,7 @@ import com.khmermart.model.entity.Promotion;
 import com.khmermart.model.entity.ShippingMethod;
 import com.khmermart.model.enumerate.CouponType;
 import com.khmermart.model.enumerate.PromotionType;
+import com.khmermart.seed.SeedCatalog;
 import com.khmermart.service.impl.PricingServiceImpl;
 import java.time.Instant;
 import java.util.List;
@@ -172,19 +173,28 @@ class PricingServiceImplTest {
   }
 
   @Test
-  @DisplayName("7. Laptop Pro 15 in flash sale + seasonal -> only the flash sale applies (89900)")
+  @DisplayName("7. Hol Silk Sampot in flash sale + seasonal -> only the flash sale applies")
   void testFlashSaleWithActiveSeasonalPromo() {
-    // Laptop Pro 15: price 99900c, flash sale price 89900c (not linked to seasonal)
-    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+    // Hero Standard: price 14900c, flash sale price 12900c (not linked to seasonal)
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                SeedCatalog.HERO_STANDARD_CENTS,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS,
+                false,
+                null));
 
     Promotion flashSale =
         Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
 
     Promotion seasonal =
         Promotion.builder()
-            .name("Seasonal 20%")
+            .name("Seasonal 10%")
             .type(PromotionType.SEASONAL)
-            .discountPercent(20)
+            .discountPercent(SeedCatalog.SEASONAL_PERCENT)
             .thresholdCents(5000L)
             .active(true)
             .build();
@@ -192,116 +202,159 @@ class PricingServiceImplTest {
     PricingResult result =
         pricingService.calculate(items, List.of(flashSale, seasonal), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(99900L);
-    assertThat(result.discountCents()).isEqualTo(10000L); // 99900 - 89900
-    assertThat(result.totalCents()).isEqualTo(89900L);
+    assertThat(result.subtotalCents()).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
+    assertThat(result.discountCents()).isEqualTo(SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS);
+    assertThat(result.totalCents()).isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
   }
 
   @Test
-  @DisplayName("8. Seasonal-only product -> 20% off its price")
+  @DisplayName("8. Seasonal-only product -> Pchum Ben 10% off a Spices & Sauces price")
   void testSeasonalOnlyProduct() {
-    // Product 1002 (Dell Latitude 5520, $750 = 75000c) with seasonal 20%
-    List<PricingItem> items = List.of(new PricingItem(1002L, 5L, 75000L, 1, null, false, 20));
+    // Product 1007 (Kampot Red Pepper 100 g, $12.50 = 1250c) with seasonal 10%
+    long price = SeedCatalog.product(1007L).priceCents();
+    long seasonalDiscount = price * SeedCatalog.SEASONAL_PERCENT / 100;
+    List<PricingItem> items =
+        List.of(new PricingItem(1007L, null, price, 1, null, false, SeedCatalog.SEASONAL_PERCENT));
 
     Promotion seasonal =
         Promotion.builder()
-            .name("Seasonal 20%")
+            .name(SeedCatalog.SEASONAL_NAME)
             .type(PromotionType.SEASONAL)
-            .discountPercent(20)
-            .thresholdCents(5000L)
+            .discountPercent(SeedCatalog.SEASONAL_PERCENT)
+            .thresholdCents(0L)
             .active(true)
             .build();
 
     PricingResult result = pricingService.calculate(items, List.of(seasonal), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(75000L);
-    assertThat(result.discountCents()).isEqualTo(15000L); // 20% of 75000
-    assertThat(result.totalCents()).isEqualTo(60000L);
+    assertThat(result.subtotalCents()).isEqualTo(price);
+    assertThat(result.discountCents()).isEqualTo(seasonalDiscount);
+    assertThat(result.totalCents()).isEqualTo(price - seasonalDiscount);
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).contains("Seasonal");
   }
 
   @Test
-  @DisplayName("9. Flash item + SAVE5 -> 89900 - 500 = 89400")
+  @DisplayName("9. Flash item + SAVE5 -> 14900 - 2000 - 500 = 12400 (demo order)")
   void testFlashSaleItemWithSave5Coupon() {
-    // Laptop Pro 15 (99900c, flash price 89900c) + coupon SAVE5 (500c)
-    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+    // Hero Standard (14900c, flash price 12900c) + coupon SAVE5 (500c)
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                SeedCatalog.HERO_STANDARD_CENTS,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS,
+                false,
+                null));
 
     Promotion flashSale =
         Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
 
     Coupon save5 =
         Coupon.builder()
-            .code("SAVE5")
+            .code(SeedCatalog.COUPON_SAVE5)
             .type(CouponType.FIXED)
-            .value(500L)
-            .minOrderCents(3500L)
+            .value(SeedCatalog.SAVE5_CENTS)
+            .minOrderCents(SeedCatalog.SAVE5_MIN_ORDER_CENTS)
             .active(true)
             .build();
 
     PricingResult result = pricingService.calculate(items, List.of(flashSale), save5, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(99900L);
-    assertThat(result.discountCents()).isEqualTo(10500L); // 10000 (flash) + 500 (coupon)
-    assertThat(result.totalCents()).isEqualTo(89400L); // 89900 - 500
+    assertThat(result.subtotalCents()).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
+    assertThat(result.discountCents())
+        .isEqualTo(SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS + SeedCatalog.SAVE5_CENTS);
+    assertThat(result.totalCents()).isEqualTo(SeedCatalog.DEMO_ORDER_TOTAL_CENTS);
+    assertThat(SeedCatalog.DEMO_ORDER_TOTAL_KHR).isEqualTo(508_400L);
   }
 
   @Test
-  @DisplayName("10. Variant 3 in cart -> no flash discount, total 129900")
-  void testVariant3NoFlashDiscount() {
-    // Laptop Pro 15 Variant 3: price 129900c, not on flash sale (flashSalePrice = null)
-    List<PricingItem> items = List.of(new PricingItem(1001L, 3L, 129900L, 1, null, false, null));
+  @DisplayName("10. Premium variant in cart -> no flash discount, full Premium price")
+  void testPremiumVariantNoFlashDiscount() {
+    // Hero Royal Blue Premium: price 19900c, not on flash sale (flashSalePrice = null)
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_BLUE_PREMIUM,
+                SeedCatalog.HERO_PREMIUM_CENTS,
+                1,
+                null,
+                false,
+                null));
 
     Promotion flashSale =
         Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
 
     PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(129900L);
+    assertThat(result.subtotalCents()).isEqualTo(SeedCatalog.HERO_PREMIUM_CENTS);
     assertThat(result.discountCents()).isEqualTo(0L);
-    assertThat(result.totalCents()).isEqualTo(129900L);
+    assertThat(result.totalCents()).isEqualTo(SeedCatalog.HERO_PREMIUM_CENTS);
     assertThat(result.promotionDiscounts()).isEmpty();
   }
 
   @Test
-  @DisplayName("11. Variant 1 in cart -> flash discount applies, total 89900")
-  void testVariant1FlashDiscount() {
-    // Laptop Pro 15 Variant 1: price 99900c, flash sale price 89900c
-    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null));
+  @DisplayName("11. Standard variant in cart -> flash discount applies, total = flash price")
+  void testStandardVariantFlashDiscount() {
+    // Hero Ruby Red Standard: price 14900c, flash sale price 12900c
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                SeedCatalog.HERO_STANDARD_CENTS,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS,
+                false,
+                null));
 
     Promotion flashSale =
         Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
 
     PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(99900L);
-    assertThat(result.discountCents()).isEqualTo(10000L);
-    assertThat(result.totalCents()).isEqualTo(89900L);
+    assertThat(result.subtotalCents()).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
+    assertThat(result.discountCents()).isEqualTo(SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS);
+    assertThat(result.totalCents()).isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
   }
 
   @Test
-  @DisplayName("12. Mixed cart (Variant 1 + Variant 3) -> only Variant 1 is discounted")
-  void testMixedCartOnlyVariant1Discounted() {
+  @DisplayName("12. Mixed cart (Standard + Premium) -> only the Standard variant is discounted")
+  void testMixedCartOnlyStandardDiscounted() {
+    long standard = SeedCatalog.HERO_STANDARD_CENTS;
+    long premium = SeedCatalog.HERO_PREMIUM_CENTS;
+    long flashDiscount = SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS;
     List<PricingItem> items =
         List.of(
-            new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, null),
-            new PricingItem(1001L, 3L, 129900L, 1, null, false, null));
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                standard,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS,
+                false,
+                null),
+            new PricingItem(
+                SeedCatalog.HERO_ID, SeedCatalog.HERO_BLUE_PREMIUM, premium, 1, null, false, null));
 
     Promotion flashSale =
         Promotion.builder().name("Flash Sale").type(PromotionType.FLASH_SALE).active(true).build();
 
     PricingResult result = pricingService.calculate(items, List.of(flashSale), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(99900L + 129900L); // 229800
-    assertThat(result.discountCents()).isEqualTo(10000L); // only variant 1 discount
-    assertThat(result.totalCents()).isEqualTo(219800L);
+    assertThat(result.subtotalCents()).isEqualTo(standard + premium);
+    assertThat(result.discountCents()).isEqualTo(flashDiscount); // only the Standard line
+    assertThat(result.totalCents()).isEqualTo(standard + premium - flashDiscount);
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
-    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(10000L);
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(flashDiscount);
   }
 
   @Test
@@ -326,22 +379,33 @@ class PricingServiceImplTest {
             .active(true)
             .build();
 
-    // Variant 1: 99900 -> 89900 (flash A); variant 3: 129900 -> 119900 (flash B); variant 4 not on
-    // sale
+    // Ruby Red Standard: 14900 -> 12900 (flash A); Ruby Red Premium: 19900 -> 17900 (flash B);
+    // Royal Blue Premium not on sale
+    long standard = SeedCatalog.HERO_STANDARD_CENTS;
+    long premium = SeedCatalog.HERO_PREMIUM_CENTS;
+    long standardOff = standard - SeedCatalog.HERO_FLASH_CENTS;
+    long premiumSale = premium - 2000L;
     List<PricingItem> items =
         List.of(
-            new PricingItem(1001L, 1L, 99900L, 1, 89900L),
-            new PricingItem(1001L, 3L, 129900L, 2, 119900L),
-            new PricingItem(1001L, 4L, 129900L, 1, null));
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                standard,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS),
+            new PricingItem(
+                SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_PREMIUM, premium, 2, premiumSale),
+            new PricingItem(SeedCatalog.HERO_ID, SeedCatalog.HERO_BLUE_PREMIUM, premium, 1, null));
 
     PricingResult result = pricingService.calculate(items, List.of(flashA, flashB), null, null);
 
-    assertThat(result.subtotalCents()).isEqualTo(99900L + 2 * 129900L + 129900L);
-    // 10000 (variant 1) + 2 * 10000 (variant 3); variant 4 pays full price
+    assertThat(result.subtotalCents()).isEqualTo(standard + 2 * premium + premium);
+    // 2000 (Ruby Red Standard) + 2 * 2000 (Ruby Red Premium); Royal Blue Premium pays full price
+    long expectedFlash = standardOff + 2 * (premium - premiumSale);
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
-    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(30000L);
-    assertThat(result.totalCents()).isEqualTo(result.subtotalCents() - 30000L);
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(expectedFlash);
+    assertThat(result.totalCents()).isEqualTo(result.subtotalCents() - expectedFlash);
   }
 
   private Promotion promo(PromotionType type, Integer percent) {
@@ -356,8 +420,18 @@ class PricingServiceImplTest {
   @Test
   @DisplayName("14. Best wins per line: seasonal 20% beats a smaller flash discount, never both")
   void testSeasonalBeatsSmallerFlash() {
-    // 99900c, flash price 89900c (10000 off) but also in seasonal 20% (19980 off) -> seasonal only
-    List<PricingItem> items = List.of(new PricingItem(1001L, 1L, 99900L, 1, 89900L, false, 20));
+    // 14900c, flash price 12900c (2000 off) but also in seasonal 20% (2980 off) -> seasonal only
+    long standard = SeedCatalog.HERO_STANDARD_CENTS;
+    List<PricingItem> items =
+        List.of(
+            new PricingItem(
+                SeedCatalog.HERO_ID,
+                SeedCatalog.HERO_RED_STANDARD,
+                standard,
+                1,
+                SeedCatalog.HERO_FLASH_CENTS,
+                false,
+                20));
 
     PricingResult result =
         pricingService.calculate(
@@ -368,8 +442,8 @@ class PricingServiceImplTest {
 
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).contains("Seasonal");
-    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(19980L);
-    assertThat(result.totalCents()).isEqualTo(99900L - 19980L);
+    assertThat(result.promotionDiscounts().get(0).amountCents()).isEqualTo(standard * 20 / 100);
+    assertThat(result.totalCents()).isEqualTo(standard - standard * 20 / 100);
   }
 
   @Test
@@ -418,5 +492,33 @@ class PricingServiceImplTest {
     assertThat(result.promotionDiscounts()).hasSize(1);
     assertThat(result.promotionDiscounts().get(0).label()).isEqualTo("Flash Sale Discount");
     assertThat(result.discountCents()).isEqualTo(1000L);
+  }
+
+  @Test
+  @DisplayName(
+      "17. BOGO on Lemongrass Soap: 2 x 1033 -> one unit free (-350); 1 unit -> no discount")
+  void testBogoLemongrassSoap() {
+    long price = SeedCatalog.BOGO_PRODUCT_CENTS;
+    long id = SeedCatalog.BOGO_PRODUCT_ID;
+    List<Promotion> promotions =
+        List.of(promo(PromotionType.BOGO, null), promo(PromotionType.SEASONAL, 10));
+
+    // 2 units: BOGO frees one (350) and beats a 10% seasonal (70) on the same line
+    PricingResult two =
+        pricingService.calculate(
+            List.of(new PricingItem(id, null, price, 2, null, true, 10)), promotions, null, null);
+    assertThat(two.subtotalCents()).isEqualTo(2 * price);
+    assertThat(two.discountCents()).isEqualTo(price);
+    assertThat(two.totalCents()).isEqualTo(price);
+    assertThat(two.promotionDiscounts())
+        .extracting(d -> d.label() + "=" + d.amountCents())
+        .containsExactly("Buy 1 Get 1 Free=" + price);
+
+    // 1 unit: BOGO needs a pair, so only the seasonal percent could apply
+    PricingResult one =
+        pricingService.calculate(
+            List.of(new PricingItem(id, null, price, 1, null, true, 10)), promotions, null, null);
+    assertThat(one.promotionDiscounts()).hasSize(1);
+    assertThat(one.promotionDiscounts().get(0).label()).contains("Seasonal");
   }
 }

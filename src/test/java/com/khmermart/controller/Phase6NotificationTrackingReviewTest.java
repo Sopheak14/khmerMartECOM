@@ -390,7 +390,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
   void testReviewLifecycleAndPermissions() throws Exception {
     // 1. Unverified purchase attempt -> 403 FORBIDDEN
     CreateReviewRequest createReq =
-        new CreateReviewRequest(5, "Amazing Laptop!", "Blazing fast performance.");
+        new CreateReviewRequest(5, "Beautiful silk!", "Rich colour and fine weave.");
     mockMvc
         .perform(
             post("/api/products/" + testProduct.getId() + "/reviews")

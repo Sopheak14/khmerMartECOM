@@ -21,6 +21,7 @@ import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.security.JwtService;
+import com.khmermart.seed.SeedCatalog;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -59,15 +60,22 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
   @DisplayName(
       "Khmer invoice PDF: embedded Khmer font, pdftotext extraction, visual PNG, and paid sample")
   void testKhmerInvoiceGeneration() throws Exception {
+    // The hero product, Ruby Red Standard variant, bought on flash sale with the SAVE5 coupon
+    SeedCatalog.Product hero = SeedCatalog.product(SeedCatalog.HERO_ID);
+    SeedCatalog.Variant heroVariant = SeedCatalog.variant(SeedCatalog.HERO_RED_STANDARD);
+    long subtotal = SeedCatalog.HERO_STANDARD_CENTS;
+    long flashDiscount = SeedCatalog.DEMO_ORDER_FLASH_DISCOUNT_CENTS;
+    long total = SeedCatalog.DEMO_ORDER_TOTAL_CENTS;
+
     Product product =
         productRepository.save(
             Product.builder()
-                .categoryId(1L)
-                .name("Laptop Pro 15")
-                .nameKm("កុំព្យូទ័រយួរដៃ ប្រូ ១៥")
-                .slug("laptop-pro-15-" + UUID.randomUUID())
-                .sku("LP15-GRY-16-512")
-                .priceCents(99900L)
+                .categoryId(SeedCatalog.CAT_SILK)
+                .name(hero.name())
+                .nameKm(hero.nameKm())
+                .slug(hero.slug() + "-" + UUID.randomUUID())
+                .sku(heroVariant.sku())
+                .priceCents(subtotal)
                 .active(true)
                 .build());
 
@@ -75,14 +83,15 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
         """
         {
           "promotions": [
-            {"label": "Flash Sale Discount", "amountCents": 10000}
+            {"label": "Flash Sale Discount", "amountCents": %d}
           ],
           "coupon": {
-            "code": "SAVE5",
-            "amountCents": 500
+            "code": "%s",
+            "amountCents": %d
           }
         }
-        """;
+        """
+            .formatted(flashDiscount, SeedCatalog.COUPON_SAVE5, SeedCatalog.SAVE5_CENTS);
 
     Order order =
         orderRepository.save(
@@ -92,11 +101,11 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
                 .status(OrderStatus.CONFIRMED)
                 .paymentStatus(PaymentStatus.PAID)
                 .paymentMethod(PaymentMethod.KHQR)
-                .subtotalCents(99900L)
-                .discountCents(10500L)
+                .subtotalCents(subtotal)
+                .discountCents(flashDiscount + SeedCatalog.SAVE5_CENTS)
                 .shippingCents(0L)
-                .totalCents(89400L)
-                .couponCode("SAVE5")
+                .totalCents(total)
+                .couponCode(SeedCatalog.COUPON_SAVE5)
                 .discountBreakdown(discountBreakdown)
                 .shippingAddress(
                     "{\"recipientName\":\"សុភាព\",\"phone\":\"+85512345678\",\"line1\":\"ផ្លូវ ២០០៤ ខណ្ឌពោធិ៍សែនជ័យ\",\"province\":\"រាជធានីភ្នំពេញ\"}")
@@ -109,11 +118,11 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
         OrderItem.builder()
             .orderId(order.getId())
             .productId(product.getId())
-            .productNameSnapshot("Laptop Pro 15")
-            .skuSnapshot("LP15-GRY-16-512")
-            .unitPriceCents(99900L)
+            .productNameSnapshot(hero.name())
+            .skuSnapshot(heroVariant.sku())
+            .unitPriceCents(subtotal)
             .quantity(1)
-            .lineTotalCents(99900L)
+            .lineTotalCents(subtotal)
             .build());
 
     paymentRepository.save(
@@ -121,7 +130,7 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
             .orderId(order.getId())
             .method(PaymentMethod.KHQR)
             .status(PaymentStatus.PAID)
-            .amountCents(89400L)
+            .amountCents(total)
             .currency("USD")
             .bakongHash("MOCK-2874fccc-513a-4c0e-bc77-516d29419d69")
             .paidAt(Instant.parse("2026-10-23T08:52:28Z"))
@@ -181,12 +190,12 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
 
     assertThat(textOutput).contains("សុភាព");
     assertThat(textOutput).contains("ផ្លូវ ២០០៤ ខណ្ឌពោធិ៍សែនជ័យ");
-    assertThat(textOutput).contains("កុំព្យូទ័រយួរដៃ ប្រូ ១៥");
+    assertThat(textOutput).contains(hero.nameKm());
     assertThat(textOutput).contains("៛");
     assertThat(textOutput).contains("KhmerMart");
     assertThat(textOutput).contains("Payment in MOCK mode — not a real transaction");
     assertThat(textOutput).contains("Flash Sale Discount");
-    assertThat(textOutput).contains("Coupon (SAVE5)");
+    assertThat(textOutput).contains("Coupon (" + SeedCatalog.COUPON_SAVE5 + ")");
     assertThat(textOutput).contains("(ICT)");
 
     // Render page 1 to PNG via pdftoppm -png -r 100

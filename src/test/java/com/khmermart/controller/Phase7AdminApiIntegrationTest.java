@@ -49,6 +49,7 @@ import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.ProductImageRepository;
 import com.khmermart.repository.ProductRepository;
 import com.khmermart.security.JwtService;
+import com.khmermart.seed.SeedCatalog;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -307,20 +308,20 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
     // 1. Create product with variants and Khmer name
     AdminProductCreateRequest createReq =
         new AdminProductCreateRequest(
-            "MacBook Pro 16",
-            "ម៉ាក់ប៊ុកប្រូ ១៦",
-            "MBP16-" + UUID.randomUUID().toString().substring(0, 4),
-            "macbook-pro-16-" + UUID.randomUUID(),
-            "Ultimate pro laptop",
-            "Apple",
-            249900L,
-            269900L,
+            "Kampot White Pepper",
+            "ម្រេចសកំពត",
+            "KWP-" + UUID.randomUUID().toString().substring(0, 4),
+            "kampot-white-pepper-" + UUID.randomUUID(),
+            "Peeled white peppercorns from Kampot",
+            "Kampot Farms",
+            1400L,
+            1600L,
             null,
             true,
             null,
             List.of(
-                new AdminVariantRequest("MBP16-512", Map.of("storage", "512GB"), 249900L, 15),
-                new AdminVariantRequest("MBP16-1TB", Map.of("storage", "1TB"), 289900L, 10)));
+                new AdminVariantRequest("KWP-100G", Map.of("weight", "100 g"), 1400L, 15),
+                new AdminVariantRequest("KWP-250G", Map.of("weight", "250 g"), 3200L, 10)));
 
     String createRes =
         mockMvc
@@ -331,8 +332,8 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                     .content(objectMapper.writeValueAsString(createReq)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.name").value("MacBook Pro 16"))
-            .andExpect(jsonPath("$.data.nameKm").value("ម៉ាក់ប៊ុកប្រូ ១៦"))
+            .andExpect(jsonPath("$.data.name").value("Kampot White Pepper"))
+            .andExpect(jsonPath("$.data.nameKm").value("ម្រេចសកំពត"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -433,9 +434,9 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                 .paymentMethod(PaymentMethod.KHQR)
                 .shippingMethodCode("STANDARD")
                 .shippingAddress("{}")
-                .subtotalCents(249900L)
+                .subtotalCents(1400L)
                 .shippingCents(0L)
-                .totalCents(249900L)
+                .totalCents(1400L)
                 .placedAt(Instant.now())
                 .build());
 
@@ -443,11 +444,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
         OrderItem.builder()
             .orderId(order.getId())
             .productId(productId)
-            .skuSnapshot("MBP16-TEST")
-            .productNameSnapshot("MacBook Pro 16")
-            .unitPriceCents(249900L)
+            .skuSnapshot("KWP-TEST")
+            .productNameSnapshot("Kampot White Pepper")
+            .unitPriceCents(1400L)
             .quantity(1)
-            .lineTotalCents(249900L)
+            .lineTotalCents(1400L)
             .build());
 
     mockMvc
@@ -967,31 +968,40 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                     .getResponse()
                     .getContentAsString())
             .path("data");
-    assertThat(seeded.path("items")).hasSize(5);
+    // hero Standard x2 variants + product-wide Black Pepper + Dried Mango
+    assertThat(seeded.path("items")).hasSize(4);
     seeded
         .path("items")
         .forEach(
             it -> {
-              if (it.path("variantId").asLong() == 1L) {
+              if (it.path("variantId").asLong() == SeedCatalog.HERO_RED_STANDARD) {
                 assertThat(it.path("sku").asText()).isNotEmpty();
                 assertThat(it.path("attributes").isObject()).isTrue();
-                assertThat(it.path("priceCents").asLong()).isEqualTo(99900L);
-                assertThat(it.path("salePriceCents").asLong()).isEqualTo(89900L);
+                assertThat(it.path("priceCents").asLong())
+                    .isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
+                assertThat(it.path("salePriceCents").asLong())
+                    .isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
               }
             });
 
+    long premiumSale = SeedCatalog.HERO_PREMIUM_CENTS - 2000L;
+    long cheaperStandardSale = SeedCatalog.HERO_FLASH_CENTS - 1000L;
     List<Long> createdIds = new java.util.ArrayList<>();
     try {
-      // 1. Per-variant flash sale on 1001 variant 3 -> 119900 while promotion 1 stays active:
-      //    variants 1,2 keep 89900 (promotion 1), variant 3 gets 119900, variant 4 not on sale
+      // 1. Per-variant flash sale on 1001 Ruby Red Premium (variant 2) while promotion 1 stays
+      //    active: Standard variants keep the flash price (promotion 1), variant 2 gets
+      // premiumSale,
+      //    variant 4 not on sale
       String res =
           postPromotion(
                   flashRequest(
-                      "Laptop variant flash",
+                      "Premium variant flash",
                       now,
                       true,
                       null,
-                      List.of(new PromotionItemRequest(1001L, 3L, 119900L))))
+                      List.of(
+                          new PromotionItemRequest(
+                              SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_PREMIUM, premiumSale))))
               .andExpect(status().isOk())
               .andExpect(jsonPath("$.data.items.length()").value(1))
               .andReturn()
@@ -1000,11 +1010,13 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
       createdIds.add(objectMapper.readTree(res).path("data").path("id").asLong());
 
       mockMvc
-          .perform(get("/api/products/1001"))
+          .perform(get("/api/products/" + SeedCatalog.HERO_ID))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.variants[0].salePriceCents").value(89900))
-          .andExpect(jsonPath("$.data.variants[1].salePriceCents").value(89900))
-          .andExpect(jsonPath("$.data.variants[2].salePriceCents").value(119900))
+          .andExpect(
+              jsonPath("$.data.variants[0].salePriceCents").value(SeedCatalog.HERO_FLASH_CENTS))
+          .andExpect(jsonPath("$.data.variants[1].salePriceCents").value(premiumSale))
+          .andExpect(
+              jsonPath("$.data.variants[2].salePriceCents").value(SeedCatalog.HERO_FLASH_CENTS))
           .andExpect(jsonPath("$.data.variants[3].salePriceCents").doesNotExist());
 
       // 1b. Same variant in a second overlapping flash sale -> 409 naming variant and other promo
@@ -1014,7 +1026,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                   now,
                   true,
                   null,
-                  List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+                  List.of(
+                      new PromotionItemRequest(
+                          SeedCatalog.HERO_ID,
+                          SeedCatalog.HERO_RED_STANDARD,
+                          cheaperStandardSale))))
           .andExpect(status().isConflict())
           .andExpect(jsonPath("$.error.code").value("CONFLICT"))
           .andExpect(
@@ -1033,7 +1049,11 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                       later,
                       true,
                       null,
-                      List.of(new PromotionItemRequest(1001L, 1L, 80000L))))
+                      List.of(
+                          new PromotionItemRequest(
+                              SeedCatalog.HERO_ID,
+                              SeedCatalog.HERO_RED_STANDARD,
+                              cheaperStandardSale))))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -1047,42 +1067,48 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                   now,
                   false,
                   null,
-                  List.of(new PromotionItemRequest(1001L, null, 89900L))))
+                  List.of(new PromotionItemRequest(SeedCatalog.HERO_ID, null, premiumSale))))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
           .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
 
-      // 3. Variant from another product -> 400
+      // 3. Variant from another product (a hero variant on the Jasmine Rice) -> 400
       postPromotion(
               flashRequest(
                   "Bad variant",
                   now,
                   false,
                   null,
-                  List.of(new PromotionItemRequest(1010L, 3L, 1000L))))
+                  List.of(
+                      new PromotionItemRequest(
+                          SeedCatalog.RICE_ID, SeedCatalog.HERO_BLUE_STANDARD, 1000L))))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
           .andExpect(jsonPath("$.error.details['items[0].variantId']").exists());
 
-      // 4. Sale price must be > 0 and < variant price (variant 3 = 129900)
-      for (long bad : new long[] {0L, 129900L, 150000L}) {
+      // 4. Sale price must be > 0 and < variant price (Ruby Red Premium)
+      long premium = SeedCatalog.HERO_PREMIUM_CENTS;
+      for (long bad : new long[] {0L, premium, premium + 5000L}) {
         postPromotion(
                 flashRequest(
                     "Bad price",
                     now,
                     false,
                     null,
-                    List.of(new PromotionItemRequest(1001L, 3L, bad))))
+                    List.of(
+                        new PromotionItemRequest(
+                            SeedCatalog.HERO_ID, SeedCatalog.HERO_RED_PREMIUM, bad))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error.details['items[0].salePriceCents']").exists());
       }
 
-      // 5. Legacy productIds-only payload on a product without variants still works
+      // 5. Legacy productIds-only payload on a product without variants (Sticky Rice) still works
+      long legacyProductId = 1015L;
       String legacy =
-          postPromotion(flashRequest("Legacy ids", now, false, List.of(1015L), null))
+          postPromotion(flashRequest("Legacy ids", now, false, List.of(legacyProductId), null))
               .andExpect(status().isOk())
-              .andExpect(jsonPath("$.data.productIds[0]").value(1015))
-              .andExpect(jsonPath("$.data.items[0].productId").value(1015))
+              .andExpect(jsonPath("$.data.productIds[0]").value(legacyProductId))
+              .andExpect(jsonPath("$.data.items[0].productId").value(legacyProductId))
               .andReturn()
               .getResponse()
               .getContentAsString();

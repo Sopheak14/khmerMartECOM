@@ -5,6 +5,11 @@
 #          BASE=http://host:4000 scripts/smoke_test.sh
 # Needs:   bash, curl, jq, pdftotext (poppler-utils), uuidgen (or /proc), date (GNU)
 #
+# Catalog under test: the Khmer-only seed (see SeedCatalog.java). The hero product 1001 "Takeo Hol
+# Silk Sampot" has 4 variants (Ruby Red / Royal Blue x Standard / Premium); only the two Standard
+# variants are on the 7-day flash sale. Every expected number below is derived from the seed
+# constants in the block that follows, never typed in as a literal result.
+#
 # Safe to re-run: registers a NEW throwaway customer (smoke+<timestamp>@khmermart.local) every run,
 # never edits the seeded demo accounts, uses KHQR MOCK mode (simulate-paid only), and restores the
 # stock it temporarily changes. It does NOT start, stop or restart anything.
@@ -23,6 +28,18 @@ CUSTOMER_EMAIL="smoke+${STAMP}@khmermart.local"
 RECIPIENT="សុភាព"
 LINE1="ផ្លូវ ២០០៤ ខណ្ឌពោធិ៍សែនជ័យ"
 DISTRICT="ពោធិ៍សែនជ័យ"
+
+# ---- seed constants (mirror com.khmermart.seed.SeedCatalog; all money in USD cents) ----
+HERO=1001
+V_RED_STD=1; V_RED_PRM=2; V_BLUE_STD=3; V_BLUE_PRM=4          # variant ids of the hero product
+STD_CENTS=14900; PRM_CENTS=19900; FLASH_CENTS=12900            # Standard / Premium / Standard on flash
+PEPPER_ID=1006; PEPPER_FLASH_CENTS=790                         # Kampot Black Pepper 100 g (flash, product-wide)
+MANGO_ID=1022; MANGO_FLASH_CENTS=320                           # Dried Mango 200 g (flash, product-wide)
+SAVE5_CENTS=500
+SEASONAL_NAME="Pchum Ben Festival Sale"
+ROOT_CATEGORIES=8
+FLASH_OFF=$((STD_CENTS - FLASH_CENTS))                         # 2000
+DEMO_TOTAL=$((FLASH_CENTS - SAVE5_CENTS))                      # 12400 (free STANDARD shipping, subtotal >= 5000)
 
 TMP="$(mktemp -d)"
 JAR="$TMP/cookies.txt"
@@ -155,7 +172,7 @@ make_buyer() { # make_buyer <email> <variantId>
     -d "$(jq -nc --arg r "$RECIPIENT" --arg l "$LINE1" --arg d "$DISTRICT" --arg ph "$CUSTOMER_PHONE" '{label:"Home",recipientName:$r,phone:$ph,line1:$l,district:$d,province:"Phnom Penh",isDefault:true}')" -o "$TMP/a.json"
   aid="$(jq -r .data.id "$TMP/a.json")"
   curl -sS -m 30 -X POST "$API/cart/items" -H "Authorization: Bearer $tok" -H 'Content-Type: application/json' \
-    -d "{\"productId\":1001,\"variantId\":$2,\"quantity\":1}" -o "$TMP/c.json"
+    -d "{\"productId\":$HERO,\"variantId\":$2,\"quantity\":1}" -o "$TMP/c.json"
   echo "$tok $aid"
 }
 
@@ -169,10 +186,10 @@ req GET /admin/promotions/1 "" >/dev/null
 expect_status 200
 expect_eq "promotion 1 returns per-variant items[] (current build)" "$(j '.data.items|type')" "array"
 expect_eq "promotion 1 is a FLASH_SALE" "$(j .data.type)" "FLASH_SALE"
-req GET /products/1001 "" >/dev/null
-expect_eq "variant 1 on flash sale (seed data intact, sale not expired)" "$(j '.data.variants[0].salePriceCents')" "89900"
-ensure_available 1 5
-ensure_available 3 5
+req GET /products/$HERO "" >/dev/null
+expect_eq "variant 1 on flash sale (seed data intact, sale not expired)" "$(j '.data.variants[0].salePriceCents')" "$FLASH_CENTS"
+ensure_available "$V_RED_STD" 5
+ensure_available "$V_BLUE_PRM" 5
 pass
 
 # ---------------------------------------------------------------- STEP 1 — health
@@ -205,41 +222,54 @@ USER_ID="$(j .data.user.id)"
 pass
 
 # ---------------------------------------------------------------- STEP 3 — browse
-step 3 "Browse: categories, search 'laptop', product 1001 variants"
+step 3 "Browse: 8 Khmer categories, search 'silk', hero variants, flash + seasonal"
 AUTH_HDR=""
 req GET /categories "" >/dev/null
 expect_status 200
 info "top-level categories: $(jc '[.data[]|.name]')"
-expect_true "at least one category" "$([ "$(j '.data|length')" -ge 1 ]; echo $?)"
-req GET "/products?q=laptop" "" >/dev/null
+expect_eq "root category count" "$(j '.data|length')" "$ROOT_CATEGORIES"
+expect_eq "first category" "$(j '.data[0].slug')" "silk-textiles"
+req GET "/products?q=silk" "" >/dev/null
 expect_status 200
 info "search hits: $(jc '[.data[]|{id,name}]' | head -c 300)"
-expect_true "search 'laptop' returns results" "$([ "$(j '.data|length')" -ge 1 ]; echo $?)"
-req GET /products/1001 "" >/dev/null
+expect_true "search 'silk' finds the hero product" "$(jq -e --argjson h "$HERO" '[.data[]|select(.id==$h)]|length==1' "$BODY" >/dev/null; echo $?)"
+req GET /products/$HERO "" >/dev/null
 expect_status 200
-info "variants: $(jc '[.data.variants[]|{id,priceCents,salePriceCents}]')"
-expect_eq "variant 1 salePriceCents" "$(j '.data.variants[0].salePriceCents')" "89900"
-expect_eq "variant 2 salePriceCents" "$(j '.data.variants[1].salePriceCents')" "89900"
-expect_eq "variant 3 has no salePriceCents" "$(j '.data.variants[2].salePriceCents')" "null"
-expect_eq "variant 4 has no salePriceCents" "$(j '.data.variants[3].salePriceCents')" "null"
+info "variants: $(jc '[.data.variants[]|{id,attributes,priceCents,salePriceCents}]')"
+expect_eq "variant count (color x grade)" "$(j '.data.variants|length')" "4"
+expect_eq "Ruby Red Standard salePriceCents" "$(j '.data.variants[0].salePriceCents')" "$FLASH_CENTS"
+expect_eq "Ruby Red Premium has no salePriceCents" "$(j '.data.variants[1].salePriceCents')" "null"
+expect_eq "Royal Blue Standard salePriceCents" "$(j '.data.variants[2].salePriceCents')" "$FLASH_CENTS"
+expect_eq "Royal Blue Premium has no salePriceCents" "$(j '.data.variants[3].salePriceCents')" "null"
+expect_eq "Premium price" "$(j '.data.variants[1].priceCents')" "$PRM_CENTS"
+req GET /products/$PEPPER_ID "" >/dev/null
+expect_eq "Kampot Black Pepper flash price (product-wide)" "$(j .data.salePriceCents)" "$PEPPER_FLASH_CENTS"
+req GET /products/$MANGO_ID "" >/dev/null
+expect_eq "Dried Mango flash price (product-wide)" "$(j .data.salePriceCents)" "$MANGO_FLASH_CENTS"
+req GET /settings/public "" >/dev/null
+expect_eq "seasonal banner" "$(j .data.seasonalBanner.title)" "$SEASONAL_NAME"
 pass
 
 # ---------------------------------------------------------------- STEP 4 — cart
-step 4 "Cart: variant 1 at flash price, variant 3 without flash discount"
+step 4 "Cart: Standard variant at flash price, Premium variant without flash discount"
 as_customer
-AVAIL_V1_BEFORE="$(inv_field 1 4)"
-AVAIL_V3_BEFORE="$(inv_field 3 4)"
-req POST /cart/items '{"productId":1001,"variantId":1,"quantity":1}' >/dev/null
+AVAIL_V1_BEFORE="$(inv_field "$V_RED_STD" 4)"
+req POST /cart/items "{\"productId\":$HERO,\"variantId\":$V_RED_STD,\"quantity\":1}" >/dev/null
 expect_status 200
-expect_eq "cart total with variant 1 (99900 - 10000 flash)" "$(j .data.totalCents)" "89900"
-expect_eq "flash discount" "$(j .data.discountCents)" "10000"
-req POST /cart/items '{"productId":1001,"variantId":3,"quantity":1}' >/dev/null
+expect_eq "cart total with Standard ($STD_CENTS - $FLASH_OFF flash)" "$(j .data.totalCents)" "$FLASH_CENTS"
+expect_eq "flash discount" "$(j .data.discountCents)" "$FLASH_OFF"
+req POST /cart/items "{\"productId\":$HERO,\"variantId\":$V_RED_PRM,\"quantity\":1}" >/dev/null
 expect_status 200
-expect_eq "variant 3 line total (full price)" "$(j '.data.items[]|select(.variantId==3)|.lineTotalCents')" "129900"
-expect_eq "discount unchanged by variant 3 (no flash on it)" "$(j .data.discountCents)" "10000"
-expect_eq "cart subtotal" "$(j .data.subtotalCents)" "229800"
-expect_eq "cart total" "$(j .data.totalCents)" "219800"
+expect_eq "Premium line total (full price)" "$(j '.data.items[]|select(.variantId=='"$V_RED_PRM"')|.lineTotalCents')" "$PRM_CENTS"
+expect_eq "discount unchanged by Premium (no flash on it)" "$(j .data.discountCents)" "$FLASH_OFF"
+expect_eq "cart subtotal" "$(j .data.subtotalCents)" "$((STD_CENTS + PRM_CENTS))"
+expect_eq "cart total" "$(j .data.totalCents)" "$((STD_CENTS + PRM_CENTS - FLASH_OFF))"
 info "promotionDiscounts: $(jc .data.promotionDiscounts)"
+# keep only the Standard variant: that is the demo order (14900 - 2000 flash - 500 SAVE5 = 12400)
+PREMIUM_ITEM_ID="$(j '.data.items[]|select(.variantId=='"$V_RED_PRM"')|.id')"
+req DELETE "/cart/items/$PREMIUM_ITEM_ID" "" >/dev/null
+expect_status 200
+expect_eq "cart back to the Standard variant only" "$(j .data.subtotalCents)" "$STD_CENTS"
 pass
 
 # ---------------------------------------------------------------- STEP 5 — coupon
@@ -248,9 +278,9 @@ as_customer
 req POST /cart/coupon '{"code":"SAVE5"}' >/dev/null
 expect_status 200
 expect_eq "coupon code" "$(j .data.coupon.code)" "SAVE5"
-expect_eq "coupon value (the 500 line)" "$(j .data.coupon.value)" "500"
-expect_eq "discountCents = 10000 flash + 500 coupon" "$(j .data.discountCents)" "10500"
-expect_eq "cart total" "$(j .data.totalCents)" "219300"
+expect_eq "coupon value (the $SAVE5_CENTS line)" "$(j .data.coupon.value)" "$SAVE5_CENTS"
+expect_eq "discountCents = $FLASH_OFF flash + $SAVE5_CENTS coupon" "$(j .data.discountCents)" "$((FLASH_OFF + SAVE5_CENTS))"
+expect_eq "cart total" "$(j .data.totalCents)" "$DEMO_TOTAL"
 req POST /cart/coupon '{"code":"INVALIDCODE"}' >/dev/null
 expect_status 422
 info "error: $(jc .error)"
@@ -278,10 +308,12 @@ AUTH_HDR=""; req GET /settings/public "" >/dev/null; KHR_RATE="$(j .data.khrRate
 req POST /checkout/preview "$(jq -nc --argjson a "$ADDRESS_ID" '{addressId:$a,shippingMethodCode:"STANDARD",paymentMethod:"KHQR"}')" >/dev/null
 expect_status 200
 SUB="$(j .data.subtotalCents)"; DISC="$(j .data.discountCents)"; SHIP="$(j .data.shippingCents)"; TOT="$(j .data.totalCents)"; TOTKHR="$(j .data.totalKhr)"
+expect_eq "demo order total (14900 - 2000 - 500)" "$TOT" "$DEMO_TOTAL"
 info "subtotal=$SUB discount=$DISC shipping=$SHIP total=$TOT totalKhr=$TOTKHR (khrRate=$KHR_RATE)"
 expect_eq "subtotal - discounts + shipping = total" "$((SUB - DISC + SHIP))" "$TOT"
 EXPECT_KHR="$(awk -v t="$TOT" -v r="$KHR_RATE" 'BEGIN{printf "%.0f", t/100*r}')"
 expect_eq "totalKhr = total/100 x khrRate" "$TOTKHR" "$EXPECT_KHR"
+expect_eq "totalKhr for the demo order ($DEMO_TOTAL cents x $KHR_RATE)" "$TOTKHR" "$((DEMO_TOTAL * KHR_RATE / 100))"
 pass
 
 # ---------------------------------------------------------------- STEP 8 — checkout (KHQR) + idempotency
@@ -297,12 +329,12 @@ expect_match "orderNumber format" "$ORDER_NO" '^KM-[0-9]{8}-[0-9]{6}$'
 expect_eq "order status" "$(j .data.order.status)" "PENDING_PAYMENT"
 expect_eq "order total matches preview" "$(j .data.order.totalCents)" "$TOT"
 expect_eq "next action" "$(j .data.next)" "KHQR_PAYMENT"
-AVAIL_V1_RESERVED="$(inv_field 1 4)"
+AVAIL_V1_RESERVED="$(inv_field "$V_RED_STD" 4)"
 expect_eq "variant 1 available dropped by 1 (reserved)" "$AVAIL_V1_RESERVED" "$((AVAIL_V1_BEFORE - 1))"
 req POST /checkout "$CHECKOUT_BODY" -H "Idempotency-Key: $IDEM" >/dev/null
 expect_status 200
 expect_eq "same Idempotency-Key -> same orderNumber" "$(j .data.order.orderNumber)" "$ORDER_NO"
-expect_eq "replay did not reserve stock twice" "$(inv_field 1 4)" "$AVAIL_V1_RESERVED"
+expect_eq "replay did not reserve stock twice" "$(inv_field "$V_RED_STD" 4)" "$AVAIL_V1_RESERVED"
 pass
 
 # ---------------------------------------------------------------- STEP 9 — KHQR + simulate-paid
@@ -326,11 +358,10 @@ req POST "/payments/$PAYMENT_ID/simulate-paid" "" >/dev/null
 expect_status 200
 expect_eq "payment status" "$(j .data.status)" "PAID"
 expect_eq "order status" "$(j .data.orderStatus)" "CONFIRMED"
-INV1="$(inv_field 1 1)"
+INV1="$(inv_field "$V_RED_STD" 1)"
 movements_for "$INV1"
 expect_true "SALE movement recorded for variant 1 / this order" "$(jq -e --argjson o "$ORDER_ID" '[.data[]|select(.type=="SALE" and .refOrderId==$o)]|length==1' "$TMP/mov.json" >/dev/null; echo $?)"
-expect_eq "variant 1 available decreased by 1 vs before checkout" "$(inv_field 1 4)" "$((AVAIL_V1_BEFORE - 1))"
-expect_eq "variant 3 available decreased by 1 vs before checkout" "$(inv_field 3 4)" "$((AVAIL_V3_BEFORE - 1))"
+expect_eq "variant 1 available decreased by 1 vs before checkout" "$(inv_field "$V_RED_STD" 4)" "$((AVAIL_V1_BEFORE - 1))"
 pass
 
 # ---------------------------------------------------------------- STEP 10 — admin ship + tracking
@@ -375,11 +406,11 @@ pass
 # ---------------------------------------------------------------- STEP 12 — review
 step 12 "Review: 5 stars accepted, second review rejected"
 as_customer
-req POST /products/1001/reviews '{"rating":5,"title":"Great laptop","body":"Smoke test review, works well."}' >/dev/null
+req POST /products/$HERO/reviews '{"rating":5,"title":"Beautiful silk","body":"Smoke test review, lovely hand-woven sampot."}' >/dev/null
 expect_status 201
 expect_eq "rating" "$(j .data.rating)" "5"
 expect_eq "verifiedPurchase" "$(j .data.verifiedPurchase)" "true"
-req POST /products/1001/reviews '{"rating":4,"title":"Again","body":"Second review should be refused."}' >/dev/null
+req POST /products/$HERO/reviews '{"rating":4,"title":"Again","body":"Second review should be refused."}' >/dev/null
 info "error: $(jc .error)"
 expect_eq "second review rejected (HTTP)" "$HTTP" "409"
 pass
@@ -387,20 +418,20 @@ pass
 # ---------------------------------------------------------------- EXTRA A — COD cancel
 step X1 "COD order -> cancel -> stock released"
 as_customer
-AV4_BEFORE="$(inv_field 4 4)"
+AV4_BEFORE="$(inv_field "$V_BLUE_PRM" 4)"
 req DELETE /cart "" >/dev/null
-req POST /cart/items '{"productId":1001,"variantId":4,"quantity":1}' >/dev/null
+req POST /cart/items "{\"productId\":$HERO,\"variantId\":$V_BLUE_PRM,\"quantity\":1}" >/dev/null
 expect_status 200
 req POST /checkout "$(jq -nc --argjson a "$ADDRESS_ID" '{addressId:$a,shippingMethodCode:"STANDARD",paymentMethod:"COD"}')" -H "Idempotency-Key: $(uuid)" >/dev/null
 expect_status 200
 COD_NO="$(j .data.order.orderNumber)"; COD_ID="$(j .data.order.id)"
 expect_eq "COD order is CONFIRMED" "$(j .data.order.status)" "CONFIRMED"
-expect_eq "variant 4 available reserved" "$(inv_field 4 4)" "$((AV4_BEFORE - 1))"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) available reserved" "$(inv_field "$V_BLUE_PRM" 4)" "$((AV4_BEFORE - 1))"
 req POST "/orders/$COD_NO/cancel" '{"reason":"smoke test"}' >/dev/null
 expect_status 200
 expect_eq "order status" "$(j .data.status)" "CANCELLED"
-expect_eq "variant 4 stock restored" "$(inv_field 4 4)" "$AV4_BEFORE"
-movements_for "$(inv_field 4 1)"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) stock restored" "$(inv_field "$V_BLUE_PRM" 4)" "$AV4_BEFORE"
+movements_for "$(inv_field "$V_BLUE_PRM" 1)"
 COD_MOVE="$(jq -r --argjson o "$COD_ID" '[.data[]|select(.refOrderId==$o and (.type=="RELEASE" or .type=="RETURN"))|.type]|first' "$TMP/mov.json")"
 info "cancel movement for an UNPAID COD order: $COD_MOVE (RETURN is only written when the order was already PAID)"
 expect_true "stock-restoring movement (RELEASE/RETURN) written" "$([ "$COD_MOVE" = "RELEASE" ] || [ "$COD_MOVE" = "RETURN" ]; echo $?)"
@@ -409,7 +440,7 @@ pass
 # ---------------------------------------------------------------- EXTRA B — paid KHQR cancel -> refund
 step X2 "Paid KHQR order -> cancel -> payment REFUNDED + RETURN movement"
 as_customer
-req POST /cart/items '{"productId":1001,"variantId":4,"quantity":1}' >/dev/null
+req POST /cart/items "{\"productId\":$HERO,\"variantId\":$V_BLUE_PRM,\"quantity\":1}" >/dev/null
 expect_status 200
 req POST /checkout "$(jq -nc --argjson a "$ADDRESS_ID" '{addressId:$a,shippingMethodCode:"STANDARD",paymentMethod:"KHQR"}')" -H "Idempotency-Key: $(uuid)" >/dev/null
 expect_status 200
@@ -426,9 +457,9 @@ expect_eq "order paymentStatus" "$(j .data.paymentStatus)" "REFUNDED"
 as_admin
 req GET "/admin/payments/$K_PID" "" >/dev/null
 expect_eq "payment status (admin view)" "$(j .data.status)" "REFUNDED"
-movements_for "$(inv_field 4 1)"
+movements_for "$(inv_field "$V_BLUE_PRM" 1)"
 expect_true "RETURN movement recorded for this order" "$(jq -e --argjson o "$K_ID" '[.data[]|select(.type=="RETURN" and .refOrderId==$o)]|length==1' "$TMP/mov.json" >/dev/null; echo $?)"
-expect_eq "variant 4 stock restored" "$(inv_field 4 4)" "$AV4_BEFORE"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) stock restored" "$(inv_field "$V_BLUE_PRM" 4)" "$AV4_BEFORE"
 pass
 
 # ---------------------------------------------------------------- EXTRA C — auth boundaries
@@ -446,7 +477,7 @@ pass
 step X4 "Quantity above stock -> 409 OUT_OF_STOCK"
 as_customer
 req DELETE /cart "" >/dev/null
-req POST /cart/items '{"productId":1001,"variantId":4,"quantity":9999}' >/dev/null
+req POST /cart/items "{\"productId\":$HERO,\"variantId\":$V_BLUE_PRM,\"quantity\":9999}" >/dev/null
 expect_status 409
 info "error: $(jc .error)"
 expect_eq "error code" "$(j .error.code)" "OUT_OF_STOCK"
@@ -454,18 +485,18 @@ pass
 
 # ---------------------------------------------------------------- EXTRA E — parallel last-3-units
 step X5 "10 parallel checkouts for the last 3 units -> exactly 3 succeed"
-INV4="$(inv_field 4 1)"
-AVAIL0="$(inv_field 4 4)"
+INV4="$(inv_field "$V_BLUE_PRM" 1)"
+AVAIL0="$(inv_field "$V_BLUE_PRM" 4)"
 DELTA_STOCK=$((3 - AVAIL0))
 if [ "$DELTA_STOCK" -gt 0 ]; then admin_stock restock "$INV4" "$DELTA_STOCK" "smoke test: set last 3 units"
 elif [ "$DELTA_STOCK" -lt 0 ]; then admin_stock adjust "$INV4" "$DELTA_STOCK" "smoke test: set last 3 units"; fi
-expect_eq "variant 4 available set to exactly 3" "$(inv_field 4 4)" "3"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) available set to exactly 3" "$(inv_field "$V_BLUE_PRM" 4)" "3"
 RES="$TMP/par"; mkdir -p "$RES"
 for i in $(seq 1 10); do
   read -r t a < <(make_buyer "smoke+${STAMP}-par${i}@khmermart.local" 4)
   echo "$t" >"$RES/tok$i"; echo "$a" >"$RES/addr$i"
 done
-info "10 buyers ready, each with variant 4 x1 in the cart; firing together"
+info "10 buyers ready, each with Royal Blue Premium x1 in the cart; firing together"
 export API RES
 seq 1 10 | xargs -P 10 -I{} bash -c '
   t=$(cat "$RES/tok{}"); a=$(cat "$RES/addr{}")
@@ -484,7 +515,7 @@ info "results: $OK x 200, $OOS x 409 OUT_OF_STOCK, $OTHER other"
 expect_eq "successful checkouts" "$OK" "3"
 expect_eq "rejected with 409 OUT_OF_STOCK" "$OOS" "7"
 expect_eq "unexpected responses" "$OTHER" "0"
-expect_eq "variant 4 available after the race (never negative)" "$(inv_field 4 4)" "0"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) available after the race (never negative)" "$(inv_field "$V_BLUE_PRM" 4)" "0"
 # cleanup: cancel the 3 winners (releases their reservations), then undo the temporary stock change
 for i in $(seq 1 10); do
   if [ "$(cat "$RES/code$i")" = "200" ]; then
@@ -492,7 +523,7 @@ for i in $(seq 1 10); do
       -H "Authorization: Bearer $(cat "$RES/tok$i")" -H 'Content-Type: application/json' -d '{"reason":"smoke cleanup"}' -o /dev/null
   fi
 done
-expect_eq "winners cancelled -> available back to 3" "$(inv_field 4 4)" "3"
+expect_eq "winners cancelled -> available back to 3" "$(inv_field "$V_BLUE_PRM" 4)" "3"
 if [ "$DELTA_STOCK" -ne 0 ]; then admin_stock adjust "$INV4" "$((-DELTA_STOCK))" "smoke test: restore stock"; fi
-expect_eq "variant 4 stock restored to original" "$(inv_field 4 4)" "$AVAIL0"
+expect_eq "Royal Blue Premium (variant $V_BLUE_PRM) stock restored to original" "$(inv_field "$V_BLUE_PRM" 4)" "$AVAIL0"
 pass

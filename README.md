@@ -66,6 +66,25 @@ Safety: the script refuses unless `SPRING_PROFILES_ACTIVE` is `dev`, the databas
 
 មុនពេល demo សូមកំណត់មូលដ្ឋានទិន្នន័យ dev ឲ្យត្រឡប់ទៅទិន្នន័យថ្មីស្រស់ (flash sale ដំណើរការ **ចាប់ពីពេលនេះរយៈពេល ៧ ថ្ងៃ** ដើម្បីឲ្យមានម៉ោងរាប់ថយក្រោយ)៖ ១) បិទ backend ដោយខ្លួនឯង ២) `scripts/reset_demo.sh` (វាសួរឲ្យវាយឈ្មោះមូលដ្ឋានទិន្នន័យ; `--yes` រំលងសំណួរ) ៣) ចាប់ផ្តើម backend ឡើងវិញ (ស្គ្រីបមិនបិទ/បើក backend ឡើយ) ៤) `scripts/smoke_test.sh`។ ស្គ្រីបបដិសេធបើមិនមែនប្រូហ្វាល `dev` មិនមែនម៉ាស៊ីន `localhost` ឬមាន backend កំពុងឆ្លើយតប។ **ត្រូវចាប់ផ្តើម backend ឡើងវិញបន្ទាប់ពី reset។**
 
+### Seeded catalog (Khmer-only) / កាតាឡុកដែលបាន seed (ផលិតផលខ្មែរតែប៉ុណ្ណោះ)
+
+KhmerMart sells **only Cambodian products**. The seed (`com.khmermart.seed.DataSeeder`, constants in `SeedCatalog.java`) creates **8 root categories** (Silk & Textiles, Spices & Sauces, Rice & Grains, Coffee & Tea, Snacks & Dried Fruit, Handicrafts, Beauty & Wellness, Books & Culture; each with a Khmer name) and **40 products** (ids 1001–1040, generic origin brands such as "Takeo Weavers" / "Kampot Farms"; the description holds an English and a Khmer paragraph).
+
+| Item | Seed value |
+|---|---|
+| Hero **1001 Takeo Hol Silk Sampot** | 4 variants: Ruby Red / Royal Blue × Standard $149.00 / Premium $199.00, 50 in stock each |
+| **Flash Sale 24H** (7 days from seed time) | 1001 Standard variants (1 and 3) at $129.00; 1006 Kampot Black Pepper at $7.90; 1022 Dried Mango at $3.20 |
+| **Pchum Ben Festival Sale** / ពិធីបុណ្យភ្ជុំបិណ្ឌ (seasonal banner) | 10% off Spices & Sauces (1006–1012) |
+| **Buy 1 Get 1 Lemongrass Soap** / ទិញ ១ ថែម ១ សាប៊ូស្លឹកគ្រៃ (BOGO, 7 days) | 1033 Lemongrass Soap, 2 units → 1 free (−$3.50) |
+| Low stock | 1027 Silver Box (3 left) and 1004 Table Runner (4 left), threshold 5, so the dashboard "Low stock" table is populated |
+| Coupons | `SAVE5` ($5 off, min $35), `WELCOME10`, `FREESHIP`, `EXPIRED` |
+| Demo order | 1001 Standard → $149.00 − $20.00 flash − $5.00 `SAVE5` = **$124.00 = 508,400 ៛** (rate 4,100 ៛/$) |
+| Orders / reviews | 32 orders covering all 9 statuses, 24 reviews, all built from the new catalog |
+
+Product photos: only verified images are used (3 category photos: rice, spices, books); every other product and category shows a clean placeholder until real photos are uploaded in Admin → Products.
+
+KhmerMart លក់តែ **ផលិតផលកម្ពុជា** ប៉ុណ្ណោះ។ ការ seed បង្កើតប្រភេទឫស ៨ (សូត្រ និងក្រណាត់, គ្រឿងទេស និងទឹកជ្រលក់, អង្ករ និងធញ្ញជាតិ, កាហ្វេ និងតែ, អាហារសម្រន់ និងផ្លែឈើស្ងួត, សិប្បកម្ម, សម្រស់ និងសុខភាព, សៀវភៅ និងវប្បធម៌) និងផលិតផល ៤០ (លេខ 1001–1040)។ ផលិតផលសំខាន់ **1001 សំពត់ហូលសូត្រ តាកែវ** មាន ៤ variant (ក្រហមរ៉ូប៊ី / ខៀវរាជា × Standard $149.00 / Premium $199.00); Flash Sale 24H បញ្ចុះតម្លៃ variant Standard ត្រឹម $129.00 បូកម្រេចខ្មៅកំពត $7.90 និងស្វាយក្រៀម $3.20; បដា "ពិធីបុណ្យភ្ជុំបិណ្ឌ" បញ្ចុះ ១០% លើគ្រឿងទេស និងទឹកជ្រលក់; ការបញ្ជាទិញ demo៖ $149.00 − $20.00 − $5.00 = **$124.00 = 508,400 ៛**។
+
 ---
 
 ## 3. Seeded Demo Accounts

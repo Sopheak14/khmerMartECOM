@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.repository.InventoryRepository;
+import com.khmermart.seed.SeedCatalog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,14 +25,14 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
   @Autowired private InventoryRepository inventoryRepository;
 
   /**
-   * Other test classes buy Laptop Pro 15 (1001); put its seeded stock back (variants 1-4 =
-   * 15/15/10/10 on hand, nothing reserved) so the availability assertions do not depend on order.
+   * Other test classes buy the hero product (1001); put its seeded stock back (every variant on
+   * hand at the seeded level, nothing reserved) so the availability assertions do not depend on
+   * order.
    */
   @BeforeEach
-  void resetLaptopStock() {
-    int[] seeded = {15, 15, 10, 10};
-    for (Inventory inv : inventoryRepository.findByProductId(1001L)) {
-      inv.setQuantityOnHand(seeded[(int) (inv.getVariantId() - 1)]);
+  void resetHeroStock() {
+    for (Inventory inv : inventoryRepository.findByProductId(SeedCatalog.HERO_ID)) {
+      inv.setQuantityOnHand(SeedCatalog.HERO_VARIANT_STOCK);
       inv.setQuantityReserved(0);
       inventoryRepository.save(inv);
     }
@@ -61,7 +62,8 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     assertThat(data.has("seasonalBanner")).isTrue();
     assertThat(data.has("flashSale")).isTrue();
     assertThat(data.get("flashSale").get("endsAt").asText()).isNotEmpty();
-    assertThat(data.get("flashSale").get("products").size()).isEqualTo(4);
+    assertThat(data.get("flashSale").get("products").size())
+        .isEqualTo(SeedCatalog.FLASH_PRODUCT_IDS.size());
     assertThat(data.get("categories").isArray()).isTrue();
     assertThat(data.get("bestSellers").isArray()).isTrue();
     assertThat(data.get("newArrivals").isArray()).isTrue();
@@ -79,12 +81,17 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     JsonNode categories = json.get("data");
     assertThat(categories.size()).isEqualTo(8);
 
-    // Electronics category with children
-    JsonNode electronics = categories.get(0); // Assuming sorted by sort_order
-    assertThat(electronics.get("slug").asText()).isEqualTo("electronics");
-    assertThat(electronics.get("nameKm").asText()).isEqualTo("គ្រឿងអេឡិចត្រូនិច");
-    assertThat(electronics.get("children").size()).isGreaterThanOrEqualTo(2);
-    assertThat(electronics.get("productCount").asLong()).isGreaterThanOrEqualTo(2);
+    // Every seeded root category, in sort order, with its Khmer name and product count
+    for (int i = 0; i < SeedCatalog.CATEGORIES.size(); i++) {
+      SeedCatalog.Category seeded = SeedCatalog.CATEGORIES.get(i);
+      JsonNode category = categories.get(i);
+      assertThat(category.get("slug").asText()).isEqualTo(seeded.slug());
+      assertThat(category.get("name").asText()).isEqualTo(seeded.name());
+      assertThat(category.get("nameKm").asText()).isEqualTo(seeded.nameKm());
+      assertThat(category.get("children").size()).isZero();
+      assertThat(category.get("productCount").asLong())
+          .isGreaterThanOrEqualTo(SeedCatalog.productsInCategory(seeded.id()));
+    }
   }
 
   @Test
@@ -102,7 +109,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     JsonNode meta = json.get("meta");
     assertThat(meta.get("page").asInt()).isEqualTo(1);
     assertThat(meta.get("limit").asInt()).isEqualTo(5);
-    assertThat(meta.get("total").asLong()).isGreaterThanOrEqualTo(10);
+    assertThat(meta.get("total").asLong()).isGreaterThanOrEqualTo(SeedCatalog.PRODUCTS.size());
 
     // Check facets
     JsonNode facets = json.get("facets");
@@ -113,7 +120,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "GET /api/products/1001 returns Laptop Pro 15 with priceCents 99900, variants, variantOptions, ratingBreakdown, related")
+      "GET /api/products/1001 returns the Hol Silk Sampot with 4 variants, flash prices on the Standard ones, variantOptions, ratingBreakdown, related")
   void testProduct1001Detail() throws Exception {
     ResponseEntity<String> response = restTemplate.getForEntity("/api/products/1001", String.class);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -123,25 +130,30 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     JsonNode p = json.get("data");
 
     assertThat(p.get("id").asLong()).isEqualTo(1001);
-    assertThat(p.get("name").asText()).isEqualTo("Laptop Pro 15");
-    assertThat(p.get("priceCents").asLong()).isEqualTo(99900);
-    assertThat(p.get("nameKm").asText()).isEqualTo("កុំព្យូទ័រយួរដៃ Laptop Pro 15");
+    SeedCatalog.Product hero = SeedCatalog.product(SeedCatalog.HERO_ID);
+    assertThat(p.get("name").asText()).isEqualTo(hero.name());
+    assertThat(p.get("priceCents").asLong()).isEqualTo(SeedCatalog.HERO_STANDARD_CENTS);
+    assertThat(p.get("nameKm").asText()).isEqualTo(hero.nameKm());
 
-    // Variants
+    // Variants: 1 Red/Standard, 2 Red/Premium, 3 Blue/Standard, 4 Blue/Premium; only Standard is on
+    // flash sale
     JsonNode variants = p.get("variants");
     assertThat(variants.size()).isEqualTo(4);
-    assertThat(p.get("available").asInt()).isEqualTo(50);
-    assertThat(variants.get(0).get("salePriceCents").asLong()).isEqualTo(89900L);
-    assertThat(variants.get(1).get("salePriceCents").asLong()).isEqualTo(89900L);
-    assertThat(variants.get(2).has("salePriceCents")).isFalse();
+    assertThat(p.get("available").asInt()).isEqualTo(4 * SeedCatalog.HERO_VARIANT_STOCK);
+    assertThat(variants.get(0).get("salePriceCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
+    assertThat(variants.get(1).has("salePriceCents")).isFalse();
+    assertThat(variants.get(2).get("salePriceCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
     assertThat(variants.get(3).has("salePriceCents")).isFalse();
-    assertThat(p.get("salePriceCents").asLong()).isEqualTo(89900L);
+    assertThat(variants.get(1).get("priceCents").asLong())
+        .isEqualTo(SeedCatalog.HERO_PREMIUM_CENTS);
+    assertThat(p.get("salePriceCents").asLong()).isEqualTo(SeedCatalog.HERO_FLASH_CENTS);
 
-    // Variant Options: color, ram, storage
+    // Variant Options: color, grade
     JsonNode options = p.get("variantOptions");
     assertThat(options.has("color")).isTrue();
-    assertThat(options.has("ram")).isTrue();
-    assertThat(options.has("storage")).isTrue();
+    assertThat(options.has("grade")).isTrue();
 
     // Rating breakdown & reviewCount (C10 computed rule)
     JsonNode breakdown = p.get("ratingBreakdown");
@@ -154,7 +166,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     }
     int reviewCount = p.get("reviewCount").asInt();
     assertThat(reviewCount).isEqualTo(breakdownSum);
-    assertThat(reviewCount).isEqualTo(3);
+    assertThat(reviewCount).isEqualTo(SeedCatalog.HERO_REVIEW_COUNT);
 
     // Related
     assertThat(p.get("related").isArray()).isTrue();
@@ -162,9 +174,9 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "Filter test: GET /api/products?q=laptop&minPrice=500&maxPrice=1000&brand=Dell&attr[ram]=16GB returns only Dell 16GB laptops in range")
+      "Filter test: GET /api/products?q=pepper&minPrice=8&maxPrice=20&brand=Kampot Farms returns only Kampot Farms peppers in range")
   void testProductFiltering() throws Exception {
-    String url = "/api/products?q=laptop&minPrice=500&maxPrice=1000&brand=Dell&attr[ram]=16GB";
+    String url = "/api/products?q=pepper&minPrice=8&maxPrice=20&brand=Kampot Farms";
     ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -172,12 +184,23 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     assertThat(json.get("success").asBoolean()).isTrue();
     JsonNode products = json.get("data");
 
-    assertThat(products.size())
-        .isEqualTo(2); // Dell Latitude 5520 ($750) and Dell Inspiron 15 ($850)
+    // Kampot Black Pepper ($9.50) and Kampot Red Pepper ($12.50); the $35 gift set is out of range
+    assertThat(products.size()).isEqualTo(2);
     for (JsonNode prod : products) {
-      assertThat(prod.get("brand").asText()).isEqualTo("Dell");
-      assertThat(prod.get("priceCents").asLong()).isBetween(50000L, 100000L);
+      assertThat(prod.get("brand").asText()).isEqualTo("Kampot Farms");
+      assertThat(prod.get("priceCents").asLong()).isBetween(800L, 2000L);
     }
+  }
+
+  @Test
+  @DisplayName("Variant attribute filter: attr[color]=Ruby Red returns only the Hol Silk Sampot")
+  void testVariantAttributeFilter() throws Exception {
+    ResponseEntity<String> response =
+        restTemplate.getForEntity("/api/products?attr[color]=Ruby Red", String.class);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode products = objectMapper.readTree(response.getBody()).get("data");
+    assertThat(products.size()).isEqualTo(1);
+    assertThat(products.get(0).get("id").asLong()).isEqualTo(SeedCatalog.HERO_ID);
   }
 
   @Test
@@ -204,19 +227,18 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
   void testSearchSuggest() throws Exception {
     // English query
     ResponseEntity<String> enResp =
-        restTemplate.getForEntity("/api/search/suggest?q=lap", String.class);
+        restTemplate.getForEntity("/api/search/suggest?q=pepper", String.class);
     assertThat(enResp.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode enJson = objectMapper.readTree(enResp.getBody());
     assertThat(enJson.get("data").get("products").size()).isGreaterThanOrEqualTo(1);
 
     // Khmer query
     ResponseEntity<String> kmResp =
-        restTemplate.getForEntity("/api/search/suggest?q=កុំព្យូទ័រ", String.class);
+        restTemplate.getForEntity("/api/search/suggest?q=ម្រេច", String.class);
     assertThat(kmResp.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode kmJson = objectMapper.readTree(kmResp.getBody());
     assertThat(kmJson.get("data").get("products").size()).isGreaterThanOrEqualTo(1);
-    assertThat(kmJson.get("data").get("products").get(0).get("nameKm").asText())
-        .contains("កុំព្យូទ័រ");
+    assertThat(kmJson.get("data").get("products").get(0).get("nameKm").asText()).contains("ម្រេច");
   }
 
   @Test
@@ -234,18 +256,18 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "Product with no APPROVED reviews must have avgRating = 0 and reviewCount = 0 (e.g. Dell Latitude 5520, product 1002)")
+      "Product with no APPROVED reviews must have avgRating = 0 and reviewCount = 0 (e.g. Hol Silk Table Runner, product 1004)")
   void testProductWithNoApprovedReviewsHasZeroRatingAndCount() throws Exception {
-    // 1. GET /api/products/1002
+    // 1. GET /api/products/1004
     ResponseEntity<String> detailResp =
-        restTemplate.getForEntity("/api/products/1002", String.class);
+        restTemplate.getForEntity("/api/products/1004", String.class);
     assertThat(detailResp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
     JsonNode detailJson = objectMapper.readTree(detailResp.getBody());
     assertThat(detailJson.get("success").asBoolean()).isTrue();
     JsonNode p = detailJson.get("data");
 
-    assertThat(p.get("id").asLong()).isEqualTo(1002L);
+    assertThat(p.get("id").asLong()).isEqualTo(1004L);
     assertThat(p.get("reviewCount").asInt()).isEqualTo(0);
     assertThat(p.get("avgRating").asDouble()).isEqualTo(0.0);
 
@@ -255,16 +277,16 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
       assertThat(breakdown.get(String.valueOf(star)).asInt()).isEqualTo(0);
     }
 
-    // 2. GET /api/products?q=Latitude card view must also show avgRating 0 and reviewCount 0
+    // 2. GET /api/products?q=Runner card view must also show avgRating 0 and reviewCount 0
     ResponseEntity<String> listResp =
-        restTemplate.getForEntity("/api/products?q=Latitude", String.class);
+        restTemplate.getForEntity("/api/products?q=Runner", String.class);
     assertThat(listResp.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode listJson = objectMapper.readTree(listResp.getBody());
     assertThat(listJson.get("data").isArray()).isTrue();
     assertThat(listJson.get("data").size()).isGreaterThanOrEqualTo(1);
 
     JsonNode card = listJson.get("data").get(0);
-    assertThat(card.get("id").asLong()).isEqualTo(1002L);
+    assertThat(card.get("id").asLong()).isEqualTo(1004L);
     assertThat(card.get("reviewCount").asInt()).isEqualTo(0);
     assertThat(card.get("avgRating").asDouble()).isEqualTo(0.0);
   }
