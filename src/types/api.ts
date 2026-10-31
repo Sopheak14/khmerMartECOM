@@ -254,6 +254,11 @@ export interface OrderTimelineEvent {
   at: string;
 }
 
+export interface DiscountBreakdownDTO {
+  promotions: { label: string; amountCents: number }[];
+  coupon: { code: string; amountCents: number } | null;
+}
+
 export interface OrderDTO {
   id: number;
   orderNumber: string;
@@ -266,6 +271,7 @@ export interface OrderDTO {
   shippingCents: number;
   totalCents: number;
   couponCode?: string | null;
+  discountBreakdown?: DiscountBreakdownDTO;
   shippingAddress: AddressDTO;
   shippingMethod: ShippingMethodDTO;
   trackingNumber?: string | null;

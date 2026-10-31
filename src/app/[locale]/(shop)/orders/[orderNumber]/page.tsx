@@ -9,6 +9,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
 import { apiClient } from '@/lib/apiClient';
 import { OrderDTO, OrderStatus, CartDTO } from '@/types/api';
+import { getDiscountLines } from '@/lib/orderDiscounts';
 import { formatUsd, formatKhr } from '@/lib/money';
 import { downloadInvoice } from '@/lib/downloadInvoice';
 import { useCartDrawerStore } from '@/lib/store/useCartDrawerStore';
@@ -433,12 +434,19 @@ export default function OrderDetailPage() {
                 <span className="font-semibold text-foreground">{formatUsd(order.subtotalCents)}</span>
               </div>
 
-              {order.discountCents > 0 && (
-                <div className="flex justify-between text-green-800 dark:text-green-400 font-medium">
-                  <span data-testid="order-discounts-label">{t('discounts')}</span>
-                  <span data-testid="order-discounts-amount">-{formatUsd(order.discountCents)}</span>
+              {getDiscountLines(order, locale, {
+                coupon: (code) => t('couponLine', { code }),
+                discounts: t('discounts'),
+              }).map((line) => (
+                <div
+                  key={line.key}
+                  data-testid={`order-discount-line-${line.kind}`}
+                  className="flex justify-between text-green-800 dark:text-green-400 font-medium"
+                >
+                  <span data-testid="order-discounts-label">{line.label}</span>
+                  <span data-testid="order-discounts-amount">-{formatUsd(line.amountCents)}</span>
                 </div>
-              )}
+              ))}
 
               <div className="flex justify-between text-muted">
                 <span>{t('shippingFee')}</span>

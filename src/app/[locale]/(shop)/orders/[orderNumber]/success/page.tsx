@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@/navigation';
 import { apiClient } from '@/lib/apiClient';
 import { OrderDTO, PaymentStatusDTO } from '@/types/api';
 import { downloadInvoice } from '@/lib/downloadInvoice';
+import { getDiscountLines } from '@/lib/orderDiscounts';
+import { formatUsd } from '@/lib/money';
 import {
   CheckCircle2,
   ArrowRight,
@@ -26,6 +28,8 @@ import { toast } from 'sonner';
 
 export default function OrderSuccessPage() {
   const t = useTranslations('checkout');
+  const ot = useTranslations('orders');
+  const locale = useLocale();
   const params = useParams();
   const searchParams = useSearchParams();
   const orderNumber = params?.orderNumber as string;
@@ -200,6 +204,39 @@ export default function OrderSuccessPage() {
                 </>
               )}
             </button>
+          </div>
+        )}
+
+        {/* Order summary: subtotal, one line per promotion, coupon, shipping, total */}
+        {order && (
+          <div data-testid="success-order-summary" className="space-y-1.5 text-xs text-left bg-background border border-border rounded-xl p-4">
+            <div className="flex justify-between text-muted">
+              <span>{ot('subtotal')}</span>
+              <span className="font-semibold text-foreground">{formatUsd(order.subtotalCents)}</span>
+            </div>
+            {getDiscountLines(order, locale, {
+              coupon: (code) => ot('couponLine', { code }),
+              discounts: ot('discounts'),
+            }).map((line) => (
+              <div
+                key={line.key}
+                data-testid={`success-discount-line-${line.kind}`}
+                className="flex justify-between text-green-800 dark:text-green-400 font-medium"
+              >
+                <span>{line.label}</span>
+                <span>-{formatUsd(line.amountCents)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-muted">
+              <span>{ot('shippingFee')}</span>
+              <span className="font-semibold text-foreground">
+                {order.shippingCents === 0 ? ot('free') : formatUsd(order.shippingCents)}
+              </span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-border font-bold text-sm text-foreground">
+              <span>{ot('total')}</span>
+              <span data-testid="success-total-usd">{formatUsd(order.totalCents)}</span>
+            </div>
           </div>
         )}
 

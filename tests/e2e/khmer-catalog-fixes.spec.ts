@@ -1,12 +1,14 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { adminToken, cancelOrder, createAddress, placeKhqrOrder } from './helpers/orders';
-import { API, CATEGORY, COUPON, HERO, SOAP, usd } from './fixtures/catalog';
+import { API, CATEGORY, COUPON, DEMO_ORDER, HERO, SOAP, usd } from './fixtures/catalog';
 
 type Locale = 'en' | 'km';
 
 const OUT_FOR_DELIVERY_LABEL: Record<Locale, string> = { en: 'Out for delivery', km: 'កំពុងដឹកជញ្ជូន' };
 const SHIPPED_LABEL: Record<Locale, string> = { en: 'Shipped', km: 'បានផ្ញើចេញ' };
+const FLASH_LINE: Record<Locale, string> = { en: 'Flash Sale', km: 'Flash Sale' };
+const COUPON_LINE: Record<Locale, string> = { en: `Coupon (${COUPON.save5})`, km: `ប័ណ្ណបញ្ចុះតម្លៃ (${COUPON.save5})` };
 const NOT_FOUND_TITLE: Record<Locale, RegExp> = { en: /Page Not Found/i, km: /រកមិនឃើញទំព័រ/ };
 const DISCOUNTS_LABEL: Record<Locale, string> = { en: 'Discounts', km: 'ការបញ្ចុះតម្លៃ' };
 
@@ -95,7 +97,7 @@ test.describe('Khmer catalog fixes', () => {
       await expect(page.locator('[data-testid="tracking-status-badge"]')).toContainText(OUT_FOR_DELIVERY_LABEL[locale]);
     });
 
-    test(`5b: order summary shows a single "Discounts" line without the coupon code (${locale})`, async ({ page, request }) => {
+    test(`5b: demo order shows one line per promotion plus a separate coupon line (${locale})`, async ({ page, request }) => {
       const user = await createThrowawayUser(request);
       const addressId = await createAddress(request, user);
       const { orderNumber } = await placeKhqrOrder(request, user, addressId, {
@@ -104,24 +106,92 @@ test.describe('Khmer catalog fixes', () => {
         coupon: COUPON.save5,
       });
       try {
-        // flash sale $20.00 + coupon $5.00 arrive as one discountCents; the label must not name only the coupon
         const dto = (await (await request.get(`${API}/orders/${orderNumber}`, { headers: { Authorization: `Bearer ${user.token}` } })).json()).data;
-        expect(dto.discountCents).toBe(HERO.standardCents - HERO.flashCents + COUPON.save5Cents);
+        const flashCents = HERO.standardCents - HERO.flashCents;
+        expect(dto.discountBreakdown.promotions).toHaveLength(1);
+        expect(dto.discountBreakdown.promotions[0].amountCents).toBe(flashCents);
+        expect(dto.discountBreakdown.coupon).toEqual({ code: COUPON.save5, amountCents: COUPON.save5Cents });
+        expect(dto.totalCents).toBe(DEMO_ORDER.totalCents);
 
+        const flashLabel = FLASH_LINE[locale];
+        const couponLabel = COUPON_LINE[locale];
+
+        // Customer order detail
         await loginViaUI(page, user.email, user.password, locale);
         await page.goto(`/${locale}/orders/${orderNumber}`);
-        const label = page.locator('[data-testid="order-discounts-label"]');
-        await expect(label).toHaveText(DISCOUNTS_LABEL[locale]);
-        await expect(label).not.toContainText(COUPON.save5);
-        await expect(page.locator('[data-testid="order-discounts-amount"]')).toHaveText(`-${usd(dto.discountCents)}`);
+        const promo = page.locator('[data-testid="order-discount-line-promotion"]');
+        await expect(promo).toHaveCount(1);
+        await expect(promo).toContainText(flashLabel);
+        await expect(promo).toContainText(`-${usd(flashCents)}`);
+        const coupon = page.locator('[data-testid="order-discount-line-coupon"]');
+        await expect(coupon).toContainText(couponLabel);
+        await expect(coupon).toContainText(`-${usd(COUPON.save5Cents)}`);
+        await expect(page.locator('[data-testid="order-discount-line-total"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="order-detail-total-usd"]')).toHaveText(usd(DEMO_ORDER.totalCents));
+
+        // Order success page shows the same lines
+        await page.goto(`/${locale}/orders/${orderNumber}/success`);
+        await expect(page.locator('[data-testid="success-discount-line-promotion"]')).toContainText(`-${usd(flashCents)}`);
+        await expect(page.locator('[data-testid="success-discount-line-coupon"]')).toContainText(`-${usd(COUPON.save5Cents)}`);
+        await expect(page.locator('[data-testid="success-total-usd"]')).toHaveText(usd(DEMO_ORDER.totalCents));
+
+        // Admin order detail
+        await page.context().clearCookies();
+        await loginViaUI(page, 'admin@khmermart.local', 'Admin@12345', locale);
+        await page.goto(`/${locale}/admin/orders/${orderNumber}`);
+        const adminPromo = page.locator('[data-testid="admin-order-discount-line-promotion"]');
+        await expect(adminPromo).toHaveCount(1);
+        await expect(adminPromo).toContainText(flashLabel);
+        await expect(adminPromo).toContainText(`-${usd(flashCents)}`);
+        const adminCoupon = page.locator('[data-testid="admin-order-discount-line-coupon"]');
+        await expect(adminCoupon).toContainText(couponLabel);
+        await expect(adminCoupon).toContainText(`-${usd(COUPON.save5Cents)}`);
+      } finally {
+        await cancelOrder(request, user, orderNumber);
+      }
+    });
+
+    // The backend now snapshots the breakdown on every order, so a "legacy" order can no longer be created or found
+    // in seed data. This test makes its own discounted order and strips the snapshot from the API responses the page
+    // receives, which is exactly the shape an old pre-snapshot order has (discountCents > 0, empty breakdown).
+    test(`5b: an order without a discount snapshot still renders, with a single Discounts line (${locale})`, async ({ page, request }) => {
+      const user = await createThrowawayUser(request);
+      const addressId = await createAddress(request, user);
+      const { orderNumber } = await placeKhqrOrder(request, user, addressId, {
+        productId: HERO.id,
+        variantId: HERO.variants.redStandard,
+        coupon: COUPON.save5,
+      });
+      try {
+        const dto = (await (await request.get(`${API}/orders/${orderNumber}`, { headers: { Authorization: `Bearer ${user.token}` } })).json()).data;
+        expect(dto.discountCents).toBeGreaterThan(0);
+
+        const stripSnapshot = async (route: import('@playwright/test').Route) => {
+          const res = await route.fetch();
+          const json = await res.json();
+          if (json?.data) json.data.discountBreakdown = { promotions: [], coupon: null };
+          await route.fulfill({ response: res, json });
+        };
+        await page.route(new RegExp(`/api/orders/${orderNumber}(\\?.*)?$`), stripSnapshot);
+        await page.route(new RegExp(`/api/admin/orders/${orderNumber}(\\?.*)?$`), stripSnapshot);
+
+        const pageErrors: string[] = [];
+        page.on('pageerror', (err) => pageErrors.push(err.message));
+        await loginViaUI(page, user.email, user.password, locale);
+        await page.goto(`/${locale}/orders/${orderNumber}`);
+        const line = page.locator('[data-testid="order-discount-line-total"]');
+        await expect(line).toHaveCount(1);
+        await expect(line.locator('[data-testid="order-discounts-label"]')).toHaveText(DISCOUNTS_LABEL[locale]);
+        await expect(line).toContainText(`-${usd(dto.discountCents)}`);
+        await expect(page.locator('[data-testid="order-discount-line-promotion"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="order-discount-line-coupon"]')).toHaveCount(0);
+        expect(pageErrors).toEqual([]);
 
         await page.context().clearCookies();
         await loginViaUI(page, 'admin@khmermart.local', 'Admin@12345', locale);
         await page.goto(`/${locale}/admin/orders/${orderNumber}`);
-        const adminLabel = page.locator('[data-testid="admin-order-discounts-label"]');
-        await expect(adminLabel).toContainText(DISCOUNTS_LABEL[locale]);
-        await expect(adminLabel).not.toContainText(COUPON.save5);
-        await expect(page.locator('[data-testid="admin-order-discounts-amount"]')).toHaveText(`-${usd(dto.discountCents)}`);
+        await expect(page.locator('[data-testid="admin-order-discount-line-total"]')).toContainText(`-${usd(dto.discountCents)}`);
+        expect(pageErrors).toEqual([]);
       } finally {
         await cancelOrder(request, user, orderNumber);
       }

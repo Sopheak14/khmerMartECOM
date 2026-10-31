@@ -11,6 +11,7 @@ import { OrderDTO, OrderStatus, ShipmentStatus, TrackingDTO } from '@/types/api'
 import { formatUsd, formatKhr } from '@/lib/money';
 import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
+import { getDiscountLines } from '@/lib/orderDiscounts';
 import { useOrderStatusLabel } from '@/hooks/useOrderStatusLabel';
 import {
   ArrowLeft,
@@ -354,12 +355,19 @@ export default function AdminOrderDetailPage() {
                   {formatUsd(order.subtotalCents)}
                 </span>
               </div>
-              {order.discountCents > 0 && (
-                <div className="flex justify-between text-emerald-700 font-medium">
-                  <span data-testid="admin-order-discounts-label">{t('discounts')}:</span>
-                  <span className="font-mono" data-testid="admin-order-discounts-amount">-{formatUsd(order.discountCents)}</span>
+              {getDiscountLines(order, locale, {
+                coupon: (code) => t('couponLine', { code }),
+                discounts: t('discounts'),
+              }).map((line) => (
+                <div
+                  key={line.key}
+                  data-testid={`admin-order-discount-line-${line.kind}`}
+                  className="flex justify-between text-emerald-700 font-medium"
+                >
+                  <span data-testid="admin-order-discounts-label">{line.label}:</span>
+                  <span className="font-mono" data-testid="admin-order-discounts-amount">-{formatUsd(line.amountCents)}</span>
                 </div>
-              )}
+              ))}
               <div className="flex justify-between text-muted">
                 <span>Shipping ({order.shippingMethod?.name || 'Standard'}):</span>
                 <span className="font-mono text-foreground font-semibold">

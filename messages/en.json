@@ -261,6 +261,7 @@
       "viewAllInventory": "View inventory"
     },
     "orders": {
+      "couponLine": "Coupon ({code})",
       "discounts": "Discounts",
       "title": "Orders",
       "subtitle": "Manage customer orders, fulfillment and tracking",
@@ -869,6 +870,7 @@
     "viewOrder": "View Order Details"
   },
   "orders": {
+    "couponLine": "Coupon ({code})",
     "discounts": "Discounts",
     "title": "My Orders",
     "subtitle": "View and manage your purchase history",
