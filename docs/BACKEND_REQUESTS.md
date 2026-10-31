@@ -78,7 +78,8 @@
 - **Frontend Action Taken:** As per instruction, the UI was built with a product picker for all products, ready to bind variant IDs once the backend DTO is updated.
 
 
-## Order discount breakdown (OrderDTO)
+## Order discount breakdown (OrderDTO) — RESOLVED
+- **Resolved:** backend commit `cbf44e7` added `OrderDTO.discountBreakdown: { promotions: [{ label, amountCents }], coupon: { code, amountCents } | null }` (always present; old orders return `promotions: []`, `coupon: null`). It is not the shape sketched below (no `promotionId` / `nameKm`): the frontend uses `label` + `translatePromotionLabel` for EN/KM. See `../back_end/API_CONTRACT_CHANGES.md` section 6. Original request kept below for history.
 - **Observation:** `OrderDTO` only exposes a single `discountCents` (plus an optional `couponCode`). It mixes automatic promotions (flash sale, BOGO, seasonal) with the coupon, so the order summary cannot show them separately the way the cart does (`CartDTO.promotionDiscounts[]` + coupon line).
 - **Request (additive):** return the same breakdown on `OrderDTO` (customer and admin endpoints):
   ```json

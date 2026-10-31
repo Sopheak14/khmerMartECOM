@@ -27,8 +27,9 @@ Automated proof: `tests/e2e/notifications-tracking-reviews.spec.ts` ("Teacher 12
   through, and nothing struck through for variants that are not on sale.
 * Order statuses each have their own label (`orders.status.*`, shared by the customer, admin and tracking views):
   `OUT_FOR_DELIVERY` is "Out for delivery" / «កំពុងដឹកជញ្ជូន», never "Shipped".
-* `OrderDTO` carries one `discountCents` (flash sale + coupon together), so the order summary shows a single "Discounts"
-  line without the coupon code until the backend adds a breakdown (see `BACKEND_REQUESTS.md`).
+* The order summary (customer order detail, order success page, admin order detail) lists one line per promotion plus
+  "Coupon (CODE)" from `OrderDTO.discountBreakdown`; the demo order shows Flash Sale −$20.00, Coupon (SAVE5) −$5.00, total
+  $124.00. Orders without a snapshot fall back to a single "Discounts" line. Subtotal − lines + shipping = total (unit-tested).
 * Checkout uses one `Idempotency-Key` per attempt, so a double click cannot create two orders.
 * `OUT_OF_STOCK` shows "Only N left in stock" (EN/KM) on the cart; `PRICE_CHANGED` / `OUT_OF_STOCK` at checkout return the user to the cart.
 * Every page above is covered by the zero-console-error and no-untranslated-key checks in EN and KM.

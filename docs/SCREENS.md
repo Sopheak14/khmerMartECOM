@@ -73,7 +73,7 @@ Order placed (COD / KHQR) confirmation.
 - **Screenshots:** [order-success-cod.png](screenshots/order-success-cod.png), [order-success-khqr.png](screenshots/order-success-khqr.png)
 
 ### `/orders/[orderNumber]`
-Order detail: timeline (every status has its own label, e.g. OUT_FOR_DELIVERY = "Out for delivery" / «កំពុងដឹកជញ្ជូន»), items, a single "Discounts" summary line, invoice download, cancel, buy again, review.
+Order detail: timeline (every status has its own label, e.g. OUT_FOR_DELIVERY = "Out for delivery" / «កំពុងដឹកជញ្ជូន»), items, a discount summary with one line per promotion plus the coupon line (single "Discounts" line for orders without a snapshot), invoice download, cancel, buy again, review.
 
 - **API:** GET /orders/{n}, POST /orders/{n}/cancel, POST /orders/{n}/reorder, GET /orders/{n}/invoice.pdf
 - **Screenshots:** [order-detail.png](screenshots/order-detail.png), [order-detail-delivered.png](screenshots/order-detail-delivered.png)
