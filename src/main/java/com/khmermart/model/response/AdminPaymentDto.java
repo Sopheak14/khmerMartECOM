@@ -23,4 +23,10 @@ public record AdminPaymentDto(
     String failureReason,
     Instant paidAt,
     JsonNode rawResponse,
-    Instant createdAt) {}
+    Instant createdAt,
+    String externalRef,
+    Integer checkCount,
+    Instant lastCheckedAt,
+    Instant qrExpiresAt,
+    Boolean orderNeedsAttention,
+    String orderAttentionNote) {}

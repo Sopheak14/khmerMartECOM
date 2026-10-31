@@ -14,15 +14,15 @@ import com.khmermart.model.entity.Payment;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
-import com.khmermart.model.response.BakongCheckResponse;
 import com.khmermart.model.response.KhqrPaymentDto;
 import com.khmermart.model.response.PaymentStatusDto;
 import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.security.JwtService;
-import com.khmermart.service.BakongApiClient;
+import com.khmermart.service.KhqrPaymentChecker;
 import com.khmermart.service.KhqrService;
 import com.khmermart.service.PaymentConfirmationService;
+import com.khmermart.service.SettingService;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -55,21 +55,24 @@ public class KhqrServiceImpl implements KhqrService {
   private final OrderRepository orderRepository;
   private final PaymentRepository paymentRepository;
   private final PaymentConfirmationService paymentConfirmationService;
-  private final BakongApiClient bakongApiClient;
   private final JwtService jwtService;
+  private final SettingService settingService;
+  private final KhqrPaymentChecker paymentChecker;
 
   public KhqrServiceImpl(
       AppProperty appProperty,
       OrderRepository orderRepository,
       PaymentRepository paymentRepository,
       PaymentConfirmationService paymentConfirmationService,
-      BakongApiClient bakongApiClient,
-      JwtService jwtService) {
+      JwtService jwtService,
+      SettingService settingService,
+      KhqrPaymentChecker paymentChecker) {
+    this.settingService = settingService;
+    this.paymentChecker = paymentChecker;
     this.appProperty = appProperty;
     this.orderRepository = orderRepository;
     this.paymentRepository = paymentRepository;
     this.paymentConfirmationService = paymentConfirmationService;
-    this.bakongApiClient = bakongApiClient;
     this.jwtService = jwtService;
   }
 
@@ -124,7 +127,7 @@ public class KhqrServiceImpl implements KhqrService {
             p.getQrExpiresAt(),
             appProperty.khqr().merchantName(),
             generateDeepLink(p.getKhqrString()),
-            appProperty.khqr().mode(),
+            settingService.getKhqrMode(),
             streamToken);
       }
     }
@@ -305,7 +308,7 @@ public class KhqrServiceImpl implements KhqrService {
         qrExpiresAt,
         props.merchantName(),
         deepLink,
-        props.mode(),
+        settingService.getKhqrMode(),
         streamToken);
   }
 
@@ -327,7 +330,7 @@ public class KhqrServiceImpl implements KhqrService {
     }
 
     // In LIVE mode, trigger one immediate Bakong check if lastCheckedAt older than 3s
-    if ("LIVE".equalsIgnoreCase(appProperty.khqr().mode())
+    if ("LIVE".equalsIgnoreCase(settingService.getKhqrMode())
         && payment.getStatus() == PaymentStatus.PENDING
         && payment.getKhqrMd5() != null) {
       Instant now = Instant.now();
@@ -349,7 +352,7 @@ public class KhqrServiceImpl implements KhqrService {
   @Override
   @Transactional
   public PaymentStatusDto simulatePaid(Long userId, Long paymentId, boolean isStaffOrAdmin) {
-    if (!"MOCK".equalsIgnoreCase(appProperty.khqr().mode())) {
+    if (!"MOCK".equalsIgnoreCase(settingService.getKhqrMode())) {
       throw new CustomException(ErrorCode.FORBIDDEN, "simulate-paid is only allowed in MOCK mode");
     }
 
@@ -405,67 +408,22 @@ public class KhqrServiceImpl implements KhqrService {
   }
 
   private void checkAndConfirmLivePayment(Payment payment) {
-    payment.setLastCheckedAt(Instant.now());
-    payment.setCheckCount(payment.getCheckCount() + 1);
-    paymentRepository.save(payment);
-
-    BakongCheckResponse resp = bakongApiClient.checkTransactionByMd5(payment.getKhqrMd5());
-    if (resp != null
-        && resp.responseCode() != null
-        && resp.responseCode() == 0
-        && resp.data() != null) {
-      // Validate toAccountId
-      if (!appProperty.khqr().accountId().equalsIgnoreCase(resp.data().toAccountId())) {
-        log.error(
-            "Payment {} account mismatch: expected {}, got {}",
-            payment.getId(),
-            appProperty.khqr().accountId(),
-            resp.data().toAccountId());
-        payment.setStatus(PaymentStatus.FAILED);
-        payment.setFailureReason("Recipient account mismatch");
-        paymentRepository.save(payment);
-        return;
-      }
-
-      // Validate currency
-      if (!payment.getCurrency().equalsIgnoreCase(resp.data().currency())) {
-        log.error(
-            "Payment {} currency mismatch: expected {}, got {}",
-            payment.getId(),
-            payment.getCurrency(),
-            resp.data().currency());
-        payment.setStatus(PaymentStatus.FAILED);
-        payment.setFailureReason("Currency mismatch");
-        paymentRepository.save(payment);
-        return;
-      }
-
-      // Validate amount
-      BigDecimal expectedAmount =
-          "USD".equalsIgnoreCase(payment.getCurrency())
-              ? BigDecimal.valueOf(payment.getAmountCents())
-                  .movePointLeft(2)
-                  .setScale(2, RoundingMode.HALF_UP)
-              : BigDecimal.valueOf(payment.getAmountKhr() != null ? payment.getAmountKhr() : 0);
-
-      if (expectedAmount.compareTo(resp.data().amount()) != 0) {
-        log.error(
-            "Payment {} amount mismatch: expected {}, got {}",
-            payment.getId(),
-            expectedAmount,
-            resp.data().amount());
-        payment.setStatus(PaymentStatus.FAILED);
-        payment.setFailureReason("Amount mismatch");
-        paymentRepository.save(payment);
-        return;
-      }
-
-      paymentConfirmationService.confirm(payment.getId(), resp.data());
-    }
+    paymentChecker.check(payment.getId(), "STATUS_POLL");
+    // The checker saved/confirmed through its own reads; refresh this instance for the response.
+    paymentRepository
+        .findById(payment.getId())
+        .ifPresent(
+            fresh -> {
+              payment.setStatus(fresh.getStatus());
+              payment.setPaidAt(fresh.getPaidAt());
+              payment.setBakongHash(fresh.getBakongHash());
+              payment.setLastCheckedAt(fresh.getLastCheckedAt());
+              payment.setCheckCount(fresh.getCheckCount());
+            });
   }
 
   private String generateDeepLink(String qr) {
-    if ("LIVE".equalsIgnoreCase(appProperty.khqr().mode())
+    if ("LIVE".equalsIgnoreCase(settingService.getKhqrMode())
         && appProperty.khqr().deeplinkUrl() != null
         && !appProperty.khqr().deeplinkUrl().isBlank()) {
       try {

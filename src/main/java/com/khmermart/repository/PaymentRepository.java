@@ -28,4 +28,7 @@ public interface PaymentRepository
   List<Payment> findByStatusAndQrExpiresAtBefore(PaymentStatus status, Instant before);
 
   List<Payment> findByMethodAndStatus(PaymentMethod method, PaymentStatus status);
+
+  List<Payment> findByMethodAndStatusAndQrExpiresAtAfter(
+      PaymentMethod method, PaymentStatus status, Instant after);
 }

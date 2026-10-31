@@ -8,6 +8,7 @@ import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
 import com.khmermart.model.response.OrderDto;
+import com.khmermart.model.response.PaymentCheckResultDto;
 import com.khmermart.model.response.ReconciliationReportDto;
 import com.khmermart.security.CurrentUser;
 import com.khmermart.security.UserPrincipal;
@@ -92,6 +93,22 @@ public class AdminPaymentController {
     Long adminId = principal != null ? principal.id() : null;
     AdminPaymentDto dto = adminPaymentService.refundPayment(id, request, adminId, ip);
     return ApiResponseUtil.success(dto);
+  }
+
+  @PostMapping("/{id}/recheck")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Re-check a KHQR payment against Bakong now",
+      description =
+          "Runs the same single check as the background poller. Confirms the payment if Bakong"
+              + " reports it paid (recorded as a late payment if it had already expired).")
+  public SuccessResponse<PaymentCheckResultDto> recheckPayment(
+      @PathVariable Long id,
+      @CurrentUser UserPrincipal principal,
+      HttpServletRequest servletRequest) {
+    Long adminId = principal != null ? principal.id() : null;
+    return ApiResponseUtil.success(
+        adminPaymentService.recheckPayment(id, adminId, resolveIp(servletRequest)));
   }
 
   @PostMapping("/{id}/approve-bank-transfer")

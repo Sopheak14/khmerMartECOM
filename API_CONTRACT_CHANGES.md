@@ -33,3 +33,9 @@
 - **Old orders** without a snapshot return `promotions: []` and `coupon: null` (the field is always present).
 - **Example** (demo order: hero Standard on Flash Sale + `SAVE5`): `discountCents: 2500`, `discountBreakdown: { "promotions": [{ "label": "Flash Sale Discount", "amountCents": 2000 }], "coupon": { "code": "SAVE5", "amountCents": 500 } }`.
 - **Note for the frontend**: this is the shape requested in this task; `Fronted/docs/BACKEND_REQUESTS.md` sketches a different one (`promotionDiscounts[]` with `promotionId`/`name`/`nameKm`, `couponDiscountCents`). The snapshot stores only `label` and `amountCents`, so no promotion id or Khmer name is available.
+
+## BACKEND-FIX-2 (additive)
+- `POST /api/admin/payments/{id}/recheck` (admin): single Bakong check, returns `PaymentCheckResultDto`.
+- `AdminPaymentDto` gains optional `externalRef`, `checkCount`, `lastCheckedAt`, `qrExpiresAt`, `orderNeedsAttention`, `orderAttentionNote`.
+- Flyway V5: `orders.needs_attention`, `orders.attention_note` (late payments are flagged here).
+- KHQR mode is now read from Admin Settings at runtime by the poller, expiry job and status endpoint.

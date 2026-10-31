@@ -10,6 +10,9 @@ public interface SettingService {
 
   String getSettingValue(String key, String defaultValue);
 
+  /** Current KHQR mode (LIVE/MOCK): Admin Settings value if set, else the startup env default. */
+  String getKhqrMode();
+
   AdminSettingsDto getAdminSettings();
 
   AdminSettingsDto updateAdminSettings(AdminSettingsUpdateRequest request, Long adminId, String ip);

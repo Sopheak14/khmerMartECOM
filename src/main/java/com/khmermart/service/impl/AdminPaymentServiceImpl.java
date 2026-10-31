@@ -16,6 +16,7 @@ import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
+import com.khmermart.model.response.PaymentCheckResultDto;
 import com.khmermart.model.response.ReconciliationReportDto;
 import com.khmermart.model.response.ReconciliationReportDto.ReconciliationMismatchDto;
 import com.khmermart.repository.InventoryMovementRepository;
@@ -26,6 +27,7 @@ import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.RefundRepository;
 import com.khmermart.service.AdminPaymentService;
 import com.khmermart.service.AuditLogService;
+import com.khmermart.service.KhqrPaymentChecker;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +54,7 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
   private final RefundRepository refundRepository;
   private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
+  private final KhqrPaymentChecker paymentChecker;
 
   public AdminPaymentServiceImpl(
       PaymentRepository paymentRepository,
@@ -61,7 +64,8 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
       InventoryMovementRepository inventoryMovementRepository,
       RefundRepository refundRepository,
       AuditLogService auditLogService,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      KhqrPaymentChecker paymentChecker) {
     this.paymentRepository = paymentRepository;
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
@@ -70,6 +74,15 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
     this.refundRepository = refundRepository;
     this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
+    this.paymentChecker = paymentChecker;
+  }
+
+  @Override
+  public PaymentCheckResultDto recheckPayment(Long id, Long adminId, String ip) {
+    PaymentCheckResultDto result = paymentChecker.check(id, "ADMIN_RECHECK");
+    auditLogService.log(
+        adminId, "RECHECK_PAYMENT", "PAYMENT", String.valueOf(id), null, result, ip);
+    return result;
   }
 
   @Override
@@ -354,6 +367,8 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
   private AdminPaymentDto toDto(Payment p) {
     Order order = orderRepository.findById(p.getOrderId()).orElse(null);
     String orderNum = order != null ? order.getOrderNumber() : null;
+    Boolean orderNeedsAttention = order != null ? order.isNeedsAttention() : null;
+    String orderAttentionNote = order != null ? order.getAttentionNote() : null;
 
     JsonNode rawResponseNode = null;
     if (p.getRawResponse() != null && !p.getRawResponse().isBlank()) {
@@ -379,6 +394,12 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
         p.getFailureReason(),
         p.getPaidAt(),
         rawResponseNode,
-        p.getCreatedAt());
+        p.getCreatedAt(),
+        p.getExternalRef(),
+        p.getCheckCount(),
+        p.getLastCheckedAt(),
+        p.getQrExpiresAt(),
+        orderNeedsAttention,
+        orderAttentionNote);
   }
 }

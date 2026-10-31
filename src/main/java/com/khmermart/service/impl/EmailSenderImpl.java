@@ -2,6 +2,7 @@ package com.khmermart.service.impl;
 
 import com.khmermart.config.AppProperty;
 import com.khmermart.service.EmailSender;
+import com.khmermart.util.MailAddressUtil;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Map;
 import java.util.Optional;
@@ -68,7 +69,7 @@ public class EmailSenderImpl implements EmailSender {
       boolean isMultipart = (attachmentBytes != null && attachmentBytes.length > 0);
       MimeMessageHelper helper = new MimeMessageHelper(message, isMultipart, "UTF-8");
 
-      helper.setFrom(appProperty.mail().from());
+      helper.setFrom(MailAddressUtil.parseFrom(appProperty.mail().from()));
       helper.setTo(toEmail);
       helper.setSubject(subject);
       helper.setText(htmlContent, true);

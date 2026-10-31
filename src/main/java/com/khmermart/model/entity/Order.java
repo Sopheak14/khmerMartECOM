@@ -115,6 +115,13 @@ public class Order {
   @Column(name = "cancel_reason")
   private String cancelReason;
 
+  @Column(name = "needs_attention", nullable = false)
+  @Builder.Default
+  private boolean needsAttention = false;
+
+  @Column(name = "attention_note", length = 500)
+  private String attentionNote;
+
   @Version
   @Column(nullable = false)
   @Builder.Default

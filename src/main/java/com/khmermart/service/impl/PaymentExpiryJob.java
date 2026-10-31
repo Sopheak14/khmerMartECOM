@@ -1,6 +1,5 @@
 package com.khmermart.service.impl;
 
-import com.khmermart.config.AppProperty;
 import com.khmermart.event.PaymentStatusChangedEvent;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
@@ -12,6 +11,7 @@ import com.khmermart.model.enumerate.CouponRedemptionStatus;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.response.PaymentCheckResultDto;
 import com.khmermart.repository.CouponRedemptionRepository;
 import com.khmermart.repository.InventoryMovementRepository;
 import com.khmermart.repository.InventoryRepository;
@@ -19,8 +19,8 @@ import com.khmermart.repository.OrderItemRepository;
 import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.OrderStatusHistoryRepository;
 import com.khmermart.repository.PaymentRepository;
-import com.khmermart.service.BakongApiClient;
-import com.khmermart.service.PaymentConfirmationService;
+import com.khmermart.service.KhqrPaymentChecker;
+import com.khmermart.service.SettingService;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class PaymentExpiryJob {
@@ -42,10 +42,10 @@ public class PaymentExpiryJob {
   private final InventoryRepository inventoryRepository;
   private final InventoryMovementRepository movementRepository;
   private final CouponRedemptionRepository couponRedemptionRepository;
-  private final BakongApiClient bakongApiClient;
-  private final PaymentConfirmationService paymentConfirmationService;
+  private final KhqrPaymentChecker paymentChecker;
   private final ApplicationEventPublisher eventPublisher;
-  private final AppProperty appProperty;
+  private final SettingService settingService;
+  private final TransactionTemplate transactionTemplate;
 
   public PaymentExpiryJob(
       PaymentRepository paymentRepository,
@@ -55,10 +55,10 @@ public class PaymentExpiryJob {
       InventoryRepository inventoryRepository,
       InventoryMovementRepository movementRepository,
       CouponRedemptionRepository couponRedemptionRepository,
-      BakongApiClient bakongApiClient,
-      PaymentConfirmationService paymentConfirmationService,
+      KhqrPaymentChecker paymentChecker,
       ApplicationEventPublisher eventPublisher,
-      AppProperty appProperty) {
+      SettingService settingService,
+      TransactionTemplate transactionTemplate) {
     this.paymentRepository = paymentRepository;
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
@@ -66,10 +66,10 @@ public class PaymentExpiryJob {
     this.inventoryRepository = inventoryRepository;
     this.movementRepository = movementRepository;
     this.couponRedemptionRepository = couponRedemptionRepository;
-    this.bakongApiClient = bakongApiClient;
-    this.paymentConfirmationService = paymentConfirmationService;
+    this.paymentChecker = paymentChecker;
     this.eventPublisher = eventPublisher;
-    this.appProperty = appProperty;
+    this.settingService = settingService;
+    this.transactionTemplate = transactionTemplate;
   }
 
   @Scheduled(fixedDelay = 30000)
@@ -77,7 +77,11 @@ public class PaymentExpiryJob {
     expirePendingPayments();
   }
 
-  @Transactional
+  /**
+   * Not @Transactional on purpose: runExpiryCheck() calls this on the same bean, so a class-level
+   * transaction would be bypassed by the proxy. Each payment gets its own transaction instead, so
+   * one failure cannot roll back or block the others.
+   */
   public void expirePendingPayments() {
     Instant now = Instant.now();
     List<Payment> expiredPayments =
@@ -85,7 +89,7 @@ public class PaymentExpiryJob {
 
     for (Payment payment : expiredPayments) {
       try {
-        expireSinglePayment(payment, now);
+        transactionTemplate.executeWithoutResult(status -> expireSinglePayment(payment, now));
       } catch (Exception e) {
         log.error("Failed to expire payment {}: {}", payment.getId(), e.getMessage(), e);
       }
@@ -93,21 +97,22 @@ public class PaymentExpiryJob {
   }
 
   private void expireSinglePayment(Payment payment, Instant now) {
-    if ("LIVE".equalsIgnoreCase(appProperty.khqr().mode()) && payment.getKhqrMd5() != null) {
+    if ("LIVE".equalsIgnoreCase(settingService.getKhqrMode()) && payment.getKhqrMd5() != null) {
       try {
-        var resp = bakongApiClient.checkTransactionByMd5(payment.getKhqrMd5());
-        if (resp != null
-            && resp.responseCode() != null
-            && resp.responseCode() == 0
-            && resp.data() != null) {
+        PaymentCheckResultDto res = paymentChecker.check(payment.getId(), "EXPIRY_JOB");
+        if (res.outcome() == PaymentCheckResultDto.Outcome.PAID
+            || res.outcome() == PaymentCheckResultDto.Outcome.ALREADY_PAID) {
           log.info(
-              "Payment {} was paid right at expiry boundary. Confirming instead of expiring.",
+              "Payment {} was paid right at expiry boundary. Confirmed instead of expiring.",
               payment.getId());
-          paymentConfirmationService.confirm(payment.getId(), resp.data());
           return;
         }
-      } catch (Exception ignored) {
+      } catch (Exception e) {
+        log.warn(
+            "Final check before expiring payment {} failed: {}", payment.getId(), e.getMessage());
       }
+      // The check updated the row; reload so we do not overwrite it with a stale version.
+      payment = paymentRepository.findById(payment.getId()).orElse(payment);
     }
 
     payment.setStatus(PaymentStatus.EXPIRED);

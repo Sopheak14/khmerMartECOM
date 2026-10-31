@@ -19,12 +19,17 @@ import com.khmermart.model.entity.Payment;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.response.BakongCheckResponse;
+import com.khmermart.repository.OrderRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.service.impl.BakongApiClientImpl;
+import com.khmermart.service.impl.KhqrPaymentCheckerImpl;
 import com.khmermart.service.impl.KhqrPollingJob;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -81,10 +86,22 @@ class BakongApiClientWireMockTest {
     paymentRepository = mock(PaymentRepository.class);
     paymentConfirmationService = mock(PaymentConfirmationService.class);
 
-    khqrPollingJob =
-        new KhqrPollingJob(
-            appProperty, paymentRepository, bakongApiClient, paymentConfirmationService);
+    when(paymentRepository.findById(any()))
+        .thenAnswer(inv -> Optional.ofNullable(store.get(inv.getArgument(0))));
+    when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+    SettingService settingService = mock(SettingService.class);
+    when(settingService.getKhqrMode()).thenReturn("LIVE");
+    KhqrPaymentChecker checker =
+        new KhqrPaymentCheckerImpl(
+            appProperty,
+            paymentRepository,
+            mock(OrderRepository.class),
+            bakongApiClient,
+            paymentConfirmationService);
+    khqrPollingJob = new KhqrPollingJob(appProperty, settingService, paymentRepository, checker);
   }
+
+  private final Map<Long, Payment> store = new HashMap<>();
 
   @AfterEach
   void tearDown() {
@@ -136,6 +153,7 @@ class BakongApiClientWireMockTest {
 
     when(paymentRepository.findByMethodAndStatus(PaymentMethod.KHQR, PaymentStatus.PENDING))
         .thenReturn(List.of(payment));
+    store.put(payment.getId(), payment);
 
     khqrPollingJob.pollPendingPayments();
 
@@ -176,6 +194,7 @@ class BakongApiClientWireMockTest {
 
     when(paymentRepository.findByMethodAndStatus(PaymentMethod.KHQR, PaymentStatus.PENDING))
         .thenReturn(List.of(payment));
+    store.put(payment.getId(), payment);
 
     khqrPollingJob.pollPendingPayments();
 
@@ -222,12 +241,13 @@ class BakongApiClientWireMockTest {
 
     when(paymentRepository.findByMethodAndStatus(PaymentMethod.KHQR, PaymentStatus.PENDING))
         .thenReturn(List.of(payment));
+    store.put(payment.getId(), payment);
 
     khqrPollingJob.pollPendingPayments();
 
     verify(paymentConfirmationService, never()).confirm(any(), any());
     assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-    assertThat(payment.getFailureReason()).isEqualTo("Amount mismatch");
+    assertThat(payment.getFailureReason()).startsWith("Amount mismatch");
   }
 
   @Test
@@ -269,12 +289,13 @@ class BakongApiClientWireMockTest {
 
     when(paymentRepository.findByMethodAndStatus(PaymentMethod.KHQR, PaymentStatus.PENDING))
         .thenReturn(List.of(payment));
+    store.put(payment.getId(), payment);
 
     khqrPollingJob.pollPendingPayments();
 
     verify(paymentConfirmationService, never()).confirm(any(), any());
     assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-    assertThat(payment.getFailureReason()).isEqualTo("Recipient account mismatch");
+    assertThat(payment.getFailureReason()).startsWith("Recipient account mismatch");
   }
 
   @Test
@@ -297,6 +318,7 @@ class BakongApiClientWireMockTest {
 
     when(paymentRepository.findByMethodAndStatus(PaymentMethod.KHQR, PaymentStatus.PENDING))
         .thenReturn(List.of(payment));
+    store.put(payment.getId(), payment);
 
     khqrPollingJob.pollPendingPayments();
 

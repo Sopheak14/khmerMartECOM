@@ -97,6 +97,12 @@ public class SettingServiceImpl implements SettingService {
   }
 
   @Override
+  public String getKhqrMode() {
+    String mode = getSettingValue("KHQR_MODE", appProperties.khqr().mode());
+    return mode == null || mode.isBlank() ? "MOCK" : mode.trim().toUpperCase();
+  }
+
+  @Override
   public AdminSettingsDto getAdminSettings() {
     String storeName = getSettingValue("STORE_NAME", "KhmerMart");
     long khrRate =

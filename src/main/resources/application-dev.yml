@@ -1,4 +1,8 @@
 spring:
+  config:
+    # Dev only (tests use the 'test' profile and never see this): load back_end/.env if present.
+    # Real environment variables still take precedence over the file.
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/khmermart}
     username: ${DB_USER:khmermart}

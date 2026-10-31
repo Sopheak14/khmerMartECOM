@@ -84,8 +84,11 @@ class KhqrServiceTest {
             orderRepository,
             paymentRepository,
             paymentConfirmationService,
-            bakongApiClient,
-            jwtService);
+            jwtService,
+            mock(
+                SettingService.class,
+                inv -> inv.getMethod().getName().equals("getKhqrMode") ? "MOCK" : null),
+            mock(KhqrPaymentChecker.class));
   }
 
   @Test
@@ -288,8 +291,11 @@ class KhqrServiceTest {
             orderRepository,
             paymentRepository,
             paymentConfirmationService,
-            bakongApiClient,
-            jwtService);
+            jwtService,
+            mock(
+                SettingService.class,
+                inv -> inv.getMethod().getName().equals("getKhqrMode") ? "LIVE" : null),
+            mock(KhqrPaymentChecker.class));
 
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () -> liveKhqrService.simulatePaid(1L, 100L, false))

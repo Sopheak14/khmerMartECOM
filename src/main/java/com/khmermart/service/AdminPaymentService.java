@@ -4,6 +4,7 @@ import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
+import com.khmermart.model.response.PaymentCheckResultDto;
 import com.khmermart.model.response.ReconciliationReportDto;
 import java.time.Instant;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,9 @@ public interface AdminPaymentService {
   AdminPaymentDto getPaymentDetail(Long id);
 
   AdminPaymentDto refundPayment(Long id, RefundRequest request, Long adminId, String ip);
+
+  /** Runs one Bakong check for this payment right now (same logic as the poller). */
+  PaymentCheckResultDto recheckPayment(Long id, Long adminId, String ip);
 
   byte[] exportPaymentsCsv();
 

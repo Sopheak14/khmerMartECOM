@@ -2,6 +2,7 @@ package com.khmermart.service.impl;
 
 import com.khmermart.config.AppProperty;
 import com.khmermart.service.MailService;
+import com.khmermart.util.MailAddressUtil;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -48,7 +49,7 @@ public class MailServiceImpl implements MailService {
 
       MimeMessage message = mailSender.get().createMimeMessage();
       MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(appProperties.mail().from());
+      helper.setFrom(MailAddressUtil.parseFrom(appProperties.mail().from()));
       helper.setTo(toEmail);
       helper.setSubject("Verify your email address - KhmerMart");
       helper.setText(content, true);
@@ -77,7 +78,7 @@ public class MailServiceImpl implements MailService {
 
       MimeMessage message = mailSender.get().createMimeMessage();
       MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(appProperties.mail().from());
+      helper.setFrom(MailAddressUtil.parseFrom(appProperties.mail().from()));
       helper.setTo(toEmail);
       helper.setSubject("Reset your password - KhmerMart");
       helper.setText(content, true);

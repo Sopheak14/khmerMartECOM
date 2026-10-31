@@ -99,12 +99,97 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
       } catch (Exception ignored) {
       }
     }
-    return confirm(
-        paymentId,
-        txData != null ? txData.hash() : null,
-        txData != null ? txData.fromAccountId() : null,
-        txData != null ? txData.toAccountId() : null,
-        rawJson);
+    Payment confirmed =
+        confirm(
+            paymentId,
+            txData != null ? txData.hash() : null,
+            txData != null ? txData.fromAccountId() : null,
+            txData != null ? txData.toAccountId() : null,
+            rawJson);
+    if (txData != null
+        && txData.externalRef() != null
+        && confirmed.getStatus() == PaymentStatus.PAID
+        && confirmed.getExternalRef() == null) {
+      confirmed.setExternalRef(txData.externalRef());
+      confirmed = paymentRepository.save(confirmed);
+    }
+    return confirmed;
+  }
+
+  @Override
+  @Transactional
+  public Payment confirmLate(Long paymentId, BakongTxData txData) {
+    Payment payment =
+        paymentRepository
+            .findById(paymentId)
+            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Payment not found"));
+    if (payment.getStatus() == PaymentStatus.PAID) {
+      return payment;
+    }
+    Order order =
+        orderRepository
+            .findById(payment.getOrderId())
+            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
+
+    String rawJson = null;
+    try {
+      rawJson = objectMapper.writeValueAsString(txData);
+    } catch (Exception ignored) {
+    }
+    Instant now = Instant.now();
+    PaymentStatus previous = payment.getStatus();
+    payment.setStatus(PaymentStatus.PAID);
+    payment.setBakongHash(txData.hash());
+    payment.setFromAccountId(txData.fromAccountId());
+    payment.setToAccountId(txData.toAccountId());
+    payment.setExternalRef(txData.externalRef());
+    payment.setRawResponse(rawJson);
+    payment.setFailureReason(null);
+    payment.setPaidAt(now);
+    payment = paymentRepository.save(payment);
+
+    String note =
+        "LATE PAYMENT: Bakong confirmed "
+            + txData.amount()
+            + " "
+            + txData.currency()
+            + " (hash "
+            + txData.hash()
+            + ") after the payment was "
+            + previous
+            + ". Stock was released - review and fulfil or refund.";
+    order.setPaymentStatus(PaymentStatus.PAID);
+    order.setNeedsAttention(true);
+    order.setAttentionNote(note.length() > 500 ? note.substring(0, 500) : note);
+    orderRepository.save(order);
+
+    orderStatusHistoryRepository.save(
+        OrderStatusHistory.builder()
+            .orderId(order.getId())
+            .fromStatus(order.getStatus().name())
+            .toStatus(order.getStatus().name())
+            .note(note.length() > 500 ? note.substring(0, 500) : note)
+            .actorId(order.getUserId())
+            .createdAt(now)
+            .build());
+
+    log.warn(
+        "Late payment recorded: paymentId={} order={} hash={} previousStatus={}",
+        payment.getId(),
+        order.getOrderNumber(),
+        txData.hash(),
+        previous);
+
+    eventPublisher.publishEvent(
+        new PaymentStatusChangedEvent(
+            payment.getId(),
+            order.getId(),
+            PaymentStatus.PAID,
+            order.getStatus(),
+            now,
+            txData.hash(),
+            payment.getQrExpiresAt()));
+    return payment;
   }
 
   @Override

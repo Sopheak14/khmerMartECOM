@@ -129,6 +129,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `GET /api/admin/payments`: Filter payments by method, status, date.
 - `GET /api/admin/payments/{id}`: Payment detail with gateway response and raw payload.
 - `POST /api/admin/payments/{id}/refund`: Issue full or partial refund (sets order to `PARTIALLY_REFUNDED` or `REFUNDED`).
+- `POST /api/admin/payments/{id}/recheck`: Run one Bakong check now (admin only). Returns `{paymentId, outcome, reason, bakongResponseCode, paymentStatus, checkCount}`; `outcome` is one of `PAID`, `LATE_PAID`, `ALREADY_PAID`, `NOT_FOUND`, `REJECTED`, `BAKONG_ERROR`, `SKIPPED`. A payment confirmed after expiry is recorded as PAID and its order gets `needsAttention=true`.
 - `GET /api/admin/payments/reconciliation`: Reconcile internal payments against Bakong transaction logs.
 - `GET /api/admin/payments/export.csv`: Export payment records to CSV.
 
