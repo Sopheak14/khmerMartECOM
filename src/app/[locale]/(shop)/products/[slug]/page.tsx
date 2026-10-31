@@ -1,12 +1,27 @@
 import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { ProductDetailView } from '@/components/product/ProductDetailView';
+import type { Metadata } from 'next';
 import { ProductDetailDTO, ReviewDTO, PublicSettingsDTO } from '@/types/api';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: { locale: string; slug: string };
+}
+
+/**
+ * Resolves the product before the response starts streaming. [locale]/loading.tsx wraps the page in a Suspense
+ * boundary, so a notFound() thrown only from the page body arrives after the 200 status was already sent.
+ * Throwing it here makes unknown / deleted products return a real HTTP 404.
+ */
+export async function generateMetadata({ params: { slug } }: PageProps): Promise<Metadata> {
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const res = await fetch(`${backendUrl}/products/${slug}`, { cache: 'no-store' });
+  if (!res.ok) notFound();
+  const json = await res.json();
+  if (!json.success || !json.data) notFound();
+  return {};
 }
 
 export default async function ProductDetailPage({ params: { locale, slug } }: PageProps) {
