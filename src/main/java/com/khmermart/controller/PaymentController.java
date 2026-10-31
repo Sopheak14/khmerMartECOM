@@ -80,17 +80,32 @@ public class PaymentController {
   }
 
   @GetMapping(value = "/{paymentId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-  @Operation(summary = "SSE payment status stream")
+  @Operation(summary = "SSE payment status stream (owner or STAFF/ADMIN only)")
   public ResponseEntity<SseEmitter> streamPaymentStatus(
-      @PathVariable Long paymentId, @RequestParam String token, HttpServletResponse response) {
-    if (!jwtService.validateStreamToken(token, paymentId)) {
+      @CurrentUser UserPrincipal principal,
+      @PathVariable Long paymentId,
+      @RequestParam(required = false) String token,
+      HttpServletResponse response) {
+    // EventSource cannot send headers, so the owner's stream token is accepted too.
+    Long userId;
+    boolean isStaffOrAdmin = false;
+    if (principal != null) {
+      userId = principal.id();
+      isStaffOrAdmin = principal.role() == Roles.ADMIN || principal.role() == Roles.STAFF;
+    } else {
+      userId = token == null ? null : jwtService.streamTokenUserId(token, paymentId);
+    }
+    if (userId == null) {
       throw new CustomException(ErrorCode.UNAUTHORIZED, "Invalid or expired stream token");
     }
+
+    // Throws 404 when the payment is not the caller's (and caller is not staff)
+    PaymentStatusDto currentStatus =
+        khqrService.getPaymentStatus(userId, paymentId, isStaffOrAdmin);
 
     response.setHeader("Cache-Control", "no-cache");
     response.setHeader("X-Accel-Buffering", "no");
 
-    PaymentStatusDto currentStatus = khqrService.getPaymentStatus(null, paymentId, true);
     SseEmitter emitter = paymentSseRegistry.register(paymentId, currentStatus);
     return ResponseEntity.ok(emitter);
   }

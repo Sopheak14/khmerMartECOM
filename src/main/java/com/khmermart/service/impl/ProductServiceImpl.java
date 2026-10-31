@@ -100,11 +100,11 @@ public class ProductServiceImpl implements ProductService {
 
     Long minPriceCents = null;
     if (minPrice != null) {
-      minPriceCents = minPrice < 10000 ? minPrice * 100 : minPrice;
+      minPriceCents = minPrice * 100;
     }
     Long maxPriceCents = null;
     if (maxPrice != null) {
-      maxPriceCents = maxPrice < 10000 ? maxPrice * 100 : maxPrice;
+      maxPriceCents = maxPrice * 100;
     }
 
     // Resolve category hierarchy

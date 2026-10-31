@@ -6,6 +6,7 @@ import com.khmermart.model.response.ProductDetailDto;
 import com.khmermart.service.ProductService;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.HashMap;
 import java.util.List;
@@ -33,8 +34,12 @@ public class ProductController {
       @RequestParam(name = "q", required = false) String q,
       @RequestParam(name = "categoryId", required = false) Long categoryId,
       @RequestParam(name = "brand", required = false) String brand,
-      @RequestParam(name = "minPrice", required = false) Long minPrice,
-      @RequestParam(name = "maxPrice", required = false) Long maxPrice,
+      @Parameter(description = "Minimum price in WHOLE US DOLLARS (e.g. 8 = $8.00)")
+          @RequestParam(name = "minPrice", required = false)
+          Long minPrice,
+      @Parameter(description = "Maximum price in WHOLE US DOLLARS (e.g. 20 = $20.00)")
+          @RequestParam(name = "maxPrice", required = false)
+          Long maxPrice,
       @RequestParam(name = "inStock", required = false) Boolean inStock,
       @RequestParam(name = "sort", required = false) String sort,
       @RequestParam(name = "page", defaultValue = "1") int page,

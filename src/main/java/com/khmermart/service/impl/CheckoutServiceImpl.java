@@ -171,6 +171,10 @@ public class CheckoutServiceImpl implements CheckoutService {
     this.eventPublisher = eventPublisher;
   }
 
+  /** Payment methods currently offered to customers (single source of truth for preview). */
+  static final List<PaymentMethod> ENABLED_PAYMENT_METHODS =
+      List.of(PaymentMethod.KHQR, PaymentMethod.COD);
+
   @Override
   @Transactional(readOnly = true)
   public CheckoutPreviewDto preview(Long userId, CheckoutRequest request) {
@@ -346,13 +350,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     AddressDto addressDto = addressMapper.toDto(address);
     ShippingMethodDto shippingMethodDto = shippingService.toDto(shippingMethod);
 
-    List<PaymentMethod> availablePaymentMethods =
-        List.of(
-            PaymentMethod.KHQR,
-            PaymentMethod.COD,
-            PaymentMethod.BANK_TRANSFER,
-            PaymentMethod.CARD,
-            PaymentMethod.WALLET);
+    List<PaymentMethod> availablePaymentMethods = ENABLED_PAYMENT_METHODS;
 
     return new CheckoutPreviewDto(
         itemDtos,

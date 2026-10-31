@@ -11,10 +11,11 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `POST /api/auth/logout`: Revoke active refresh token.
 - `GET /api/users/me`: Current user profile.
 - `PATCH /api/users/me`: Update profile (name, phone).
-- `PUT /api/users/me/password`: Change account password (invalidates sessions).
+- `PATCH /api/users/me/password`: Change account password (invalidates sessions).
 - `GET /api/users/me/addresses`: List user delivery addresses.
 - `POST /api/users/me/addresses`: Create new delivery address.
-- `PUT /api/users/me/addresses/{id}`: Update delivery address.
+- `GET /api/users/me/addresses/{id}`: Get one delivery address.
+- `PATCH /api/users/me/addresses/{id}`: Partially update delivery address.
 - `DELETE /api/users/me/addresses/{id}`: Delete delivery address.
 
 ---
@@ -22,9 +23,9 @@ This document details the complete REST API contract for KhmerMart, covering all
 ## 2. Catalog & Discovery
 - `GET /api/home`: Curated home feeds (featured, flash sale, new arrivals, popular).
 - `GET /api/categories`: Category tree with subcategories and product counts.
-- `GET /api/products`: Full-text search, multi-faceted filtering, sorting, pagination.
+- `GET /api/products`: Full-text search, multi-faceted filtering, sorting, pagination. **`minPrice` / `maxPrice` are WHOLE US DOLLARS** (e.g. `minPrice=8&maxPrice=20` = $8–$20); there is no cents form. Response prices (`priceCents`, …) stay in cents.
 - `GET /api/products/{idOrSlug}`: Full product detail with variants and active promotions.
-- `GET /api/search/suggestions`: Fast typeahead autocomplete suggestions.
+- `GET /api/search/suggest`: Fast typeahead autocomplete suggestions.
 
 ### 2.1 Pricing & Promotion Contract
 - **`VariantDTO`**:
@@ -42,10 +43,13 @@ This document details the complete REST API contract for KhmerMart, covering all
 
 ## 3. Cart & Checkout
 - `GET /api/cart`: Current shopping cart with live price calculations.
-- `POST /api/cart/items`: Add or update item quantity.
+- `POST /api/cart/items`: Add item to cart.
+- `PATCH /api/cart/items/{id}`: Change quantity of a cart line.
 - `DELETE /api/cart/items/{id}`: Remove item from cart.
+- `DELETE /api/cart`: Clear the whole cart.
 - `POST /api/cart/coupon`: Apply promotional coupon code.
 - `DELETE /api/cart/coupon`: Remove applied coupon code.
+- `POST /api/checkout/preview`: Price/shipping preview. `availablePaymentMethods` lists only the currently enabled methods (`KHQR`, `COD`).
 - `POST /api/checkout`: Idempotent order checkout with stock reservation (`Idempotency-Key`).
 
 ---
@@ -55,10 +59,12 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline. `OrderDTO.discountBreakdown` = `{ "promotions": [{ "label", "amountCents" }], "coupon": { "code", "amountCents" } | null }`, read from the checkout snapshot (never recalculated); `discountCents` = sum(promotions) + coupon. Orders without a snapshot return `promotions: []`, `coupon: null`. Also returned by `POST /api/checkout` and the admin order endpoints.
 - `POST /api/orders/{orderNumber}/cancel`: Customer order cancellation.
 - `GET /api/orders/{orderNumber}/invoice.pdf`: Download PDF tax invoice.
-- `GET /api/payments/{id}`: Fetch payment status and KHQR payload.
-- `GET /api/payments/{id}/events`: Real-time Server-Sent Events (SSE) payment status stream.
-- `POST /api/payments/{id}/simulate-paid`: Development & test payment settlement simulator.
-- `POST /api/payments/{id}/bank-transfer/slip`: Upload bank transfer deposit slip.
+- `POST /api/payments/khqr/{orderNumber}`: Generate (or return the active) KHQR payment for a `PENDING_PAYMENT` order. Returns `paymentId`, `qrString`, `qrImageDataUrl`, `expiresAt`, `streamToken`. The order's `paymentDeadline` **equals** this `expiresAt`.
+- `POST /api/payments/khqr/{orderNumber}/regenerate`: Expire previous pending QR and issue a fresh one.
+- `GET /api/payments/{paymentId}/status`: Current payment + order status. Owner or STAFF/ADMIN only; any other user gets `404` (existence is not revealed); unauthenticated gets `401`.
+- `GET /api/payments/{paymentId}/stream`: Server-Sent Events status stream. Authorised by the owner's `?token=<streamToken>` (EventSource cannot send headers) or by a STAFF/ADMIN bearer token. Missing/invalid token → `401`; token/user not owning the payment → `404`.
+- `POST /api/payments/{paymentId}/simulate-paid`: MOCK-mode settlement simulator. Only valid for a `PENDING` payment (idempotent for `PAID`); `EXPIRED`/`FAILED` → `422 INVALID_STATUS_TRANSITION`.
+- `POST /api/payments/bank-transfer/{orderNumber}/slip`: Upload bank transfer deposit slip (multipart `file`).
 
 ---
 
@@ -84,7 +90,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 ## 7. Section H: Backoffice Administration (Admin API)
 
 ### 7.1 Dashboard
-- `GET /api/admin/dashboard?range=today|7d|30d`: Comprehensive executive KPI dashboard matching [`DashboardDto`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/main/java/com/khmermart/model/response/DashboardDto.java).
+- `GET /api/admin/dashboard`: (query `range=today|7d|30d`) Comprehensive executive KPI dashboard matching [`DashboardDto`](file:///mnt/data/Year4/SYS(1)/spring/final/khmermart/back_end/src/main/java/com/khmermart/model/response/DashboardDto.java).
 
 ### 7.2 Users Management
 - `GET /api/admin/users`: Search, filter by role/status, paginate users.
@@ -145,7 +151,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `PATCH /api/admin/reviews/{id}`: Approve/Reject review with optional administrative reply.
 
 ### 7.10 Analytics & Reports
-- `GET /api/admin/reports/sales?groupBy=day|month|category|product|paymentMethod&from=&to=`: Dynamic aggregation report.
+- `GET /api/admin/reports/sales`: (query `groupBy=day|month|category|product|paymentMethod`, `from`, `to`) Dynamic aggregation report.
 - `GET /api/admin/reports/sales.csv`: Export sales report to CSV.
 - `GET /api/admin/reports/sales.xlsx`: Export sales report to Microsoft Excel format.
 

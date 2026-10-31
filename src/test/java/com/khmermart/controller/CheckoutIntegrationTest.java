@@ -115,6 +115,31 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("Fix5: preview availablePaymentMethods lists only enabled methods (KHQR, COD)")
+  void testPreviewListsOnlyEnabledPaymentMethods() throws Exception {
+    String token = loginCustomer("customer1@khmermart.local", "Customer@123");
+    HttpHeaders headers = new HttpHeaders();
+    headers.setBearerAuth(token);
+    restTemplate.exchange(
+        "/api/cart/items",
+        HttpMethod.POST,
+        new HttpEntity<>(new CartItemRequest(1001L, null, 1), headers),
+        String.class);
+
+    CheckoutRequest req = new CheckoutRequest(1L, "STANDARD", PaymentMethod.COD, null);
+    ResponseEntity<String> res =
+        restTemplate.exchange(
+            "/api/checkout/preview", HttpMethod.POST, new HttpEntity<>(req, headers), String.class);
+
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode methods =
+        objectMapper.readTree(res.getBody()).get("data").get("availablePaymentMethods");
+    assertThat(methods).hasSize(2);
+    assertThat(methods.get(0).asText()).isEqualTo("KHQR");
+    assertThat(methods.get(1).asText()).isEqualTo("COD");
+  }
+
+  @Test
   @DisplayName("4. Checkout: missing Idempotency-Key returns 400 BAD_REQUEST / VALIDATION_ERROR")
   void testCheckoutMissingIdempotencyKey() throws Exception {
     String token = loginCustomer("customer1@khmermart.local", "Customer@123");

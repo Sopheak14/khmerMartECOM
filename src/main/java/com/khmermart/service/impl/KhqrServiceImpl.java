@@ -283,8 +283,8 @@ public class KhqrServiceImpl implements KhqrService {
     payment.setQrExpiresAt(qrExpiresAt);
     payment = paymentRepository.save(payment);
 
-    // Update order payment deadline (+1 min grace period)
-    order.setPaymentDeadline(qrExpiresAt.plus(Duration.ofMinutes(1)));
+    // Single source of truth: the order deadline IS the KHQR expiry
+    order.setPaymentDeadline(qrExpiresAt);
     orderRepository.save(order);
 
     String streamToken = jwtService.generateStreamToken(payment.getId(), order.getUserId());
@@ -321,8 +321,9 @@ public class KhqrServiceImpl implements KhqrService {
             .findById(payment.getOrderId())
             .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
 
+    // 404 (not 403) so we never reveal that another user's payment exists
     if (userId != null && !order.getUserId().equals(userId) && !isStaffOrAdmin) {
-      throw new CustomException(ErrorCode.FORBIDDEN, "Access denied");
+      throw new CustomException(ErrorCode.NOT_FOUND, "Payment not found");
     }
 
     // In LIVE mode, trigger one immediate Bakong check if lastCheckedAt older than 3s
@@ -362,8 +363,9 @@ public class KhqrServiceImpl implements KhqrService {
             .findById(payment.getOrderId())
             .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
 
+    // 404 (not 403) so we never reveal that another user's payment exists
     if (userId != null && !order.getUserId().equals(userId) && !isStaffOrAdmin) {
-      throw new CustomException(ErrorCode.FORBIDDEN, "Access denied");
+      throw new CustomException(ErrorCode.NOT_FOUND, "Payment not found");
     }
 
     if (payment.getStatus() == PaymentStatus.PAID) {
@@ -374,6 +376,12 @@ public class KhqrServiceImpl implements KhqrService {
           payment.getPaidAt(),
           payment.getBakongHash(),
           payment.getQrExpiresAt());
+    }
+
+    if (payment.getStatus() != PaymentStatus.PENDING) {
+      throw new CustomException(
+          ErrorCode.INVALID_STATUS_TRANSITION,
+          "Cannot pay a payment in status " + payment.getStatus());
     }
 
     String mockHash = "MOCK-" + UUID.randomUUID();

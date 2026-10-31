@@ -69,6 +69,18 @@ public class JwtService {
     }
   }
 
+  /** Returns the user id a (valid) stream token was issued to, or null if invalid. */
+  public Long streamTokenUserId(String token, Long paymentId) {
+    if (!validateStreamToken(token, paymentId)) {
+      return null;
+    }
+    try {
+      return Long.valueOf(validateAndGetClaims(token).getSubject());
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   public Claims validateAndGetClaims(String token) {
     return Jwts.parser().verifyWith(accessKey).build().parseSignedClaims(token).getPayload();
   }
