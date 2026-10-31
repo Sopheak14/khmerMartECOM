@@ -262,7 +262,10 @@ public final class SeedCatalog {
         descKm);
   }
 
-  /** Exactly 40 products, ids 1001..1040 in order. Variant products carry the cheapest price. */
+  /**
+   * Exactly 38 products, ids 1001..1040 in order with gaps at 1011 and 1024 (perishables removed,
+   * ids never renumbered). Variant products carry the cheapest price.
+   */
   public static final List<Product> PRODUCTS =
       List.of(
           // ---- Silk & Textiles ----
@@ -397,19 +400,6 @@ public final class SeedCatalog {
               60,
               "Pure palm sugar cooked down in Kampong Speu, used in curries and desserts.",
               "ស្ករត្នោតសុទ្ធដែលកូរនៅខេត្តកំពង់ស្ពឺ ប្រើក្នុងសម្ល និងនំ។"),
-          p(
-              1011,
-              "SPC-1011",
-              "Yellow Kroeung Paste 200 g",
-              "គ្រឿងលឿង ២០០ ក្រាម",
-              "Siem Reap Kitchen",
-              350,
-              CAT_SPICES,
-              150,
-              170,
-              30,
-              "Ready-made yellow kroeung paste of lemongrass, turmeric and garlic, for amok and curries.",
-              "គ្រឿងលឿងរួចរាល់ពីស្លឹកគ្រៃ រមៀត និងខ្ទឹមស សម្រាប់ធ្វើអាម៉ុក និងសម្លការី។"),
           p(
               1012,
               "SPC-1012",
@@ -569,19 +559,6 @@ public final class SeedCatalog {
               20,
               "Crispy fried banana chips from Battambang.",
               "ចេកចៀនស្រួយពីខេត្តបាត់ដំបង។"),
-          p(
-              1024,
-              "SNK-1024",
-              "Num Akor Rice Cakes, box of 10",
-              "នំអាកោ ១០ ដុំ",
-              "Siem Reap Sweets",
-              300,
-              CAT_SNACKS,
-              60,
-              55,
-              14,
-              "Traditional Khmer rice-flour cakes with coconut and palm sugar, in a box of ten.",
-              "នំអាកោប្រពៃណីខ្មែរធ្វើពីម្សៅអង្ករ ដូង និងស្ករត្នោត ១០ ដុំក្នុងមួយប្រអប់។"),
           p(
               1025,
               "SNK-1025",
@@ -818,8 +795,9 @@ public final class SeedCatalog {
     return PRODUCTS.stream().filter(p -> p.categoryId() == categoryId).count();
   }
 
-  public static boolean isSpice(long productId) {
-    return productId >= FIRST_SPICE_ID && productId <= LAST_SPICE_ID;
+  /** Spices & Sauces on the seasonal banner: every spice except the flash-sale pepper (1006). */
+  public static boolean isSeasonalProduct(long productId) {
+    return productId >= FIRST_SPICE_ID && productId <= LAST_SPICE_ID && productId != PEPPER_ID;
   }
 
   /** Cents to Khmer riel at the seeded rate (the app stores amountKhr as cents * rate / 100). */

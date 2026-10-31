@@ -147,7 +147,7 @@ public class DataSeeder implements CommandLineRunner {
     }
     resetSequences();
     log.info(
-        "Seeding complete: 3 seed customers, 8 root categories, 40 products, 32 orders, reviews recomputed.");
+        "Seeding complete: 3 seed customers, 8 root categories, 38 products, 32 orders, reviews recomputed.");
   }
 
   private void seedUsersAndAddresses() {
@@ -445,7 +445,8 @@ public class DataSeeder implements CommandLineRunner {
     insertPromotionProduct(1L, SeedCatalog.PEPPER_ID, null, SeedCatalog.PEPPER_FLASH_CENTS);
     insertPromotionProduct(1L, SeedCatalog.MANGO_ID, null, SeedCatalog.MANGO_FLASH_CENTS);
 
-    // 2. SEASONAL: Pchum Ben Festival Sale, 10% off Spices & Sauces (products 1006..1012)
+    // 2. SEASONAL: Pchum Ben Festival Sale, 10% off Spices & Sauces (spices 1007..1012 except
+    // flash-sale 1006; 1011 removed)
     jdbcTemplate.update(
         """
         INSERT INTO promotions (id, name, name_km, type, discount_percent, threshold_cents, starts_at, ends_at, banner_image, link, is_active)
@@ -458,8 +459,10 @@ public class DataSeeder implements CommandLineRunner {
         Timestamp.from(now.minus(5, ChronoUnit.DAYS)),
         Timestamp.from(now.plus(25, ChronoUnit.DAYS)),
         SeedCatalog.SEASONAL_BANNER);
-    for (long pid = SeedCatalog.FIRST_SPICE_ID; pid <= SeedCatalog.LAST_SPICE_ID; pid++) {
-      insertPromotionProduct(2L, pid, null);
+    for (SeedCatalog.Product product : SeedCatalog.PRODUCTS) {
+      if (SeedCatalog.isSeasonalProduct(product.id())) {
+        insertPromotionProduct(2L, product.id(), null);
+      }
     }
 
     // 3. BOGO: Buy 1 Get 1 Lemongrass Soap (no variants), same 7-day window as the flash sale
@@ -844,8 +847,8 @@ public class DataSeeder implements CommandLineRunner {
             List.of(item(1005L, 1)), // 6: Phamuong Silk Fabric
             List.of(
                 item(1010L, 2),
-                item(1011L, 2),
-                item(1012L, 1)), // 7: Palm Sugar, Kroeung, Fish Sauce
+                item(1009L, 2),
+                item(1012L, 1)), // 7: Palm Sugar, Salt Flower, Fish Sauce
             List.of(item(1031L, 1), item(1033L, 3)), // 8: Coconut Oil + Lemongrass Soap 3x
             List.of(item(1036L, 1), item(1037L, 1)), // 9: Angkor book + Folk Tales
             List.of(
@@ -861,7 +864,7 @@ public class DataSeeder implements CommandLineRunner {
             List.of(item(1018L, 2), item(1019L, 1)), // 14: Robusta 2x + Lotus Tea
             List.of(item(1008L, 1), item(1012L, 1)), // 15: Pepper Gift Set + Fish Sauce (SAVE5)
             List.of(item(1004L, 1), item(1002L, 1)), // 16: Table Runner + Cotton Krama
-            List.of(item(1024L, 2), item(1023L, 2)), // 17: Num Akor 2 boxes + Banana Chips 2x
+            List.of(item(1025L, 2), item(1023L, 2)), // 17: Durian Candy 2x + Banana Chips 2x
             List.of(item(1038L, 1), item(1040L, 1)), // 18: Dictionary + Home Cooking
             List.of(item(1015L, 2), item(1016L, 3)), // 19: Sticky Rice 2x + Num Banh Chok 3x
             List.of(
@@ -949,7 +952,8 @@ public class DataSeeder implements CommandLineRunner {
                 : prod.priceCents();
         Long flashPrice = prod.flashSalePriceCents();
         // Same rule as checkout: linked products get the seasonal percent, others 0
-        Integer seasonal = SeedCatalog.isSpice(prod.productId()) ? SeedCatalog.SEASONAL_PERCENT : 0;
+        Integer seasonal =
+            SeedCatalog.isSeasonalProduct(prod.productId()) ? SeedCatalog.SEASONAL_PERCENT : 0;
 
         pricingItems.add(
             new PricingItem(
@@ -1220,11 +1224,11 @@ public class DataSeeder implements CommandLineRunner {
                 "Red pepper is milder and fruitier than the black one.",
                 false),
             new SeedReview(
-                1011,
+                1009,
                 4,
                 5,
-                "Makes amok easy",
-                "Fresh kroeung paste, saves an hour of pounding.",
+                "Lovely finishing salt",
+                "Fine, flaky crystals that make plain rice taste better.",
                 true),
             new SeedReview(
                 1014,

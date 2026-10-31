@@ -68,13 +68,13 @@ Safety: the script refuses unless `SPRING_PROFILES_ACTIVE` is `dev`, the databas
 
 ### Seeded catalog (Khmer-only) / កាតាឡុកដែលបាន seed (ផលិតផលខ្មែរតែប៉ុណ្ណោះ)
 
-KhmerMart sells **only Cambodian products**. The seed (`com.khmermart.seed.DataSeeder`, constants in `SeedCatalog.java`) creates **8 root categories** (Silk & Textiles, Spices & Sauces, Rice & Grains, Coffee & Tea, Snacks & Dried Fruit, Handicrafts, Beauty & Wellness, Books & Culture; each with a Khmer name) and **40 products** (ids 1001–1040, generic origin brands such as "Takeo Weavers" / "Kampot Farms"; the description holds an English and a Khmer paragraph).
+KhmerMart sells **only Cambodian products**. The seed (`com.khmermart.seed.DataSeeder`, constants in `SeedCatalog.java`) creates **8 root categories** (Silk & Textiles, Spices & Sauces, Rice & Grains, Coffee & Tea, Snacks & Dried Fruit, Handicrafts, Beauty & Wellness, Books & Culture; each with a Khmer name) and **38 products** (ids 1001–1040 with gaps at 1011 and 1024, the two perishable products removed and never renumbered; generic origin brands such as "Takeo Weavers" / "Kampot Farms"; the description holds an English and a Khmer paragraph).
 
 | Item | Seed value |
 |---|---|
 | Hero **1001 Takeo Hol Silk Sampot** | 4 variants: Ruby Red / Royal Blue × Standard $149.00 / Premium $199.00, 50 in stock each |
 | **Flash Sale 24H** (7 days from seed time) | 1001 Standard variants (1 and 3) at $129.00; 1006 Kampot Black Pepper at $7.90; 1022 Dried Mango at $3.20 |
-| **Pchum Ben Festival Sale** / ពិធីបុណ្យភ្ជុំបិណ្ឌ (seasonal banner) | 10% off Spices & Sauces (1006–1012) |
+| **Pchum Ben Festival Sale** / ពិធីបុណ្យភ្ជុំបិណ្ឌ (seasonal banner) | 10% off Spices & Sauces (1007–1010 and 1012; 1006 is on the flash sale instead, 1011 removed) |
 | **Buy 1 Get 1 Lemongrass Soap** / ទិញ ១ ថែម ១ សាប៊ូស្លឹកគ្រៃ (BOGO, 7 days) | 1033 Lemongrass Soap, 2 units → 1 free (−$3.50) |
 | Low stock | 1027 Silver Box (3 left) and 1004 Table Runner (4 left), threshold 5, so the dashboard "Low stock" table is populated |
 | Coupons | `SAVE5` ($5 off, min $35), `WELCOME10`, `FREESHIP`, `EXPIRED` |
@@ -83,7 +83,7 @@ KhmerMart sells **only Cambodian products**. The seed (`com.khmermart.seed.DataS
 
 Product photos: only verified images are used (3 category photos: rice, spices, books); every other product and category shows a clean placeholder until real photos are uploaded in Admin → Products.
 
-KhmerMart លក់តែ **ផលិតផលកម្ពុជា** ប៉ុណ្ណោះ។ ការ seed បង្កើតប្រភេទឫស ៨ (សូត្រ និងក្រណាត់, គ្រឿងទេស និងទឹកជ្រលក់, អង្ករ និងធញ្ញជាតិ, កាហ្វេ និងតែ, អាហារសម្រន់ និងផ្លែឈើស្ងួត, សិប្បកម្ម, សម្រស់ និងសុខភាព, សៀវភៅ និងវប្បធម៌) និងផលិតផល ៤០ (លេខ 1001–1040)។ ផលិតផលសំខាន់ **1001 សំពត់ហូលសូត្រ តាកែវ** មាន ៤ variant (ក្រហមរ៉ូប៊ី / ខៀវរាជា × Standard $149.00 / Premium $199.00); Flash Sale 24H បញ្ចុះតម្លៃ variant Standard ត្រឹម $129.00 បូកម្រេចខ្មៅកំពត $7.90 និងស្វាយក្រៀម $3.20; បដា "ពិធីបុណ្យភ្ជុំបិណ្ឌ" បញ្ចុះ ១០% លើគ្រឿងទេស និងទឹកជ្រលក់; ការបញ្ជាទិញ demo៖ $149.00 − $20.00 − $5.00 = **$124.00 = 508,400 ៛**។
+KhmerMart លក់តែ **ផលិតផលកម្ពុជា** ប៉ុណ្ណោះ។ ការ seed បង្កើតប្រភេទឫស ៨ (សូត្រ និងក្រណាត់, គ្រឿងទេស និងទឹកជ្រលក់, អង្ករ និងធញ្ញជាតិ, កាហ្វេ និងតែ, អាហារសម្រន់ និងផ្លែឈើស្ងួត, សិប្បកម្ម, សម្រស់ និងសុខភាព, សៀវភៅ និងវប្បធម៌) និងផលិតផល ៣៨ (លេខ 1001–1040 លើកលែង 1011 និង 1024)។ ផលិតផលសំខាន់ **1001 សំពត់ហូលសូត្រ តាកែវ** មាន ៤ variant (ក្រហមរ៉ូប៊ី / ខៀវរាជា × Standard $149.00 / Premium $199.00); Flash Sale 24H បញ្ចុះតម្លៃ variant Standard ត្រឹម $129.00 បូកម្រេចខ្មៅកំពត $7.90 និងស្វាយក្រៀម $3.20; បដា "ពិធីបុណ្យភ្ជុំបិណ្ឌ" បញ្ចុះ ១០% លើគ្រឿងទេស និងទឹកជ្រលក់; ការបញ្ជាទិញ demo៖ $149.00 − $20.00 − $5.00 = **$124.00 = 508,400 ៛**។
 
 ---
 
@@ -127,7 +127,7 @@ All responses follow the unified response envelope:
 {
   "success": true,
   "data": { ... },
-  "meta": { "page": 1, "limit": 20, "total": 40, "totalPages": 2 }
+  "meta": { "page": 1, "limit": 20, "total": 38, "totalPages": 2 }
 }
 ```
 
