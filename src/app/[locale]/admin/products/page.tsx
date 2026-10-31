@@ -152,6 +152,19 @@ export default function AdminProductsPage() {
   });
 
   const products = productsData?.data || [];
+
+  // The list DTO carries no `active` flag, so ask the backend which products are inactive
+  // (soft-deleted products that have orders stay listed but are hidden from the storefront).
+  const { data: inactiveData } = useQuery({
+    queryKey: ['admin', 'products', 'inactive-ids'],
+    queryFn: async () => {
+      const res = await apiClient<ProductCardDTO[]>('/admin/products', {
+        query: { active: false, page: 0, size: 200 },
+      });
+      return new Set((res.data || []).map((p) => p.id));
+    },
+  });
+  const isInactive = (item: ProductCardDTO) => item.active === false || !!inactiveData?.has(item.id);
   const meta = productsData?.meta;
   const totalPages = meta?.totalPages || 1;
 
@@ -208,11 +221,11 @@ export default function AdminProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
-      toast.success('Product deleted successfully');
+      toast.success(t('deleteSuccess'));
       setDeleteConfirmId(null);
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to delete product');
+      toast.error(err.message || t('deleteFailed'));
       setDeleteConfirmId(null);
     },
   });
@@ -672,14 +685,16 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
+                        data-testid={`product-status-${item.id}`}
+                        title={isInactive(item) ? t('inactiveHint') : undefined}
                         className={cn(
                           'inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold',
-                          item.active !== false
+                          !isInactive(item)
                             ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                             : 'bg-muted/20 text-muted'
                         )}
                       >
-                        {item.active !== false ? t('statusActive') : t('statusInactive')}
+                        {!isInactive(item) ? t('statusActive') : t('inactiveBadge')}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -687,8 +702,9 @@ export default function AdminProductsPage() {
                         <button
                           type="button"
                           onClick={() => openEditModal(item)}
+                          disabled={isInactive(item)}
                           data-testid={`edit-product-btn-${item.id}`}
-                          className="p-1.5 rounded-lg border border-border hover:bg-muted/10 text-muted hover:text-foreground transition-colors"
+                          className="p-1.5 rounded-lg border border-border hover:bg-muted/10 text-muted hover:text-foreground transition-colors disabled:opacity-40 disabled:pointer-events-none"
                           title={t('editProduct')}
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -696,8 +712,9 @@ export default function AdminProductsPage() {
                         <button
                           type="button"
                           onClick={() => setDeleteConfirmId(item.id)}
+                          disabled={isInactive(item)}
                           data-testid={`delete-product-btn-${item.id}`}
-                          className="p-1.5 rounded-lg border border-border hover:bg-red-500/10 text-muted hover:text-red-600 transition-colors"
+                          className="p-1.5 rounded-lg border border-border hover:bg-red-500/10 text-muted hover:text-red-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                           title={t('deleteProduct')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1225,7 +1242,8 @@ export default function AdminProductsPage() {
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 text-xs font-semibold border border-border rounded-xl"
+                disabled={deleteMutation.isPending}
+                className="px-4 py-2 text-xs font-semibold border border-border rounded-xl disabled:opacity-50"
               >
                 {commonT('cancel')}
               </button>
@@ -1234,9 +1252,9 @@ export default function AdminProductsPage() {
                 data-testid="confirm-delete-product-btn"
                 disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate(deleteConfirmId)}
-                className="px-4 py-2 text-xs font-bold bg-destructive text-destructive-foreground rounded-xl hover:bg-destructive/90"
+                className="px-4 py-2 text-xs font-bold bg-destructive text-destructive-foreground rounded-xl hover:bg-destructive/90 disabled:opacity-50"
               >
-                {deleteMutation.isPending ? 'Deleting...' : commonT('confirm')}
+                {deleteMutation.isPending ? t('deleting') : commonT('confirm')}
               </button>
             </div>
           </div>

@@ -435,7 +435,12 @@
       "dragDropImages": "ចុច ឬអូសរូបភាពមកទីនេះដើម្បីបញ្ចូល",
       "primaryImage": "រូបភាពចម្បង",
       "deleteConfirm": "តើអ្នកប្រាកដថាចង់លុបទំនិញនេះមែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។",
-      "deleteProduct": "លុបទំនិញ"
+      "deleteProduct": "លុបទំនិញ",
+      "deleteSuccess": "បានលុបទំនិញ",
+      "deleteFailed": "លុបទំនិញមិនបានជោគជ័យ",
+      "deleting": "កំពុងលុប...",
+      "inactiveBadge": "ផ្អាក",
+      "inactiveHint": "ផ្អាក (មានការបញ្ជាទិញ) — លាក់ពីហាង"
     },
     "categories": {
       "title": "រចនាសម្ព័ន្ធប្រភេទ",

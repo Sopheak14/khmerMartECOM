@@ -435,7 +435,12 @@
       "dragDropImages": "Click or drag images here to upload",
       "primaryImage": "Primary Cover",
       "deleteConfirm": "Are you sure you want to delete this product? This action cannot be undone.",
-      "deleteProduct": "Delete Product"
+      "deleteProduct": "Delete Product",
+      "deleteSuccess": "Product deleted",
+      "deleteFailed": "Failed to delete product",
+      "deleting": "Deleting...",
+      "inactiveBadge": "Inactive",
+      "inactiveHint": "Inactive (has orders) — hidden from the storefront"
     },
     "categories": {
       "title": "Category Hierarchy",
