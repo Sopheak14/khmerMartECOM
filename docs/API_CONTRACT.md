@@ -50,7 +50,7 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `POST /api/cart/coupon`: Apply promotional coupon code.
 - `DELETE /api/cart/coupon`: Remove applied coupon code.
 - `POST /api/checkout/preview`: Price/shipping preview. `availablePaymentMethods` lists only the currently enabled methods (`KHQR`, `COD`).
-- `POST /api/checkout`: Idempotent order checkout with stock reservation (`Idempotency-Key`).
+- `POST /api/checkout`: Idempotent order checkout with stock reservation (`Idempotency-Key`). `paymentMethod` must be one of the enabled methods (`KHQR`, `COD`); `BANK_TRANSFER`/`CARD`/`WALLET` → `422 PAYMENT_METHOD_NOT_AVAILABLE`.
 
 ---
 

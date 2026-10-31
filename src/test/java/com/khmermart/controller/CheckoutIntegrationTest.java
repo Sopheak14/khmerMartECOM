@@ -115,6 +115,36 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("Checkout rejects non-enabled payment methods with 422 PAYMENT_METHOD_NOT_AVAILABLE")
+  void testCheckoutRejectsDisabledPaymentMethods() throws Exception {
+    String token = loginCustomer("customer1@khmermart.local", "Customer@123");
+    HttpHeaders headers = new HttpHeaders();
+    headers.setBearerAuth(token);
+    restTemplate.exchange(
+        "/api/cart/items",
+        HttpMethod.POST,
+        new HttpEntity<>(new CartItemRequest(1001L, null, 1), headers),
+        String.class);
+
+    for (PaymentMethod method :
+        new PaymentMethod[] {
+          PaymentMethod.BANK_TRANSFER, PaymentMethod.CARD, PaymentMethod.WALLET
+        }) {
+      HttpHeaders h = new HttpHeaders();
+      h.setBearerAuth(token);
+      h.set("Idempotency-Key", "disabled-" + method + "-" + System.nanoTime());
+      CheckoutRequest req = new CheckoutRequest(1L, "STANDARD", method, null);
+      ResponseEntity<String> res =
+          restTemplate.exchange(
+              "/api/checkout", HttpMethod.POST, new HttpEntity<>(req, h), String.class);
+
+      assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+      JsonNode json = objectMapper.readTree(res.getBody());
+      assertThat(json.get("error").get("code").asText()).isEqualTo("PAYMENT_METHOD_NOT_AVAILABLE");
+    }
+  }
+
+  @Test
   @DisplayName("Fix5: preview availablePaymentMethods lists only enabled methods (KHQR, COD)")
   void testPreviewListsOnlyEnabledPaymentMethods() throws Exception {
     String token = loginCustomer("customer1@khmermart.local", "Customer@123");

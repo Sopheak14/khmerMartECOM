@@ -16,6 +16,7 @@ public enum ErrorCode {
   COUPON_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Coupon has expired"),
   COUPON_MIN_ORDER(HttpStatus.UNPROCESSABLE_ENTITY, "Minimum order subtotal not met for coupon"),
   INVALID_STATUS_TRANSITION(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid status transition"),
+  PAYMENT_METHOD_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Payment method is not available"),
   PAYMENT_EXPIRED(HttpStatus.GONE, "Payment has expired"),
   KHQR_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "Failed to generate KHQR code"),
   BAKONG_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Bakong service is temporarily unavailable"),

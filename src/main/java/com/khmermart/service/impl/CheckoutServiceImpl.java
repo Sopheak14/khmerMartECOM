@@ -371,6 +371,12 @@ public class CheckoutServiceImpl implements CheckoutService {
       throw new CustomException(ErrorCode.VALIDATION_ERROR, "Idempotency-Key header is required");
     }
 
+    if (!ENABLED_PAYMENT_METHODS.contains(request.paymentMethod())) {
+      throw new CustomException(
+          ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
+          "Payment method not available: " + request.paymentMethod());
+    }
+
     String redisKey = "idem:" + userId + ":" + idempotencyKey.trim();
 
     // 1. Check idempotency in Redis
