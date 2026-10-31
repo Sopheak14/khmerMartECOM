@@ -70,16 +70,25 @@ export async function placeKhqrOrder(
 
 export { createThrowawayUser };
 
-/** Tracking number of any already-shipped order (the public /track page needs no login). */
+/**
+ * Tracking number of an already-shipped order (the public /track page needs no login). When the database has none
+ * (fresh reset), it creates one itself: a throwaway customer checks out via the API and the order is paid and shipped.
+ * No seeded customer, staff or admin data is modified (the admin token is only used to list and to ship).
+ */
 export async function findShippedTrackingNumber(request: APIRequestContext): Promise<string> {
   const token = await adminToken(request);
   const res = await request.get(`${API}/admin/orders`, {
     headers: { Authorization: `Bearer ${token}` },
     params: { status: 'SHIPPED', size: 1 },
   });
-  const tracking = (await res.json()).data?.[0]?.trackingNumber;
-  expect(tracking, 'a shipped order must exist').toBeTruthy();
-  return tracking;
+  const existing = (await res.json()).data?.[0]?.trackingNumber;
+  if (existing) return existing;
+
+  const user = await createThrowawayUser(request);
+  const addressId = await createAddress(request, user);
+  const { trackingNumber } = await placeKhqrOrder(request, user, addressId, { ship: true });
+  expect(trackingNumber, 'a shipped order must exist').toBeTruthy();
+  return trackingNumber as string;
 }
 
 export async function cancelOrder(request: APIRequestContext, user: ThrowawayUser, orderNumber: string) {
