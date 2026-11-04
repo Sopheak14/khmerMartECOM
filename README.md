@@ -66,6 +66,21 @@ Safety: the script refuses unless `SPRING_PROFILES_ACTIVE` is `dev`, the databas
 
 មុនពេល demo សូមកំណត់មូលដ្ឋានទិន្នន័យ dev ឲ្យត្រឡប់ទៅទិន្នន័យថ្មីស្រស់ (flash sale ដំណើរការ **ចាប់ពីពេលនេះរយៈពេល ៧ ថ្ងៃ** ដើម្បីឲ្យមានម៉ោងរាប់ថយក្រោយ)៖ ១) បិទ backend ដោយខ្លួនឯង ២) `scripts/reset_demo.sh` (វាសួរឲ្យវាយឈ្មោះមូលដ្ឋានទិន្នន័យ; `--yes` រំលងសំណួរ) ៣) ចាប់ផ្តើម backend ឡើងវិញ (ស្គ្រីបមិនបិទ/បើក backend ឡើយ) ៤) `scripts/smoke_test.sh`។ ស្គ្រីបបដិសេធបើមិនមែនប្រូហ្វាល `dev` មិនមែនម៉ាស៊ីន `localhost` ឬមាន backend កំពុងឆ្លើយតប។ **ត្រូវចាប់ផ្តើម backend ឡើងវិញបន្ទាប់ពី reset។**
 
+### 3b. Clean store, backup & restore (EN / ខ្មែរ)
+
+```bash
+scripts/reset_clean.sh           # type "clean" to confirm; --yes skips the prompt
+scripts/backup_db.sh             # writes backups/khmermart-<YYYYMMDD-HHMM>.sql (git-ignored)
+scripts/restore_db.sh backups/khmermart-20261104-0900.sql   # type "restore" to confirm
+```
+
+- `reset_clean.sh` - for a live demo with real data: drops and re-creates the dev database, runs Flyway, then seeds **only** the admin (`admin@khmermart.local` / `Admin@12345`), the 25 provinces, the 3 shipping methods (STANDARD, SAME_DAY, EXPRESS) and settings (KhmerMart, USD→KHR 4100, `KHQR_MODE=MOCK`). No products, categories, customers, orders, etc. Later backend starts do not re-add the demo catalog (the seeder skips once users exist). `uploads/` is untouched. `reset_demo.sh` and `smoke_test.sh` still use the full demo data.
+- `backup_db.sh` - `pg_dump` of the dev database; safe to run while the backend is up.
+- `restore_db.sh <file>` - replaces the dev database with a dump.
+- Safety (reset_clean / restore): only the `dev` profile, only a `localhost` database, refuses if anything answers on `:4000` (stop the backend yourself first - the scripts never start/stop it), and needs the typed confirmation. Restart the backend afterwards.
+
+ស្គ្រីបបីសម្រាប់ demo ផ្ទាល់៖ `reset_clean.sh` សម្អាតមូលដ្ឋានទិន្នន័យ dev ឲ្យនៅសល់តែ admin (`admin@khmermart.local` / `Admin@12345`), ខេត្ត ២៥, វិធីដឹកជញ្ជូន ៣ និងការកំណត់ (វាយ `clean` ដើម្បីបញ្ជាក់; គ្មានផលិតផល ប្រភេទ អតិថិជន ឬការបញ្ជាទិញ)។ `backup_db.sh` ចម្លងទុកទៅ `backups/khmermart-<ថ្ងៃ-ម៉ោង>.sql`។ `restore_db.sh <ឯកសារ>` ស្តារមូលដ្ឋានទិន្នន័យពីឯកសារនោះ (វាយ `restore` ដើម្បីបញ្ជាក់)។ ត្រូវបិទ backend ដោយខ្លួនឯងមុនប្រើ `reset_clean` / `restore` ហើយចាប់ផ្តើមវាឡើងវិញបន្ទាប់ពីនោះ; ស្គ្រីបមិនបិទ/បើក backend ឡើយ។
+
 ### Seeded catalog (Khmer-only) / កាតាឡុកដែលបាន seed (ផលិតផលខ្មែរតែប៉ុណ្ណោះ)
 
 KhmerMart sells **only Cambodian products**. The seed (`com.khmermart.seed.DataSeeder`, constants in `SeedCatalog.java`) creates **8 root categories** (Silk & Textiles, Spices & Sauces, Rice & Grains, Coffee & Tea, Snacks & Dried Fruit, Handicrafts, Beauty & Wellness, Books & Culture; each with a Khmer name) and **38 products** (ids 1001–1040 with gaps at 1011 and 1024, the two perishable products removed and never renumbered; generic origin brands such as "Takeo Weavers" / "Kampot Farms"; the description holds an English and a Khmer paragraph).

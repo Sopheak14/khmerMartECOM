@@ -13,13 +13,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 public abstract class AbstractIntegrationTest {
 
-  static final PostgreSQLContainer<?> postgres =
+  public static final PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>("postgres:16-alpine")
           .withDatabaseName("khmermart_test")
           .withUsername("khmermart")
           .withPassword("khmermart");
 
-  static final GenericContainer<?> redis =
+  public static final GenericContainer<?> redis =
       new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
   static {

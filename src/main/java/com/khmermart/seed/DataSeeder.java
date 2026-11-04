@@ -54,6 +54,10 @@ public class DataSeeder implements CommandLineRunner {
   @Value("${app.seed.reset:false}")
   private boolean seedReset;
 
+  /** "full" (default demo catalog) or "clean" (admin + provinces + shipping + settings only). */
+  @Value("${app.seed.mode:full}")
+  private String seedMode;
+
   public DataSeeder(
       AppUserRepository appUserRepository,
       PasswordEncoder passwordEncoder,
@@ -82,9 +86,17 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     if (resetRequested || appUserRepository.count() == 0) {
-      log.info("Executing database reset & full seeding (resetRequested={})...", resetRequested);
+      boolean clean = "clean".equalsIgnoreCase(seedMode);
+      log.info(
+          "Executing database reset & {} seeding (resetRequested={})...",
+          clean ? "clean" : "full",
+          resetRequested);
       truncateAllTables();
-      seedAll();
+      if (clean) {
+        seedClean();
+      } else {
+        seedAll();
+      }
     } else {
       log.info(
           "Database already seeded with {} users. Skipping seeder.", appUserRepository.count());
@@ -129,6 +141,21 @@ public class DataSeeder implements CommandLineRunner {
             users
         CASCADE
         """);
+  }
+
+  /**
+   * Minimal live-store seed: one ADMIN, 25 provinces, 3 shipping methods, core settings. Nothing
+   * else. Once the admin exists the normal startup check (users.count() == 0) skips seeding, so the
+   * full demo catalog is never added on a later start.
+   */
+  public void seedClean() {
+    insertUser(
+        1L, "admin@khmermart.local", "Admin@12345", "Admin User", "+85512000001", Roles.ADMIN);
+    seedSettings();
+    seedShippingMethods();
+    seedProvinces();
+    resetSequences();
+    log.info("Clean seeding complete: 1 admin, 25 provinces, 3 shipping methods, settings.");
   }
 
   public void seedAll() {

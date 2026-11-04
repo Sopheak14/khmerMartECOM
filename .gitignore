@@ -33,3 +33,6 @@ target/
 .env
 uploads/*
 !uploads/.gitkeep
+
+### DB backups ###
+backups/
