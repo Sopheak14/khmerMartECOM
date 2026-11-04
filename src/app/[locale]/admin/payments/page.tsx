@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, usePathname, Link } from '@/navigation';
+import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -364,7 +365,10 @@ export default function AdminPaymentsPage() {
             ) : payments.length === 0 ? (
               <div className="py-20 text-center space-y-3" data-testid="payments-empty-state">
                 <CreditCard className="w-10 h-10 text-muted mx-auto" />
-                <p className="text-xs text-muted font-medium">{t('noPayments')}</p>
+                <p className="text-xs text-muted font-medium">
+                  {status || method ? t('noPayments') : t('noPaymentsYet')}
+                </p>
+                {!(status || method) && <EmptyStoreCta className="max-w-2xl mx-auto text-left" />}
               </div>
             ) : (
               <div className="overflow-x-auto">

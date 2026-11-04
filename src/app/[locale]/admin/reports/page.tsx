@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, usePathname } from '@/navigation';
 import { apiClient } from '@/lib/apiClient';
+import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { SalesGroupDTO } from '@/types/api';
 import { formatUsd, formatKhr } from '@/lib/money';
@@ -135,9 +136,9 @@ export default function AdminReportsPage() {
     units: item.unitsSold,
   }));
 
-  const totalOrders = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + curr.ordersCount, 0);
-  const totalUnits = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + curr.unitsSold, 0);
-  const totalRevenueCents = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + curr.revenueCents, 0);
+  const totalOrders = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + (curr.ordersCount ?? 0), 0);
+  const totalUnits = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + (curr.unitsSold ?? 0), 0);
+  const totalRevenueCents = reportItems.reduce((acc: number, curr: SalesGroupDTO) => acc + (curr.revenueCents ?? 0), 0);
 
   return (
     <div className="space-y-6" data-testid="admin-reports-page">
@@ -240,6 +241,8 @@ export default function AdminReportsPage() {
         </div>
       </div>
 
+      <EmptyStoreCta />
+
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-surface border border-border rounded-xl p-4">
@@ -282,8 +285,8 @@ export default function AdminReportsPage() {
             </button>
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-64 flex items-center justify-center text-xs text-muted">
-            {commonT('noData')}
+          <div className="h-64 flex items-center justify-center text-xs text-muted" data-testid="reports-empty-chart">
+            {from || to ? commonT('noData') : t('noSalesYet')}
           </div>
         ) : mounted ? (
           <div className="h-64 w-full">
@@ -335,7 +338,9 @@ export default function AdminReportsPage() {
             <p className="text-xs text-muted">{commonT('loading')}</p>
           </div>
         ) : reportItems.length === 0 ? (
-          <div className="p-8 text-center text-xs text-muted">{commonT('noData')}</div>
+          <div className="p-8 text-center text-xs text-muted">
+            {from || to ? commonT('noData') : t('noSalesYet')}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">

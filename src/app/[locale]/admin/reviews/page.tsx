@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, usePathname } from '@/navigation';
+import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { ReviewDTO, ReviewStatus } from '@/types/api';
@@ -186,8 +187,9 @@ export default function AdminReviewsPage() {
         ) : reviews.length === 0 ? (
           <div className="p-12 text-center text-xs text-muted space-y-1">
             <CheckCircle className="w-8 h-8 mx-auto text-emerald-500 opacity-60" />
-            <p className="font-semibold">All caught up!</p>
-            <p>No reviews currently matching the &quot;{statusParam}&quot; status.</p>
+            <p className="font-semibold">{t('allCaughtUp')}</p>
+            <p>{t('noneForStatus', { status: statusParam })}</p>
+            <EmptyStoreCta className="max-w-2xl mx-auto text-left mt-4" />
           </div>
         ) : (
           <div className="divide-y divide-border/60">

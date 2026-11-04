@@ -645,8 +645,26 @@ export default function AdminProductsPage() {
         ) : products.length === 0 ? (
           <div className="p-12 text-center space-y-2 text-muted">
             <Package className="w-10 h-10 mx-auto text-muted/60" />
-            <h3 className="text-sm font-bold text-foreground">{commonT('empty')}</h3>
-            <p className="text-xs">No products found matching your search.</p>
+            {q || categoryParam || activeParam !== '' ? (
+              <>
+                <h3 className="text-sm font-bold text-foreground">{commonT('empty')}</h3>
+                <p className="text-xs">No products found matching your search.</p>
+              </>
+            ) : (
+              <div data-testid="admin-products-empty-state" className="space-y-3">
+                <h3 className="text-sm font-bold text-foreground">{t('noProductsYet')}</h3>
+                <p className="text-xs">{t('noProductsYetDesc')}</p>
+                <button
+                  type="button"
+                  data-testid="add-first-product-btn"
+                  onClick={openCreateModal}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-btn bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('addFirstProduct')}</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

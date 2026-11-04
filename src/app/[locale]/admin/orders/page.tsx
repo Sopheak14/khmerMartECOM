@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, usePathname, Link } from '@/navigation';
+import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { OrderDTO, OrderStatus, PaymentStatus } from '@/types/api';
@@ -248,7 +249,10 @@ export default function AdminOrdersPage() {
             <div className="w-12 h-12 rounded-full bg-muted/10 text-muted flex items-center justify-center mx-auto">
               <ShoppingBag className="w-6 h-6" />
             </div>
-            <p className="text-xs text-muted font-medium">{t('noOrders')}</p>
+            <p className="text-xs text-muted font-medium">
+              {status || paymentStatus || from || to || q ? t('noOrders') : t('noOrdersYet')}
+            </p>
+            {!(status || paymentStatus || from || to || q) && <EmptyStoreCta className="max-w-2xl mx-auto text-left" />}
           </div>
         ) : (
           <div className="overflow-x-auto">

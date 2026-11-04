@@ -210,7 +210,18 @@ export default function AdminCategoriesPage() {
             </button>
           </div>
         ) : rootCategories.length === 0 ? (
-          <div className="p-8 text-center text-xs text-muted">{commonT('empty')}</div>
+          <div data-testid="admin-categories-empty-state" className="p-10 text-center text-xs text-muted space-y-3">
+            <h3 className="text-sm font-bold text-foreground">{t('noCategoriesYet')}</h3>
+            <p>{t('noCategoriesYetDesc')}</p>
+            <button
+              type="button"
+              data-testid="add-first-category-btn"
+              onClick={() => openCreateModal()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-btn bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+            >
+              <span>{t('addFirstCategory')}</span>
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             {rootCategories.map((root) => {

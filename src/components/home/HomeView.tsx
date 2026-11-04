@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   HeartHandshake,
   Flame,
+  PackageOpen,
 } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { apiClient } from '@/lib/apiClient';
@@ -52,16 +53,24 @@ export function HomeView({
     initialData: initialSettingsData,
   });
 
-  if (isHomeLoading || !homeData) {
+  if (isHomeLoading) {
     return <HomeSkeleton />;
   }
 
+  // An empty/missing feed (brand-new store) renders the empty state rather than a skeleton forever.
+  const feed: Partial<HomeDTO> = homeData ?? {};
+
   const khrRate = settingsData?.khrRate || 4100;
-  const seasonalBanner = homeData.seasonalBanner || settingsData?.seasonalBanner;
-  const flashSale = homeData.flashSale;
-  const categories = homeData.categories || [];
-  const bestSellers = homeData.bestSellers || [];
-  const newArrivals = homeData.newArrivals || [];
+  const seasonalBanner = feed.seasonalBanner || settingsData?.seasonalBanner;
+  const flashSale = feed.flashSale;
+  const categories = feed.categories || [];
+  const bestSellers = feed.bestSellers || [];
+  const newArrivals = feed.newArrivals || [];
+
+  const hasFlashSale = !!flashSale && (flashSale.products?.length ?? 0) > 0;
+  // Brand-new store: nothing to show yet. Render one friendly message instead of empty/broken sections.
+  const storeEmpty =
+    !hasFlashSale && categories.length === 0 && bestSellers.length === 0 && newArrivals.length === 0;
 
   const bannerTitle =
     locale === 'km' && seasonalBanner?.titleKm
@@ -87,10 +96,12 @@ export function HomeView({
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-chip bg-accent/20 border border-accent/30 text-accent font-semibold text-xs">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{t('flashSaleTitle')}</span>
-            </div>
+            {hasFlashSale && (
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-chip bg-accent/20 border border-accent/30 text-accent font-semibold text-xs">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{t('flashSaleTitle')}</span>
+              </div>
+            )}
 
             <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight drop-shadow-sm text-white">
               {bannerTitle}
@@ -114,12 +125,14 @@ export function HomeView({
               </Link>
 
               {/* Requirement 2: Outline button with transparent background, white border, white text, AA contrast */}
-              <Link
-                href="#flash-sale"
-                className="inline-flex items-center justify-center rounded-btn px-6 py-3 text-base font-semibold bg-transparent border-2 border-white text-white hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white transition-colors shadow-sm"
-              >
-                {t('exploreDeals')}
-              </Link>
+              {hasFlashSale && (
+                <Link
+                  href="#flash-sale"
+                  className="inline-flex items-center justify-center rounded-btn px-6 py-3 text-base font-semibold bg-transparent border-2 border-white text-white hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white transition-colors shadow-sm"
+                >
+                  {t('exploreDeals')}
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -169,6 +182,27 @@ export function HomeView({
           </div>
         </div>
       </section>
+
+      {storeEmpty && (
+        <section
+          data-testid="home-empty-state"
+          className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 w-full"
+        >
+          <div className="text-center py-14 px-4 rounded-card bg-surface border border-border space-y-3">
+            <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <PackageOpen className="w-7 h-7" />
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">{t('emptyTitle')}</h2>
+            <p className="text-sm text-muted max-w-md mx-auto">{t('emptyDesc')}</p>
+            <Link
+              href="/track"
+              className="inline-block text-xs font-semibold text-primary hover:underline pt-1"
+            >
+              {t('emptyTrack')}
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Featured Categories from API */}
       {categories.length > 0 && (
@@ -230,7 +264,7 @@ export function HomeView({
       )}
 
       {/* Flash Sale Section with Countdown to endsAt */}
-      {flashSale && flashSale.products && flashSale.products.length > 0 && (
+      {hasFlashSale && flashSale && (
         <section id="flash-sale" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="rounded-card bg-gradient-to-r from-primary/10 via-accent/10 to-primary/5 border border-primary/20 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -259,7 +293,7 @@ export function HomeView({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {flashSale.products.map((product) => (
+              {(flashSale.products ?? []).map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}

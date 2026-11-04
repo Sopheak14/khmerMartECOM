@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { DashboardDTO } from '@/types/api';
 import { formatUsd, formatKhr } from '@/lib/money';
+import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { DashboardCharts } from '@/components/admin/DashboardCharts';
 import {
   DollarSign,
@@ -51,9 +52,9 @@ export default function AdminDashboardPage() {
   // Calculate revenue based on selected range
   const getSelectedRevenueCents = (dashboardData?: DashboardDTO) => {
     if (!dashboardData) return 0;
-    if (range === 'today') return dashboardData.revenueTodayCents;
-    if (range === '7d') return dashboardData.revenue7dCents;
-    return dashboardData.revenue30dCents;
+    if (range === 'today') return dashboardData.revenueTodayCents ?? 0;
+    if (range === '7d') return dashboardData.revenue7dCents ?? 0;
+    return dashboardData.revenue30dCents ?? 0;
   };
 
   const currentRevenueCents = getSelectedRevenueCents(data);
@@ -149,6 +150,9 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* Brand-new store: point to the first setup steps */}
+      <EmptyStoreCta />
+
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Revenue */}
@@ -185,10 +189,10 @@ export default function AdminDashboardPage() {
           </div>
           <div className="space-y-1">
             <div className="text-xl sm:text-2xl font-black text-foreground font-mono" data-testid="kpi-orders-count">
-              {data.ordersToday}
+              {data.ordersToday ?? 0}
             </div>
             <div className="text-xs text-muted font-medium">
-              <span>{data.ordersPending} {t('pendingOrders')}</span>
+              <span>{data.ordersPending ?? 0} {t('pendingOrders')}</span>
             </div>
           </div>
         </div>
@@ -206,10 +210,10 @@ export default function AdminDashboardPage() {
           </div>
           <div className="space-y-1">
             <div className="text-xl sm:text-2xl font-black text-foreground font-mono" data-testid="kpi-avg-order-usd">
-              {formatUsd(data.avgOrderValueCents)}
+              {formatUsd(data.avgOrderValueCents ?? 0)}
             </div>
             <div className="text-xs text-muted font-medium font-mono" data-testid="kpi-avg-order-khr">
-              {formatKhr(data.avgOrderValueCents)}
+              {formatKhr(data.avgOrderValueCents ?? 0)}
             </div>
           </div>
         </div>
@@ -227,7 +231,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="space-y-1">
             <div className="text-xl sm:text-2xl font-black text-foreground font-mono" data-testid="kpi-pending-payments">
-              {data.pendingPayments}
+              {data.pendingPayments ?? 0}
             </div>
             <div className="text-xs text-muted font-medium">Awaiting customer payment</div>
           </div>

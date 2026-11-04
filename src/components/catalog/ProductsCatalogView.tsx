@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useRouter, usePathname } from '@/navigation';
+import { useRouter, usePathname, Link } from '@/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/apiClient';
@@ -29,6 +29,7 @@ export function ProductsCatalogView({
   categoryTitle,
 }: ProductsCatalogViewProps) {
   const t = useTranslations('catalog');
+  const categoryT = useTranslations('category');
   const common = useTranslations('common');
   const locale = useLocale();
   const router = useRouter();
@@ -106,6 +107,18 @@ export function ProductsCatalogView({
   const products = data?.products || [];
   const meta = data?.meta || { page: 1, limit: 20, total: 0, totalPages: 1 };
   const facets = data?.facets || initialFacets;
+
+  // No products AND no filter applied: the store (or category) is simply empty, which needs a different message
+  // than "nothing matched your filters" and has nothing to filter or sort.
+  const hasActiveFilters =
+    !!q ||
+    !!brand ||
+    !!minPrice ||
+    !!maxPrice ||
+    inStock ||
+    Object.keys(attributes).length > 0 ||
+    (!categoryTitle && !!categoryId);
+  const catalogEmpty = !isLoading && products.length === 0 && !hasActiveFilters;
 
   // Helper to push new URL params while preserving other filters
   const updateUrlParams = (updates: Record<string, string | null | undefined>) => {
@@ -206,6 +219,7 @@ export function ProductsCatalogView({
 
         <div className="flex items-center gap-3">
           {/* Mobile Filter Toggle Button */}
+          {!catalogEmpty && (
           <button
             type="button"
             onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
@@ -214,8 +228,10 @@ export function ProductsCatalogView({
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>{t('filters')}</span>
           </button>
+          )}
 
           {/* Sort Select */}
+          {!catalogEmpty && (
           <div className="flex items-center gap-2">
             <label htmlFor="sort-select" className="text-xs text-muted whitespace-nowrap hidden sm:inline">
               <ArrowUpDown className="w-3 h-3 inline mr-1" />
@@ -235,6 +251,7 @@ export function ProductsCatalogView({
               <option value="rating">{t('sortRating')}</option>
             </select>
           </div>
+          )}
         </div>
       </div>
 
@@ -257,6 +274,7 @@ export function ProductsCatalogView({
       {/* Main Content Layout */}
       <div className="flex flex-col lg:flex-row gap-8 mt-6">
         {/* Desktop Filter Sidebar */}
+        {!catalogEmpty && (
         <div className="hidden lg:block">
           <FilterSidebar
             facets={facets}
@@ -269,6 +287,7 @@ export function ProductsCatalogView({
             onClearAll={handleClearAll}
           />
         </div>
+        )}
 
         {/* Mobile Filter Drawer */}
         {mobileFilterOpen && (
@@ -306,7 +325,29 @@ export function ProductsCatalogView({
 
         {/* Product Grid & Pagination */}
         <div className="flex-1 min-w-0">
-          {products.length === 0 ? (
+          {catalogEmpty ? (
+            <div
+              data-testid="products-empty-state"
+              data-variant="store-empty"
+              className="text-center py-16 px-4 bg-surface rounded-card border border-border my-4"
+            >
+              <div className="w-14 h-14 mx-auto rounded-full bg-muted/20 flex items-center justify-center text-muted mb-4">
+                <PackageSearch className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">
+                {categoryTitle ? categoryT('noProductsInCategory') : t('noProductsYet')}
+              </h3>
+              <p className="text-xs text-muted max-w-md mx-auto mt-1 mb-6">
+                {categoryTitle ? categoryT('noProductsInCategoryDesc') : t('noProductsYetDesc')}
+              </p>
+              <Link
+                href="/"
+                className="inline-block px-4 py-2 rounded-btn bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs"
+              >
+                {t('backToHome')}
+              </Link>
+            </div>
+          ) : products.length === 0 ? (
             /* Empty State */
             <div
               data-testid="products-empty-state"
