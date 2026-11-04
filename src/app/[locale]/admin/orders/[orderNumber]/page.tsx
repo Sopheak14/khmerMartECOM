@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { OrderDTO, OrderStatus, ShipmentStatus, TrackingDTO } from '@/types/api';
 import { formatUsd, formatKhr } from '@/lib/money';
+import { osmUrl } from '@/lib/geo';
 import { SafeImage } from '@/components/common/SafeImage';
 import { getImageUrl } from '@/lib/images';
 import { getDiscountLines } from '@/lib/orderDiscounts';
@@ -46,6 +47,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 export default function AdminOrderDetailPage() {
   const t = useTranslations('admin.orders');
+  const tAddr = useTranslations('address');
   const commonT = useTranslations('admin.common');
   const orderStatusLabel = useOrderStatusLabel();
   const locale = useLocale();
@@ -530,6 +532,19 @@ export default function AdminOrderDetailPage() {
                   {order.shippingAddress?.province}
                 </p>
                 {order.shippingAddress?.postalCode && <p>Postal: {order.shippingAddress.postalCode}</p>}
+                {order.shippingAddress?.latitude != null && order.shippingAddress?.longitude != null && (
+                  <p>
+                    <a
+                      data-testid="admin-order-open-map"
+                      href={osmUrl(order.shippingAddress.latitude, order.shippingAddress.longitude)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      📍 {tAddr('openInMap')}
+                    </a>
+                  </p>
+                )}
               </div>
             </div>
 

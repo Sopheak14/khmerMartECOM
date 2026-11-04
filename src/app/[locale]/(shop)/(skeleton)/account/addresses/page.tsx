@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { AddressLocationField, useAddressAutofill } from '@/components/map/AddressLocationField';
+import type { LatLng } from '@/components/map/LocationPicker';
 import { Plus, Edit2, Trash2, Check, MapPin, Loader2 } from 'lucide-react';
 
 export default function AddressesPage() {
@@ -29,7 +31,7 @@ export default function AddressesPage() {
   const [line2, setLine2] = useState('');
   const [district, setDistrict] = useState('');
   const [province, setProvince] = useState('');
-  const [postalCode, setPostalCode] = useState('');
+  const [coords, setCoords] = useState<LatLng | null>(null);
   const [isDefault, setIsDefault] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -64,7 +66,7 @@ export default function AddressesPage() {
     setLine2('');
     setDistrict('');
     setProvince(provinces[0]?.name || 'Phnom Penh');
-    setPostalCode('');
+    setCoords(null);
     setIsDefault(false);
     setFieldErrors({});
     setGeneralError(null);
@@ -86,7 +88,11 @@ export default function AddressesPage() {
     setLine2(addr.line2 || '');
     setDistrict(addr.district);
     setProvince(addr.province);
-    setPostalCode(addr.postalCode || '');
+    setCoords(
+      addr.latitude != null && addr.longitude != null
+        ? { lat: addr.latitude, lng: addr.longitude }
+        : null
+    );
     setIsDefault(addr.isDefault);
     setFieldErrors({});
     setGeneralError(null);
@@ -164,6 +170,9 @@ export default function AddressesPage() {
           district: addr.district,
           province: addr.province,
           postalCode: addr.postalCode,
+          ...(addr.latitude != null && addr.longitude != null
+            ? { latitude: addr.latitude, longitude: addr.longitude }
+            : {}),
           isDefault: true,
         },
       });
@@ -187,7 +196,7 @@ export default function AddressesPage() {
       line2: line2.trim() || undefined,
       district: district.trim(),
       province: province.trim(),
-      postalCode: postalCode.trim() || undefined,
+      ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
       isDefault,
     };
 
@@ -197,6 +206,8 @@ export default function AddressesPage() {
       createMutation.mutate(payload);
     }
   };
+
+  const onSuggest = useAddressAutofill(line1, setLine1, district, setDistrict);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -315,22 +326,13 @@ export default function AddressesPage() {
                 id="addr-district"
                 type="text"
                 label={t('district')}
-                placeholder="Khan Daun Penh"
+                placeholder={t('districtPlaceholder')}
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
                 error={fieldErrors.district}
                 required
               />
 
-              <Input
-                id="addr-postal"
-                type="text"
-                label={t('postalCode')}
-                placeholder="12201"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
-                error={fieldErrors.postalCode}
-              />
             </div>
 
             <Input
@@ -352,6 +354,11 @@ export default function AddressesPage() {
               onChange={(e) => setLine2(e.target.value)}
               error={fieldErrors.line2}
             />
+
+            <AddressLocationField value={coords} onChange={setCoords} onSuggest={onSuggest} />
+            {(fieldErrors.latitude || fieldErrors.longitude) && (
+              <p className="text-xs text-destructive">{fieldErrors.latitude || fieldErrors.longitude}</p>
+            )}
 
             <div className="flex items-center gap-2 pt-1">
               <input

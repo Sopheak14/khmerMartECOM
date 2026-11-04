@@ -4,8 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/apiClient';
+import { queryKeys } from '@/lib/queryKeys';
 import { AdminSettingsDTO, ShippingMethodDTO } from '@/types/api';
-import { toCents } from '@/lib/money';
+import { formatUsd } from '@/lib/money';
+import { parseFeeInput, FeeError } from '@/lib/shippingFee';
+import { toast } from 'sonner';
 import {
   Settings,
   AlertTriangle,
@@ -29,7 +32,9 @@ export default function AdminSettingsPage() {
   const [khrRate, setKhrRate] = useState<number>(4100);
   const [khqrMode, setKhqrMode] = useState<'MOCK' | 'LIVE'>('MOCK');
   const [shippingMethods, setShippingMethods] = useState<ShippingMethodDTO[]>([]);
-  const [shippingFeeInputs, setShippingFeeInputs] = useState<Record<string, { fee: string; freeOver: string }>>({});
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [rowDraft, setRowDraft] = useState<{ fee: string; freeOver: string }>({ fee: '', freeOver: '' });
+  const [rowErrors, setRowErrors] = useState<{ fee?: FeeError; freeOver?: FeeError }>({});
 
   const [showLiveWarning, setShowLiveWarning] = useState(false);
   const [pendingKhqrMode, setPendingKhqrMode] = useState<'LIVE' | null>(null);
@@ -51,40 +56,19 @@ export default function AdminSettingsPage() {
       setKhqrMode((data.khqrMode as 'MOCK' | 'LIVE') || 'MOCK');
       setShippingMethods(data.shippingMethods || []);
 
-      const feeMap: Record<string, { fee: string; freeOver: string }> = {};
-      (data.shippingMethods || []).forEach((m: ShippingMethodDTO) => {
-        feeMap[m.code] = {
-          fee: (m.feeCents / 100).toFixed(2),
-          freeOver: m.freeOverCents ? (m.freeOverCents / 100).toFixed(2) : '',
-        };
-      });
-      setShippingFeeInputs(feeMap);
     }
   }, [data]);
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: async () => {
-      const updatedMethods: ShippingMethodDTO[] = shippingMethods.map((m) => {
-        const input = shippingFeeInputs[m.code] || {
-          fee: (m.feeCents / 100).toFixed(2),
-          freeOver: m.freeOverCents ? (m.freeOverCents / 100).toFixed(2) : '',
-        };
-        const feeCents = toCents(parseFloat(input.fee) || 0);
-        const freeOverCents = input.freeOver ? toCents(parseFloat(input.freeOver) || 0) : undefined;
-        return {
-          ...m,
-          feeCents,
-          freeOverCents,
-        };
-      });
+  const saveSettings = (methods: ShippingMethodDTO[]) =>
+    apiClient.put<AdminSettingsDTO>('/admin/settings', {
+      storeName,
+      khrRate: Number(khrRate),
+      khqrMode,
+      shippingMethods: methods,
+    });
 
-      return apiClient.put<AdminSettingsDTO>('/admin/settings', {
-        storeName,
-        khrRate: Number(khrRate),
-        khqrMode,
-        shippingMethods: updatedMethods,
-      });
-    },
+  const updateSettingsMutation = useMutation({
+    mutationFn: () => saveSettings(shippingMethods),
     onSuccess: (res) => {
       queryClient.setQueryData(['admin-settings'], res.data);
       setSaveSuccess(true);
@@ -96,6 +80,53 @@ export default function AdminSettingsPage() {
       setSaveSuccess(false);
     },
   });
+
+  // Per-row save: only this method changes; everything else is sent as currently stored.
+  const saveRowMutation = useMutation({
+    mutationFn: async ({ code, feeCents, freeOverCents }: { code: string; feeCents: number; freeOverCents: number | null }) => {
+      const stored = data?.shippingMethods || shippingMethods;
+      const methods = stored.map((m) =>
+        m.code === code ? { ...m, feeCents, freeOverCents: freeOverCents ?? undefined } : m
+      );
+      return saveSettings(methods);
+    },
+    onSuccess: (res) => {
+      queryClient.setQueryData(['admin-settings'], res.data);
+      // Storefront/checkout read these via /shipping/methods.
+      queryClient.invalidateQueries({ queryKey: queryKeys.shipping.methods });
+      setEditingCode(null);
+      toast.success(t('shippingFeeSaved'));
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to save shipping fee');
+    },
+  });
+
+  const startRowEdit = (m: ShippingMethodDTO) => {
+    setEditingCode(m.code);
+    setRowErrors({});
+    setRowDraft({
+      fee: (m.feeCents / 100).toFixed(2),
+      freeOver: m.freeOverCents ? (m.freeOverCents / 100).toFixed(2) : '',
+    });
+  };
+
+  const submitRow = (code: string) => {
+    const fee = parseFeeInput(rowDraft.fee);
+    const freeOver = parseFeeInput(rowDraft.freeOver, { optional: true });
+    if (!fee.ok || !freeOver.ok) {
+      setRowErrors({
+        fee: fee.ok ? undefined : fee.error,
+        freeOver: freeOver.ok ? undefined : freeOver.error,
+      });
+      return;
+    }
+    setRowErrors({});
+    saveRowMutation.mutate({ code, feeCents: fee.cents as number, freeOverCents: freeOver.cents });
+  };
+
+  const feeErrorText = (e?: FeeError) =>
+    e === 'required' ? t('feeRequired') : e === 'negative' ? t('feeNegative') : e === 'decimals' ? t('feeDecimals') : e ? t('feeInvalid') : null;
 
   const handleKhqrModeClick = (mode: 'MOCK' | 'LIVE') => {
     if (mode === 'LIVE' && khqrMode !== 'LIVE') {
@@ -110,16 +141,6 @@ export default function AdminSettingsPage() {
     setKhqrMode('LIVE');
     setShowLiveWarning(false);
     setPendingKhqrMode(null);
-  };
-
-  const handleFeeInputChange = (code: string, field: 'fee' | 'freeOver', value: string) => {
-    setShippingFeeInputs((prev) => ({
-      ...prev,
-      [code]: {
-        ...prev[code],
-        [field]: value,
-      },
-    }));
   };
 
   return (
@@ -246,56 +267,100 @@ export default function AdminSettingsPage() {
                     <th className="py-2.5 px-3">{t('shippingName')}</th>
                     <th className="py-2.5 px-3">{t('shippingFee')} ($)</th>
                     <th className="py-2.5 px-3">{t('shippingFreeOver')} ($)</th>
+                    <th className="py-2.5 px-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {shippingMethods.map((m) => {
-                    const input = shippingFeeInputs[m.code] || {
-                      fee: (m.feeCents / 100).toFixed(2),
-                      freeOver: m.freeOverCents ? (m.freeOverCents / 100).toFixed(2) : '',
-                    };
+                    const editing = editingCode === m.code;
+                    const inputCls =
+                      'w-full pl-6 pr-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary';
                     return (
-                      <tr key={m.code} className="hover:bg-muted/5 transition-colors">
-                        <td className="py-2.5 px-3 font-mono text-xs font-semibold text-muted">
-                          {m.code}
-                        </td>
+                      <tr key={m.code} data-testid={`shipping-row-${m.code}`} className="hover:bg-muted/5 transition-colors align-top">
+                        <td className="py-2.5 px-3 font-mono text-xs font-semibold text-muted">{m.code}</td>
                         <td className="py-2.5 px-3 font-medium text-foreground">
                           {locale === 'km' && m.nameKm ? m.nameKm : m.name}
                         </td>
                         <td className="py-2.5 px-3">
-                          <div className="relative w-28">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-xs">
-                              $
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={input.fee}
-                              onChange={(e) =>
-                                handleFeeInputChange(m.code, 'fee', e.target.value)
-                              }
-                              className="w-full pl-6 pr-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
+                          {editing ? (
+                            <div>
+                              <div className="relative w-28">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-xs">$</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  data-testid={`shipping-fee-input-${m.code}`}
+                                  aria-label={`${m.code} ${t('shippingFee')}`}
+                                  value={rowDraft.fee}
+                                  onChange={(e) => setRowDraft((d) => ({ ...d, fee: e.target.value }))}
+                                  className={inputCls}
+                                />
+                              </div>
+                              {rowErrors.fee && <p className="text-[11px] text-destructive mt-1">{feeErrorText(rowErrors.fee)}</p>}
+                            </div>
+                          ) : (
+                            <span data-testid={`shipping-fee-text-${m.code}`}>{formatUsd(m.feeCents)}</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3">
-                          <div className="relative w-32">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-xs">
-                              $
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="No free threshold"
-                              value={input.freeOver}
-                              onChange={(e) =>
-                                handleFeeInputChange(m.code, 'freeOver', e.target.value)
-                              }
-                              className="w-full pl-6 pr-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted/60"
-                            />
-                          </div>
+                          {editing ? (
+                            <div>
+                              <div className="relative w-32">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-xs">$</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  data-testid={`shipping-free-input-${m.code}`}
+                                  aria-label={`${m.code} ${t('shippingFreeOver')}`}
+                                  placeholder={t('shippingNoThreshold')}
+                                  value={rowDraft.freeOver}
+                                  onChange={(e) => setRowDraft((d) => ({ ...d, freeOver: e.target.value }))}
+                                  className={inputCls + ' placeholder:text-muted/60'}
+                                />
+                              </div>
+                              {rowErrors.freeOver && <p className="text-[11px] text-destructive mt-1">{feeErrorText(rowErrors.freeOver)}</p>}
+                            </div>
+                          ) : m.freeOverCents ? (
+                            formatUsd(m.freeOverCents)
+                          ) : (
+                            <span className="text-muted text-xs">{t('shippingNoThreshold')}</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap text-right">
+                          {editing ? (
+                            <div className="inline-flex gap-2">
+                              <button
+                                type="button"
+                                data-testid={`shipping-save-${m.code}`}
+                                disabled={saveRowMutation.isPending}
+                                onClick={() => submitRow(m.code)}
+                                className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+                              >
+                                {t('shippingSave')}
+                              </button>
+                              <button
+                                type="button"
+                                data-testid={`shipping-cancel-${m.code}`}
+                                disabled={saveRowMutation.isPending}
+                                onClick={() => {
+                                  setEditingCode(null);
+                                  setRowErrors({});
+                                }}
+                                className="px-3 py-1 text-xs font-semibold border border-border rounded-lg hover:bg-muted/10"
+                              >
+                                {t('shippingCancel')}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              data-testid={`shipping-edit-${m.code}`}
+                              onClick={() => startRowEdit(m)}
+                              className="px-3 py-1 text-xs font-semibold border border-border rounded-lg hover:bg-muted/10"
+                            >
+                              {t('shippingEdit')} ✏️
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

@@ -9,6 +9,8 @@ import { AddressDTO, ProvinceDTO } from '@/types/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { X, MapPin } from 'lucide-react';
+import { AddressLocationField, useAddressAutofill } from '@/components/map/AddressLocationField';
+import type { LatLng } from '@/components/map/LocationPicker';
 import { toast } from 'sonner';
 
 interface AddAddressDialogProps {
@@ -39,7 +41,7 @@ export function AddAddressDialog({ isOpen, onClose, onAddressCreated }: AddAddre
   const [line2, setLine2] = useState('');
   const [district, setDistrict] = useState('');
   const [province, setProvince] = useState(provinces[0]?.name || 'Phnom Penh');
-  const [postalCode, setPostalCode] = useState('');
+  const [coords, setCoords] = useState<LatLng | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
 
@@ -49,6 +51,8 @@ export function AddAddressDialog({ isOpen, onClose, onAddressCreated }: AddAddre
       setProvince(provinces[0].name);
     }
   }, [provinces, province]);
+
+  const onSuggest = useAddressAutofill(line1, setLine1, district, setDistrict);
 
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -86,7 +90,7 @@ export function AddAddressDialog({ isOpen, onClose, onAddressCreated }: AddAddre
       line2: line2.trim() || undefined,
       district: district.trim(),
       province,
-      postalCode: postalCode.trim() || undefined,
+      ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
       isDefault: false,
     });
   };
@@ -192,24 +196,19 @@ export function AddAddressDialog({ isOpen, onClose, onAddressCreated }: AddAddre
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label={t('postalCode')}
-              data-testid="address-postal-input"
-              value={postalCode}
-              onChange={(e) => setPostalCode(e.target.value)}
-              placeholder="12000"
-              error={fieldErrors.postalCode}
-            />
-            <Input
-              label={t('label')}
-              data-testid="address-label-input"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Home, Office..."
-              error={fieldErrors.label}
-            />
-          </div>
+          <Input
+            label={t('label')}
+            data-testid="address-label-input"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Home, Office..."
+            error={fieldErrors.label}
+          />
+
+          <AddressLocationField value={coords} onChange={setCoords} onSuggest={onSuggest} />
+          {(fieldErrors.latitude || fieldErrors.longitude) && (
+            <p className="text-xs text-destructive">{fieldErrors.latitude || fieldErrors.longitude}</p>
+          )}
 
           <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

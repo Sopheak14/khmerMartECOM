@@ -86,6 +86,8 @@ export interface AddressDTO {
   province: string;
   provinceKm?: string;
   postalCode?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
 }
 

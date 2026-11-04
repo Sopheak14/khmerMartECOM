@@ -336,7 +336,6 @@ test.describe('Phase 4 — Cart, Promotions, Checkout, Shipping E2E against Real
     await page.fill('[data-testid="address-line1-input"]', 'Street 6, Pub Street Area');
     await page.fill('[data-testid="address-district-input"]', 'Siem Reap');
     await page.selectOption('[data-testid="address-province-select"]', 'Siem Reap');
-    await page.fill('[data-testid="address-postal-input"]', '17000');
     await page.fill('[data-testid="address-label-input"]', 'Siem Reap Home');
 
     // Screenshot: checkout-address.png
