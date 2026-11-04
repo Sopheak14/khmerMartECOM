@@ -1,9 +1,12 @@
 package com.khmermart.model.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 
 public record AddressRequest(
     @NotBlank(message = "Label is required")
@@ -28,4 +31,10 @@ public record AddressRequest(
         @Size(max = 100, message = "Province cannot exceed 100 characters")
         String province,
     @Size(max = 50, message = "Postal code cannot exceed 50 characters") String postalCode,
+    @DecimalMin(value = "9.5", message = "Latitude must be inside Cambodia (9.5 to 15.0)")
+        @DecimalMax(value = "15.0", message = "Latitude must be inside Cambodia (9.5 to 15.0)")
+        BigDecimal latitude,
+    @DecimalMin(value = "102.0", message = "Longitude must be inside Cambodia (102.0 to 108.0)")
+        @DecimalMax(value = "108.0", message = "Longitude must be inside Cambodia (102.0 to 108.0)")
+        BigDecimal longitude,
     @JsonProperty("isDefault") boolean isDefault) {}

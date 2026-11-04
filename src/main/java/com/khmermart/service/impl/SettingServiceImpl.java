@@ -156,6 +156,36 @@ public class SettingServiceImpl implements SettingService {
       settingRepository.save(new Setting("KHQR_MODE", request.khqrMode().trim().toUpperCase()));
     }
 
+    if (request.shippingMethods() != null) {
+      for (ShippingMethodDto in : request.shippingMethods()) {
+        if (in == null || in.code() == null) {
+          continue;
+        }
+        if (in.feeCents() == null || in.feeCents() < 0) {
+          throw new CustomException(
+              ErrorCode.VALIDATION_ERROR,
+              "Shipping fee must be >= 0 for " + in.code(),
+              HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+        if (in.freeOverCents() != null && in.freeOverCents() < 0) {
+          throw new CustomException(
+              ErrorCode.VALIDATION_ERROR,
+              "Free-shipping threshold must be >= 0 for " + in.code(),
+              HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+        var method =
+            shippingMethodRepository
+                .findByCode(in.code())
+                .orElseThrow(
+                    () ->
+                        new CustomException(
+                            ErrorCode.NOT_FOUND, "Shipping method not found: " + in.code()));
+        method.setFeeCents(in.feeCents());
+        method.setFreeOverCents(in.freeOverCents());
+        shippingMethodRepository.save(method);
+      }
+    }
+
     AdminSettingsDto afterState = getAdminSettings();
 
     auditLogService.log(

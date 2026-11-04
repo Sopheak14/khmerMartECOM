@@ -18,6 +18,8 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `PATCH /api/users/me/addresses/{id}`: Partially update delivery address.
 - `DELETE /api/users/me/addresses/{id}`: Delete delivery address.
 
+  Address fields: `postalCode` is fully optional (nullable). `latitude` / `longitude` are optional additive `NUMERIC(9,6)` fields on `AddressDto` and the create/update requests; they must be sent together and lie inside Cambodia (lat 9.5..15.0, lng 102.0..108.0), otherwise `VALIDATION_ERROR`. On update, omitted coordinates keep their stored value. The admin order detail `shippingAddress` includes them so staff can open a map link (e.g. `https://www.google.com/maps?q=<lat>,<lng>`). Pre-existing addresses and order snapshots have no coordinates (fields omitted).
+
 ---
 
 ## 2. Catalog & Discovery
@@ -158,5 +160,5 @@ This document details the complete REST API contract for KhmerMart, covering all
 
 ### 7.11 System Settings & Audit Logs
 - `GET /api/admin/settings`: Read global configurations (`khrRate`, `khqrMode`, merchant tags).
-- `PUT /api/admin/settings`: Update settings (enforces `BAKONG_TOKEN` when switching to `LIVE`).
+- `PUT /api/admin/settings`: Update settings (enforces `BAKONG_TOKEN` when switching to `LIVE`). `shippingMethods[]` entries are matched by `code` and update `feeCents` (must be >= 0, e.g. EXPRESS `5` = $0.05) and `freeOverCents` (optional/null = no free-shipping threshold, otherwise >= 0); unknown code -> 404, negative -> 422 `VALIDATION_ERROR`. New fees apply immediately to `GET /api/shipping/methods` and `POST /api/checkout/preview`.
 - `GET /api/admin/audit-logs`: Audit trail listing backoffice writes with actor, action, entity, before/after JSON, and IP.

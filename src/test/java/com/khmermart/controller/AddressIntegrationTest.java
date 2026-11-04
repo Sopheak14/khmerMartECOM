@@ -50,6 +50,8 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
             "Sen Sok",
             "Phnom Penh",
             "120801",
+            null,
+            null,
             false);
     ResponseEntity<String> addr1Resp =
         restTemplate.exchange(
@@ -73,6 +75,8 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
             "Tuol Kouk",
             "Phnom Penh",
             "120101",
+            null,
+            null,
             true);
     ResponseEntity<String> addr2Resp =
         restTemplate.exchange(
@@ -113,6 +117,8 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
             "Sen Sok",
             "Phnom Penh",
             "120801",
+            null,
+            null,
             true);
     ResponseEntity<String> patchResp =
         restTemplate.exchange(
@@ -180,6 +186,8 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
             "Sen Sok",
             "Phnom Penh",
             "120801",
+            null,
+            null,
             false);
 
     ResponseEntity<String> resp =

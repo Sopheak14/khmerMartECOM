@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -50,6 +51,12 @@ public class Address {
 
   @Column(name = "postal_code", length = 50)
   private String postalCode;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal latitude;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal longitude;
 
   @Column(name = "is_default", nullable = false)
   @Builder.Default

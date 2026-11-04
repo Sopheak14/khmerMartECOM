@@ -1,5 +1,7 @@
 package com.khmermart.model.response;
 
+import java.math.BigDecimal;
+
 public record AddressDto(
     Long id,
     String label,
@@ -10,4 +12,6 @@ public record AddressDto(
     String district,
     String province,
     String postalCode,
+    BigDecimal latitude,
+    BigDecimal longitude,
     boolean isDefault) {}

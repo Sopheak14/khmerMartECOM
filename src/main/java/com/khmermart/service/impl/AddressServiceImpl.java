@@ -53,6 +53,7 @@ public class AddressServiceImpl implements AddressService {
       addressRepository.clearDefaultForUser(userId);
     }
 
+    requireBothCoordinates(request);
     Address address = addressMapper.toEntity(request);
     address.setUserId(userId);
     address.setDefault(shouldBeDefault);
@@ -94,6 +95,12 @@ public class AddressServiceImpl implements AddressService {
       address.setPostalCode(request.postalCode().trim());
     }
 
+    if (request.latitude() != null || request.longitude() != null) {
+      requireBothCoordinates(request);
+      address.setLatitude(request.latitude());
+      address.setLongitude(request.longitude());
+    }
+
     if (request.isDefault()) {
       addressRepository.clearDefaultForUser(userId);
       address.setDefault(true);
@@ -113,6 +120,15 @@ public class AddressServiceImpl implements AddressService {
 
     Address saved = addressRepository.save(address);
     return addressMapper.toDTO(saved);
+  }
+
+  private static void requireBothCoordinates(AddressRequest request) {
+    if ((request.latitude() == null) != (request.longitude() == null)) {
+      throw new CustomException(
+          ErrorCode.VALIDATION_ERROR,
+          "Latitude and longitude must be provided together",
+          org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY);
+    }
   }
 
   @Override
