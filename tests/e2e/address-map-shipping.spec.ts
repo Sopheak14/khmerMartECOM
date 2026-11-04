@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createThrowawayUser, loginViaUI } from './helpers/auth';
 import { selectHeroVariant } from './helpers/shop';
-import { adminToken } from './helpers/orders';
+import { adminToken, createAddress, placeKhqrOrder } from './helpers/orders';
 import { API, HERO } from './fixtures/catalog';
 
 const PHNOM_PENH = { latitude: 11.5564, longitude: 104.9282 };
@@ -146,5 +146,27 @@ test.describe('Address map picker, no postal code, editable shipping fees', () =
       const after = (await (await request.get(`${API}/admin/settings`, { headers })).json()).data;
       expect(after.shippingMethods.find((m: any) => m.code === 'STANDARD').feeCents).toBe(original.feeCents);
     }
+  });
+
+  test('admin order detail shows "Open in map" only when the address has coordinates', async ({ page, request }) => {
+    const withPin = await createThrowawayUser(request);
+    const pinnedAddr = await createAddress(request, withPin, { latitude: 11.5564, longitude: 104.9282 });
+    const pinned = await placeKhqrOrder(request, withPin, pinnedAddr);
+
+    const noPin = await createThrowawayUser(request);
+    const plainAddr = await createAddress(request, noPin);
+    const plain = await placeKhqrOrder(request, noPin, plainAddr);
+
+    await loginViaUI(page, 'admin@khmermart.local', 'Admin@12345', 'en');
+
+    await page.goto(`/en/admin/orders/${pinned.orderNumber}`);
+    const link = page.locator('[data-testid="admin-order-open-map"]');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', /openstreetmap\.org\/\?mlat=11\.5564&mlon=104\.9282/);
+    await expect(link).toHaveAttribute('target', '_blank');
+
+    await page.goto(`/en/admin/orders/${plain.orderNumber}`);
+    await expect(page.locator('[data-testid="admin-customer-name"]')).toBeVisible();
+    await expect(page.locator('[data-testid="admin-order-open-map"]')).toHaveCount(0);
   });
 });

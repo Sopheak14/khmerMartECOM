@@ -11,7 +11,11 @@ export async function adminToken(request: APIRequestContext): Promise<string> {
   return (await res.json()).data.accessToken;
 }
 
-export async function createAddress(request: APIRequestContext, user: ThrowawayUser): Promise<number> {
+export async function createAddress(
+  request: APIRequestContext,
+  user: ThrowawayUser,
+  extra: Record<string, unknown> = {}
+): Promise<number> {
   const res = await request.post(`${API}/users/me/addresses`, {
     headers: { Authorization: `Bearer ${user.token}` },
     data: {
@@ -23,6 +27,7 @@ export async function createAddress(request: APIRequestContext, user: ThrowawayU
       province: 'Phnom Penh',
       postalCode: '12000',
       isDefault: true,
+      ...extra,
     },
   });
   return (await res.json()).data.id;
