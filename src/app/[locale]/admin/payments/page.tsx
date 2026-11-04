@@ -129,6 +129,29 @@ export default function AdminPaymentsPage() {
     },
   });
 
+  // Re-check KHQR payment against Bakong now (same single check the poller runs)
+  const recheckMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiClient<{ outcome: string; reason?: string }>(
+        `/admin/payments/${id}/recheck`,
+        { method: 'POST' },
+      );
+      return res.data;
+    },
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+      const msg = `${r.outcome}${r.reason ? ': ' + r.reason : ''}`;
+      if (r.outcome === 'PAID' || r.outcome === 'LATE_PAID' || r.outcome === 'ALREADY_PAID') {
+        toast.success(msg);
+      } else {
+        toast.info(msg);
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to re-check payment');
+    },
+  });
+
   // Approve Bank Transfer mutation
   const approveMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -441,6 +464,22 @@ export default function AdminPaymentsPage() {
                                   <span>JSON</span>
                                 </button>
                               )}
+
+                              {/* Re-check KHQR payment with Bakong */}
+                              {p.method === 'KHQR' &&
+                                (p.status === 'PENDING' ||
+                                  p.status === 'EXPIRED' ||
+                                  p.status === 'FAILED') && (
+                                  <button
+                                    type="button"
+                                    data-testid={`recheck-payment-btn-${p.id}`}
+                                    onClick={() => recheckMutation.mutate(p.id)}
+                                    disabled={recheckMutation.isPending}
+                                    className="px-2 py-1 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 hover:bg-sky-500/20 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                  >
+                                    {t('recheck')}
+                                  </button>
+                                )}
 
                               {/* Refund Button for paid orders */}
                               {p.status === 'PAID' && (

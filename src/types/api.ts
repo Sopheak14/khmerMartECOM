@@ -490,6 +490,12 @@ export interface AdminPaymentDTO {
   paidAt?: string;
   rawResponse?: any;
   createdAt: string;
+  externalRef?: string;
+  checkCount?: number;
+  lastCheckedAt?: string;
+  qrExpiresAt?: string;
+  orderNeedsAttention?: boolean;
+  orderAttentionNote?: string;
 }
 
 export interface ReconciliationMismatchDTO {

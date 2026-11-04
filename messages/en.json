@@ -348,6 +348,7 @@
       "rawResponseTitle": "Payment Gateway Payload",
       "rawResponseSubtitle": "Raw response returned by payment provider",
       "close": "Close",
+      "recheck": "Re-check payment now",
       "refund": "Refund Payment",
       "approveBankTransfer": "Approve Transfer",
       "approveSuccess": "Bank transfer payment approved successfully.",
