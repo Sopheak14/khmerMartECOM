@@ -269,10 +269,23 @@ test.describe('Khmer catalog fixes', () => {
     await expect(page.locator('[data-testid="product-card"]').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="product-card"] [data-testid="image-fallback"]').first()).toBeVisible();
 
-    const brokenImages = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('img')).filter((img) => img.complete && img.naturalWidth === 0).length
-    );
-    expect(brokenImages).toBe(0);
+    // Lazy images below the fold report complete=true/naturalWidth=0 until they start loading (and then fail into the
+    // fallback). Scroll through the page so every image attempts to load, then wait for zero broken <img> elements.
+    await page.evaluate(async () => {
+      for (let y = 0; y <= document.body.scrollHeight; y += 600) {
+        window.scrollTo(0, y);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => Array.from(document.querySelectorAll('img')).filter((img) => img.complete && img.naturalWidth === 0).length
+          ),
+        { timeout: 10000 }
+      )
+      .toBe(0);
 
     await page.goto('/en');
     await expect(page.locator('[data-testid="image-fallback"]').first()).toBeVisible({ timeout: 10000 });

@@ -50,7 +50,12 @@ export async function loginViaUI(page: Page, email: string, password: string, lo
   await page.goto(`/${locale}/login`);
   await page.waitForLoadState('networkidle');
   const emailInput = page.locator('#login-email');
-  await expect(emailInput).toBeVisible();
+  // Under CPU load the page can be served with its CSS/JS chunks still missing (no form rendered). Give it time, then
+  // reload once before failing so a stalled asset request does not fail an unrelated test.
+  if (!(await emailInput.isVisible({ timeout: 8000 }).catch(() => false))) {
+    await page.reload({ waitUntil: 'networkidle' });
+  }
+  await expect(emailInput).toBeVisible({ timeout: 15000 });
   await emailInput.fill(email);
   const passwordInput = page.locator('#login-password');
   await passwordInput.fill(password);

@@ -546,8 +546,11 @@ test.describe('Phase 7B — Admin Remaining Pages E2E Tests', () => {
       await page.screenshot({ path: 'docs/screenshots/admin-settings-km.png' });
 
       // Click LIVE radio -> red warning modal opens
-      await page.click('[data-testid="mode-live-radio"]');
-      await expect(page.locator('[data-testid="live-warning-modal"]')).toBeVisible();
+      // A click that lands before React has hydrated does nothing; retry until the modal opens.
+      await expect(async () => {
+        await page.click('[data-testid="mode-live-radio"]');
+        await expect(page.locator('[data-testid="live-warning-modal"]')).toBeVisible({ timeout: 2000 });
+      }).toPass({ timeout: 15000 });
 
       // Cancel warning dialog (SAFETY: NEVER switch to LIVE!)
       await page.click('[data-testid="cancel-live-btn"]');
