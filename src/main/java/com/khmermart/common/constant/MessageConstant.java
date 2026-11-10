@@ -7,6 +7,16 @@ public final class MessageConstant {
   public static final String AUTH_REQUIRED = "Authentication required";
   public static final String ACCESS_DENIED = "Access denied";
   public static final String INVALID_CREDENTIALS = "Invalid email or password";
+  public static final String EMAIL_NOT_VERIFIED =
+      "Please verify your email address before signing in";
+  public static final String EMAIL_ALREADY_VERIFIED = "Email address is already verified";
+  public static final String OTP_INVALID = "Verification code is incorrect";
+  public static final String OTP_EXPIRED = "Verification code has expired. Request a new code";
+  public static final String OTP_TOO_MANY_ATTEMPTS =
+      "Too many incorrect attempts. Request a new code";
+  public static final String OTP_RESEND_COOLDOWN = "Please wait before requesting a new code";
+  public static final String OTP_RESEND_GENERIC =
+      "If the account exists and is not verified, a new code has been sent";
   public static final String EMAIL_REGISTERED = "Email is already registered";
   public static final String ACCOUNT_DISABLED = "Account is disabled";
   public static final String USER_NOT_FOUND = "User not found";

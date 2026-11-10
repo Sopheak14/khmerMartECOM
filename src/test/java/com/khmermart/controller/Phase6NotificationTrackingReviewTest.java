@@ -94,6 +94,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
                 () ->
                     appUserRepository.save(
                         AppUser.builder()
+                            .emailVerified(true)
                             .email("customer1@khmermart.local")
                             .passwordHash("$2a$10$dummy")
                             .fullName("Dara Sok")
@@ -109,6 +110,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
                 () ->
                     appUserRepository.save(
                         AppUser.builder()
+                            .emailVerified(true)
                             .email("admin@khmermart.local")
                             .passwordHash("$2a$10$dummy")
                             .fullName("Admin System")
@@ -540,6 +542,7 @@ class Phase6NotificationTrackingReviewTest extends AbstractIntegrationTest {
             () ->
                 appUserRepository.save(
                     AppUser.builder()
+                        .emailVerified(true)
                         .email("staff@khmermart.local")
                         .passwordHash("$2a$10$dummy")
                         .fullName("Staff User")

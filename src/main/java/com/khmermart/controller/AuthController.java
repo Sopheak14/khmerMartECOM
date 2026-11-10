@@ -8,11 +8,15 @@ import com.khmermart.common.response.TokenResponse;
 import com.khmermart.model.request.AuthRequest;
 import com.khmermart.model.request.ForgotPasswordRequest;
 import com.khmermart.model.request.RegisterRequest;
+import com.khmermart.model.request.ResendVerificationRequest;
 import com.khmermart.model.request.ResetPasswordRequest;
 import com.khmermart.model.request.VerifyEmailRequest;
 import com.khmermart.security.CookieUtil;
+import com.khmermart.security.OtpRateLimiter;
 import com.khmermart.service.AuthService;
 import com.khmermart.service.AuthService.AuthResult;
+import com.khmermart.service.AuthService.RegisterResult;
+import com.khmermart.service.AuthService.ResendResult;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,20 +39,25 @@ public class AuthController {
 
   private final AuthService authService;
   private final CookieUtil cookieUtil;
+  private final OtpRateLimiter otpRateLimiter;
 
-  public AuthController(AuthService authService, CookieUtil cookieUtil) {
+  public AuthController(
+      AuthService authService, CookieUtil cookieUtil, OtpRateLimiter otpRateLimiter) {
     this.authService = authService;
     this.cookieUtil = cookieUtil;
+    this.otpRateLimiter = otpRateLimiter;
   }
 
   @PostMapping("/register")
-  @Operation(summary = "Register a new customer account")
-  public ResponseEntity<SuccessResponse<TokenResponse>> register(
-      @Valid @RequestBody RegisterRequest request) {
-    AuthResult result = authService.register(request);
-    return ResponseEntity.ok()
-        .header(HttpHeaders.SET_COOKIE, result.cookie().toString())
-        .body(ApiResponseUtil.success(result.tokenResponse()));
+  @Operation(
+      summary = "Register a customer account",
+      description =
+          "Creates an unverified account and emails a 6-digit code. No tokens are returned;"
+              + " call POST /auth/verify-email. 409 CONFLICT if the email is taken; 429 RATE_LIMITED.")
+  public SuccessResponse<RegisterResult> register(
+      @Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+    otpRateLimiter.check(getClientIp(httpRequest), request.email());
+    return ApiResponseUtil.success(authService.register(request));
   }
 
   @PostMapping("/login")
@@ -120,11 +129,32 @@ public class AuthController {
   }
 
   @PostMapping("/verify-email")
-  @Operation(summary = "Verify account email address")
-  public SuccessResponse<Map<String, Object>> verifyEmail(
-      @Valid @RequestBody VerifyEmailRequest request) {
-    authService.verifyEmail(request);
-    return ApiResponseUtil.success();
+  @Operation(
+      summary = "Verify email with the 6-digit code and sign in",
+      description =
+          "200 returns the login payload + km_rt cookie. Errors: 400 OTP_INVALID"
+              + " (details.attemptsLeft), 400 OTP_EXPIRED, 429 OTP_TOO_MANY_ATTEMPTS,"
+              + " 409 EMAIL_ALREADY_VERIFIED, 429 RATE_LIMITED.")
+  public ResponseEntity<SuccessResponse<TokenResponse>> verifyEmail(
+      @Valid @RequestBody VerifyEmailRequest request, HttpServletRequest httpRequest) {
+    otpRateLimiter.check(getClientIp(httpRequest), request.email());
+    AuthResult result = authService.verifyEmail(request);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, result.cookie().toString())
+        .body(ApiResponseUtil.success(result.tokenResponse()));
+  }
+
+  @PostMapping("/resend-verification")
+  @Operation(
+      summary = "Send a new verification code",
+      description =
+          "Always 200 with a generic message for unknown or already verified emails."
+              + " 429 OTP_RESEND_COOLDOWN (details.retryInSeconds) within 60 s of the last code;"
+              + " 429 RATE_LIMITED. A new code invalidates the old one and resets attempts.")
+  public SuccessResponse<ResendResult> resendVerification(
+      @Valid @RequestBody ResendVerificationRequest request, HttpServletRequest httpRequest) {
+    otpRateLimiter.check(getClientIp(httpRequest), request.email());
+    return ApiResponseUtil.success(authService.resendVerification(request));
   }
 
   private String getClientIp(HttpServletRequest request) {

@@ -136,7 +136,7 @@ public class DataSeeder implements CommandLineRunner {
             push_subscriptions,
             refresh_tokens,
             password_reset_tokens,
-            email_verification_tokens,
+            email_otp,
             shipping_methods,
             users
         CASCADE
@@ -272,8 +272,8 @@ public class DataSeeder implements CommandLineRunner {
       Long id, String email, String password, String name, String phone, Roles role) {
     jdbcTemplate.update(
         """
-        INSERT INTO users (id, email, password_hash, full_name, phone, role, is_active, email_verified_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, true, now(), now(), now())
+        INSERT INTO users (id, email, password_hash, full_name, phone, role, is_active, email_verified, email_verified_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, true, true, now(), now(), now())
         ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash
         """,
         id,

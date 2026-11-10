@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>KhmerMart verification code</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f7fafc; padding: 20px;">
+    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; padding: 28px;">
+        <h2 style="color: #2b6cb0; margin-top: 0;">KhmerMart</h2>
+        <p>Hello <span th:text="${fullName}">Customer</span>,</p>
+        <p>Your verification code · លេខកូដផ្ទៀងផ្ទាត់របស់អ្នក:</p>
+        <p style="font-size: 36px; font-weight: bold; letter-spacing: 8px; text-align: center; margin: 24px 0; color: #1a202c;" th:text="${code}">123456</p>
+        <p>This code expires in 10 minutes.<br/>ផុតកំណត់ក្នុង ១០ នាទី</p>
+        <p style="color: #718096; font-size: 13px;">If you did not sign up, ignore this email.<br/>ប្រសិនបើអ្នកមិនបានចុះឈ្មោះទេ សូមបដិសេធអ៊ីមែលនេះ។</p>
+    </div>
+</body>
+</html>

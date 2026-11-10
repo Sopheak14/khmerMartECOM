@@ -98,6 +98,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                 () ->
                     appUserRepository.save(
                         AppUser.builder()
+                            .emailVerified(true)
                             .email("admin@khmermart.local")
                             .passwordHash("$2a$10$dummy")
                             .fullName("Admin System")
@@ -113,6 +114,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                 () ->
                     appUserRepository.save(
                         AppUser.builder()
+                            .emailVerified(true)
                             .email("staff@khmermart.local")
                             .passwordHash("$2a$10$dummy")
                             .fullName("Staff Operator")
@@ -128,6 +130,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
                 () ->
                     appUserRepository.save(
                         AppUser.builder()
+                            .emailVerified(true)
                             .email("customer1@khmermart.local")
                             .passwordHash("$2a$10$dummy")
                             .fullName("Customer One")
@@ -266,6 +269,7 @@ class Phase7AdminApiIntegrationTest extends AbstractIntegrationTest {
     AppUser tempUser =
         appUserRepository.save(
             AppUser.builder()
+                .emailVerified(true)
                 .email("temp-deactivate-" + UUID.randomUUID() + "@khmermart.local")
                 .passwordHash("$2a$10$dummy")
                 .fullName("Temporary User")

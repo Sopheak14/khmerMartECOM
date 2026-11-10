@@ -90,7 +90,8 @@ public class SecurityConfig {
                         "/api/auth/logout",
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
-                        "/api/auth/verify-email")
+                        "/api/auth/verify-email",
+                        "/api/auth/resend-verification")
                     .permitAll()
 
                     // Public Catalog, Search, Settings & Home

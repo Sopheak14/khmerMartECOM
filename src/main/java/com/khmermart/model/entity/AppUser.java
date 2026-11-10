@@ -49,6 +49,10 @@ public class AppUser {
   @Builder.Default
   private boolean active = true;
 
+  @Column(name = "email_verified", nullable = false)
+  @Builder.Default
+  private boolean emailVerified = false;
+
   @Column(name = "email_verified_at")
   private Instant emailVerifiedAt;
 
@@ -59,8 +63,4 @@ public class AppUser {
   @Column(name = "updated_at", nullable = false)
   @Builder.Default
   private Instant updatedAt = Instant.now();
-
-  public boolean isEmailVerified() {
-    return emailVerifiedAt != null;
-  }
 }

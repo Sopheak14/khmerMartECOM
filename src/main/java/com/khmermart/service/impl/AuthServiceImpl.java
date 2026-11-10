@@ -8,18 +8,20 @@ import com.khmermart.config.AppProperty;
 import com.khmermart.mapper.AppUserMapper;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.AppUserToken;
-import com.khmermart.model.entity.EmailVerificationToken;
+import com.khmermart.event.EmailOtpRequestedEvent;
+import com.khmermart.model.entity.EmailOtp;
 import com.khmermart.model.entity.PasswordResetToken;
 import com.khmermart.model.enumerate.Roles;
 import com.khmermart.model.request.AuthRequest;
 import com.khmermart.model.request.ForgotPasswordRequest;
 import com.khmermart.model.request.RegisterRequest;
+import com.khmermart.model.request.ResendVerificationRequest;
 import com.khmermart.model.request.ResetPasswordRequest;
 import com.khmermart.model.request.VerifyEmailRequest;
 import com.khmermart.model.response.AppUserDto;
 import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.AppUserTokenRepository;
-import com.khmermart.repository.EmailVerificationTokenRepository;
+import com.khmermart.repository.EmailOtpRepository;
 import com.khmermart.repository.PasswordResetTokenRepository;
 import com.khmermart.security.CookieUtil;
 import com.khmermart.security.JwtService;
@@ -31,10 +33,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -46,11 +54,15 @@ public class AuthServiceImpl implements AuthService {
 
   private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
+  private static final int OTP_TTL_SECONDS = 600;
+  private static final int RESEND_COOLDOWN_SECONDS = 60;
+  private static final int OTP_MAX_ATTEMPTS = 5;
+
   private final AppUserRepository appUserRepository;
   private final AppUserTokenRepository appUserTokenRepository;
   private final AppUserTokenService appUserTokenService;
   private final PasswordResetTokenRepository passwordResetTokenRepository;
-  private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+  private final EmailOtpRepository emailOtpRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final CookieUtil cookieUtil;
@@ -58,25 +70,30 @@ public class AuthServiceImpl implements AuthService {
   private final MailService mailService;
   private final AppProperty appProperties;
   private final AppUserMapper appUserMapper;
+  private final ApplicationEventPublisher eventPublisher;
+  private final String otpPepper;
+  private final SecureRandom secureRandom = new SecureRandom();
 
   public AuthServiceImpl(
       AppUserRepository appUserRepository,
       AppUserTokenRepository appUserTokenRepository,
       AppUserTokenService appUserTokenService,
       PasswordResetTokenRepository passwordResetTokenRepository,
-      EmailVerificationTokenRepository emailVerificationTokenRepository,
+      EmailOtpRepository emailOtpRepository,
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
       CookieUtil cookieUtil,
       LoginRateLimiter loginRateLimiter,
       MailService mailService,
       AppProperty appProperties,
-      AppUserMapper appUserMapper) {
+      AppUserMapper appUserMapper,
+      ApplicationEventPublisher eventPublisher,
+      @Value("${app.otp.pepper}") String otpPepper) {
     this.appUserRepository = appUserRepository;
     this.appUserTokenRepository = appUserTokenRepository;
     this.appUserTokenService = appUserTokenService;
     this.passwordResetTokenRepository = passwordResetTokenRepository;
-    this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+    this.emailOtpRepository = emailOtpRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
     this.cookieUtil = cookieUtil;
@@ -84,10 +101,12 @@ public class AuthServiceImpl implements AuthService {
     this.mailService = mailService;
     this.appProperties = appProperties;
     this.appUserMapper = appUserMapper;
+    this.eventPublisher = eventPublisher;
+    this.otpPepper = otpPepper;
   }
 
   @Override
-  public AuthResult register(RegisterRequest request) {
+  public RegisterResult register(RegisterRequest request) {
     String email = request.email().toLowerCase().trim();
     if (appUserRepository.existsByEmail(email)) {
       throw new CustomException(ErrorCode.CONFLICT, MessageConstant.EMAIL_REGISTERED);
@@ -101,26 +120,15 @@ public class AuthServiceImpl implements AuthService {
             .phone(request.phone().trim())
             .role(Roles.CUSTOMER)
             .active(true)
+            .emailVerified(false)
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
             .build();
 
     user = appUserRepository.save(user);
+    issueOtp(user);
 
-    // Create Email Verification Token
-    String rawVerifyToken = UUID.randomUUID().toString();
-    EmailVerificationToken verificationToken =
-        EmailVerificationToken.builder()
-            .userId(user.getId())
-            .tokenHash(sha256(rawVerifyToken))
-            .expiresAt(Instant.now().plus(Duration.ofHours(24)))
-            .build();
-    emailVerificationTokenRepository.save(verificationToken);
-
-    mailService.sendVerificationEmail(user.getEmail(), user.getFullName(), rawVerifyToken);
-
-    // Issue initial session
-    return createSession(user);
+    return new RegisterResult(email, true, OTP_TTL_SECONDS, RESEND_COOLDOWN_SECONDS);
   }
 
   @Override
@@ -146,6 +154,11 @@ public class AuthServiceImpl implements AuthService {
 
     if (!user.isActive()) {
       throw new CustomException(ErrorCode.FORBIDDEN, "Account is deactivated");
+    }
+
+    if (!user.isEmailVerified()) {
+      throw new CustomException(
+          ErrorCode.EMAIL_NOT_VERIFIED, MessageConstant.EMAIL_NOT_VERIFIED, Map.of("email", email));
     }
 
     loginRateLimiter.reset(rateLimitKey);
@@ -293,34 +306,121 @@ public class AuthServiceImpl implements AuthService {
     appUserTokenRepository.revokeAllByUserId(user.getId(), Instant.now());
   }
 
+  /** Failed attempts must be persisted even though the request ends in an exception. */
   @Override
-  public void verifyEmail(VerifyEmailRequest request) {
-    String tokenHash = sha256(request.token().trim());
-    EmailVerificationToken verificationToken =
-        emailVerificationTokenRepository
-            .findByTokenHash(tokenHash)
-            .orElseThrow(
-                () ->
-                    new CustomException(
-                        ErrorCode.VALIDATION_ERROR, MessageConstant.INVALID_VERIFY_TOKEN));
-
-    if (verificationToken.getUsedAt() != null
-        || verificationToken.getExpiresAt().isBefore(Instant.now())) {
-      throw new CustomException(ErrorCode.VALIDATION_ERROR, MessageConstant.INVALID_VERIFY_TOKEN);
+  @Transactional(noRollbackFor = CustomException.class)
+  public AuthResult verifyEmail(VerifyEmailRequest request) {
+    String email = request.email().toLowerCase().trim();
+    AppUser user = appUserRepository.findByEmail(email).orElse(null);
+    if (user == null) {
+      // Same answer as a wrong code, so the endpoint does not reveal which emails exist.
+      throw new CustomException(
+          ErrorCode.OTP_INVALID,
+          MessageConstant.OTP_INVALID,
+          Map.of("attemptsLeft", OTP_MAX_ATTEMPTS - 1));
+    }
+    if (user.isEmailVerified()) {
+      throw new CustomException(
+          ErrorCode.EMAIL_ALREADY_VERIFIED, MessageConstant.EMAIL_ALREADY_VERIFIED);
     }
 
-    AppUser user =
-        appUserRepository
-            .findById(verificationToken.getUserId())
-            .orElseThrow(
-                () -> new CustomException(ErrorCode.NOT_FOUND, MessageConstant.USER_NOT_FOUND));
+    EmailOtp otp = emailOtpRepository.findByUserId(user.getId()).orElse(null);
+    if (otp == null || otp.getConsumedAt() != null) {
+      throw new CustomException(ErrorCode.OTP_EXPIRED, MessageConstant.OTP_EXPIRED);
+    }
+    if (otp.getAttempts() >= OTP_MAX_ATTEMPTS) {
+      throw tooManyAttempts();
+    }
+    if (otp.getExpiresAt().isBefore(Instant.now())) {
+      throw new CustomException(ErrorCode.OTP_EXPIRED, MessageConstant.OTP_EXPIRED);
+    }
 
-    user.setEmailVerifiedAt(Instant.now());
-    user.setUpdatedAt(Instant.now());
+    String candidate = hashCode(user.getId(), request.code().trim());
+    boolean match =
+        MessageDigest.isEqual(
+            candidate.getBytes(StandardCharsets.UTF_8),
+            otp.getCodeHash().getBytes(StandardCharsets.UTF_8));
+    if (!match) {
+      otp.setAttempts(otp.getAttempts() + 1);
+      emailOtpRepository.save(otp);
+      int left = OTP_MAX_ATTEMPTS - otp.getAttempts();
+      if (left <= 0) {
+        throw tooManyAttempts();
+      }
+      throw new CustomException(
+          ErrorCode.OTP_INVALID, MessageConstant.OTP_INVALID, Map.of("attemptsLeft", left));
+    }
+
+    Instant now = Instant.now();
+    otp.setConsumedAt(now);
+    emailOtpRepository.save(otp);
+    user.setEmailVerified(true);
+    user.setEmailVerifiedAt(now);
+    user.setUpdatedAt(now);
     appUserRepository.save(user);
+    return createSession(user);
+  }
 
-    verificationToken.setUsedAt(Instant.now());
-    emailVerificationTokenRepository.save(verificationToken);
+  @Override
+  public ResendResult resendVerification(ResendVerificationRequest request) {
+    String email = request.email().toLowerCase().trim();
+    AppUser user = appUserRepository.findByEmail(email).orElse(null);
+    if (user != null && user.isActive() && !user.isEmailVerified()) {
+      EmailOtp existing = emailOtpRepository.findByUserId(user.getId()).orElse(null);
+      if (existing != null) {
+        long elapsed = Duration.between(existing.getLastSentAt(), Instant.now()).getSeconds();
+        if (elapsed < RESEND_COOLDOWN_SECONDS) {
+          throw new CustomException(
+              ErrorCode.OTP_RESEND_COOLDOWN,
+              MessageConstant.OTP_RESEND_COOLDOWN,
+              Map.of("retryInSeconds", RESEND_COOLDOWN_SECONDS - elapsed));
+        }
+      }
+      issueOtp(user);
+    }
+    // Identical answer for unknown / already verified emails: no user enumeration.
+    return new ResendResult(MessageConstant.OTP_RESEND_GENERIC, OTP_TTL_SECONDS, RESEND_COOLDOWN_SECONDS);
+  }
+
+  private CustomException tooManyAttempts() {
+    return new CustomException(
+        ErrorCode.OTP_TOO_MANY_ATTEMPTS,
+        MessageConstant.OTP_TOO_MANY_ATTEMPTS,
+        Map.of("attemptsLeft", 0));
+  }
+
+  /** Creates/overwrites the user's code (old code invalid, attempts reset) and queues the mail. */
+  private void issueOtp(AppUser user) {
+    String code = String.format("%06d", secureRandom.nextInt(1_000_000));
+    Instant now = Instant.now();
+    EmailOtp otp =
+        emailOtpRepository
+            .findByUserId(user.getId())
+            .orElseGet(() -> EmailOtp.builder().userId(user.getId()).build());
+    otp.setCodeHash(hashCode(user.getId(), code));
+    otp.setExpiresAt(now.plusSeconds(OTP_TTL_SECONDS));
+    otp.setAttempts(0);
+    otp.setLastSentAt(now);
+    otp.setConsumedAt(null);
+    emailOtpRepository.save(otp);
+    eventPublisher.publishEvent(
+        new EmailOtpRequestedEvent(user.getEmail(), user.getFullName(), code));
+  }
+
+  /** HMAC-SHA256(pepper, userId:code), hex. The plain code is never stored. */
+  private String hashCode(Long userId, String code) {
+    try {
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(new SecretKeySpec(otpPepper.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+      byte[] out = mac.doFinal((userId + ":" + code).getBytes(StandardCharsets.UTF_8));
+      StringBuilder sb = new StringBuilder();
+      for (byte b : out) {
+        sb.append(String.format("%02x", b));
+      }
+      return sb.toString();
+    } catch (Exception e) {
+      throw new IllegalStateException("HMAC-SHA256 unavailable", e);
+    }
   }
 
   private AuthResult createSession(AppUser user) {

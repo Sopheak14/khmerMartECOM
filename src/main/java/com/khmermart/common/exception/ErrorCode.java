@@ -20,6 +20,13 @@ public enum ErrorCode {
   PAYMENT_EXPIRED(HttpStatus.GONE, "Payment has expired"),
   KHQR_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "Failed to generate KHQR code"),
   BAKONG_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Bakong service is temporarily unavailable"),
+  EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Email address is not verified"),
+  EMAIL_ALREADY_VERIFIED(HttpStatus.CONFLICT, "Email address is already verified"),
+  OTP_INVALID(HttpStatus.BAD_REQUEST, "Verification code is incorrect"),
+  OTP_EXPIRED(HttpStatus.BAD_REQUEST, "Verification code has expired"),
+  OTP_TOO_MANY_ATTEMPTS(
+      HttpStatus.TOO_MANY_REQUESTS, "Too many incorrect codes. Request a new code"),
+  OTP_RESEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "Please wait before requesting a new code"),
   RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

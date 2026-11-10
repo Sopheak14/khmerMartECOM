@@ -4,6 +4,7 @@ import com.khmermart.common.response.TokenResponse;
 import com.khmermart.model.request.AuthRequest;
 import com.khmermart.model.request.ForgotPasswordRequest;
 import com.khmermart.model.request.RegisterRequest;
+import com.khmermart.model.request.ResendVerificationRequest;
 import com.khmermart.model.request.ResetPasswordRequest;
 import com.khmermart.model.request.VerifyEmailRequest;
 import org.springframework.http.ResponseCookie;
@@ -12,7 +13,12 @@ public interface AuthService {
 
   record AuthResult(TokenResponse tokenResponse, ResponseCookie cookie) {}
 
-  AuthResult register(RegisterRequest request);
+  record RegisterResult(
+      String email, boolean verificationRequired, int expiresInSeconds, int resendInSeconds) {}
+
+  record ResendResult(String message, int expiresInSeconds, int resendInSeconds) {}
+
+  RegisterResult register(RegisterRequest request);
 
   AuthResult login(AuthRequest request, String clientIp);
 
@@ -24,5 +30,7 @@ public interface AuthService {
 
   void resetPassword(ResetPasswordRequest request);
 
-  void verifyEmail(VerifyEmailRequest request);
+  AuthResult verifyEmail(VerifyEmailRequest request);
+
+  ResendResult resendVerification(ResendVerificationRequest request);
 }

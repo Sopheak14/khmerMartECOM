@@ -84,7 +84,8 @@ public class EmailSenderImpl implements EmailSender {
       mailSender.get().send(message);
       log.info("Sent email to {} with subject '{}'", toEmail, subject);
     } catch (Exception e) {
-      log.error("Failed to send email to {}: {}", toEmail, e.getMessage(), e);
+      log.error(
+          "Failed to send email to {}: {}: {}", toEmail, e.getClass().getSimpleName(), e.getMessage());
       throw new RuntimeException("Email delivery failed: " + e.getMessage(), e);
     }
   }

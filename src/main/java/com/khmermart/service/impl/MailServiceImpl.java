@@ -34,31 +34,56 @@ public class MailServiceImpl implements MailService {
 
   @Async
   @Override
-  public void sendVerificationEmail(String toEmail, String fullName, String rawToken) {
+  public void sendVerificationCodeEmail(String toEmail, String fullName, String code) {
     if (mailSender.isEmpty()) {
-      log.info("Mail sender not configured. Skipping verification email to {}", toEmail);
+      log.info("Mail sender not configured. Skipping OTP email to {}", maskEmail(toEmail));
       return;
     }
     try {
-      String verificationUrl = appProperties.frontendUrl() + "/verify-email?token=" + rawToken;
       Context context = new Context();
       context.setVariable("fullName", fullName);
-      context.setVariable("verificationUrl", verificationUrl);
-
-      String content = templateEngine.process("email/verify-email", context);
+      context.setVariable("code", code);
+      String html = templateEngine.process("email/verify-otp", context);
+      String text =
+          "KhmerMart verification code / លេខកូដផ្ទៀងផ្ទាត់ KhmerMart\n\n"
+              + "Hello "
+              + fullName
+              + ",\n\n"
+              + "Your code / លេខកូដរបស់អ្នក: "
+              + code
+              + "\n\n"
+              + "This code expires in 10 minutes. / កូដនេះផុតកំណត់ក្នុង ១០ នាទី។\n"
+              + "If you did not sign up, ignore this email.\n"
+              + "ប្រសិនបើអ្នកមិនបានចុះឈ្មោះទេ សូមបដិសេធអ៊ីមែលនេះ។\n";
 
       MimeMessage message = mailSender.get().createMimeMessage();
       MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
       helper.setFrom(MailAddressUtil.parseFrom(appProperties.mail().from()));
       helper.setTo(toEmail);
-      helper.setSubject("Verify your email address - KhmerMart");
-      helper.setText(content, true);
+      helper.setSubject("KhmerMart verification code · លេខកូដផ្ទៀងផ្ទាត់ KhmerMart");
+      helper.setText(text, html);
 
       mailSender.get().send(message);
-      log.info("Sent verification email to {}", toEmail);
+      log.info("OTP sent to {}", maskEmail(toEmail));
     } catch (Exception e) {
-      log.warn("Failed to send verification email to {}: {}", toEmail, e.getMessage());
+      log.warn(
+          "Failed to send OTP email to {}: {}: {}",
+          maskEmail(toEmail),
+          e.getClass().getSimpleName(),
+          e.getMessage());
     }
+  }
+
+  /** u***@domain, so logs never hold the full address. */
+  public static String maskEmail(String email) {
+    if (email == null) {
+      return "";
+    }
+    int at = email.indexOf('@');
+    if (at <= 0) {
+      return "***";
+    }
+    return email.charAt(0) + "***" + email.substring(at);
   }
 
   @Async
@@ -86,7 +111,7 @@ public class MailServiceImpl implements MailService {
       mailSender.get().send(message);
       log.info("Sent password reset email to {}", toEmail);
     } catch (Exception e) {
-      log.warn("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+      log.warn("Failed to send password reset email to {}: {}: {}", toEmail, e.getClass().getSimpleName(), e.getMessage());
     }
   }
 }

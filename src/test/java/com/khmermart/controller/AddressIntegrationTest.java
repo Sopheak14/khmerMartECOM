@@ -30,10 +30,7 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
     String email = "addr_" + System.currentTimeMillis() + "@khmermart.local";
     RegisterRequest reg =
         new RegisterRequest(email, "Pass123456", "Address Tester", "+85512444555");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    JsonNode regJson = objectMapper.readTree(regResp.getBody());
-    String token = regJson.get("data").get("accessToken").asText();
+    String token = registerVerifiedAndLogin(restTemplate, reg);
 
     HttpHeaders headers = new HttpHeaders();
     headers.setBearerAuth(token);
@@ -167,10 +164,7 @@ class AddressIntegrationTest extends AbstractIntegrationTest {
   void testAddressValidation() throws Exception {
     String email = "addr_val_" + System.currentTimeMillis() + "@khmermart.local";
     RegisterRequest reg = new RegisterRequest(email, "Pass123456", "Val Tester", "+85512444555");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    JsonNode regJson = objectMapper.readTree(regResp.getBody());
-    String token = regJson.get("data").get("accessToken").asText();
+    String token = registerVerifiedAndLogin(restTemplate, reg);
 
     HttpHeaders headers = new HttpHeaders();
     headers.setBearerAuth(token);

@@ -99,6 +99,7 @@ class ConcurrencyCheckoutIntegrationTest extends AbstractIntegrationTest {
               + "@khmermart.local";
       AppUser user =
           AppUser.builder()
+              .emailVerified(true)
               .email(email)
               .passwordHash(passwordEncoder.encode("Test@12345"))
               .fullName("Concurrent Customer " + i)

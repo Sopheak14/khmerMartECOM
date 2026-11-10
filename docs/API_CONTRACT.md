@@ -5,8 +5,10 @@ This document details the complete REST API contract for KhmerMart, covering all
 ---
 
 ## 1. Authentication & Users
-- `POST /api/auth/register`: Create customer account.
-- `POST /api/auth/login`: Issue access token + `km_rt` cookie.
+- `POST /api/auth/register`: Create an UNVERIFIED customer account and email a 6-digit code. Returns no tokens and no cookie: `{ success:true, data:{ email, verificationRequired:true, expiresInSeconds:600, resendInSeconds:60 } }`. `409 CONFLICT` if the email is taken.
+- `POST /api/auth/verify-email`: Body `{ email, code }`. Correct code → same payload as login (`accessToken`, `user`) + `km_rt` cookie. Errors: `400 OTP_INVALID` (`details.attemptsLeft`), `400 OTP_EXPIRED`, `429 OTP_TOO_MANY_ATTEMPTS` (5th wrong code; request a new one), `409 EMAIL_ALREADY_VERIFIED`. Codes live 10 minutes. This replaces the old link flow (`{ token }` body, `?token=` URL), which was removed.
+- `POST /api/auth/resend-verification`: Body `{ email }`. Always `200` with a generic message `{ message, expiresInSeconds:600, resendInSeconds:60 }` for unknown or already verified emails (no user enumeration). `429 OTP_RESEND_COOLDOWN` (`details.retryInSeconds`) within 60 s of the last code. A new code invalidates the old one and resets attempts.
+- `POST /api/auth/login`: Issue access token + `km_rt` cookie. `403 EMAIL_NOT_VERIFIED` (`details.email`) when the password is right but the email is not verified; no tokens are issued.
 - `POST /api/auth/refresh`: Refresh expired access token using rotating cookie.
 - `POST /api/auth/logout`: Revoke active refresh token.
 - `GET /api/users/me`: Current user profile.
@@ -19,6 +21,8 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `DELETE /api/users/me/addresses/{id}`: Delete delivery address.
 
   Address fields: `postalCode` is fully optional (nullable). `latitude` / `longitude` are optional additive `NUMERIC(9,6)` fields on `AddressDto` and the create/update requests; they must be sent together and lie inside Cambodia (lat 9.5..15.0, lng 102.0..108.0), otherwise `VALIDATION_ERROR`. On update, omitted coordinates keep their stored value. The admin order detail `shippingAddress` includes them so staff can open a map link (e.g. `https://www.google.com/maps?q=<lat>,<lng>`). Pre-existing addresses and order snapshots have no coordinates (fields omitted).
+
+  Email OTP error codes: `EMAIL_NOT_VERIFIED` (403), `EMAIL_ALREADY_VERIFIED` (409), `OTP_INVALID` (400), `OTP_EXPIRED` (400), `OTP_TOO_MANY_ATTEMPTS` (429), `OTP_RESEND_COOLDOWN` (429), plus `RATE_LIMITED` (429, Redis, per IP and per email) on register / verify-email / resend-verification. Flyway V7 marks every pre-existing user verified; seeds create verified users.
 
 ---
 

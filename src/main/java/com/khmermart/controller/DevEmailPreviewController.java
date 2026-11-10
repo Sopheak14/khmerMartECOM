@@ -61,9 +61,7 @@ public class DevEmailPreviewController {
     vars.put(
         "adminReply",
         "Thank you for sharing your experience! We are glad you love the speed and screen quality.");
-    vars.put(
-        "verificationUrl",
-        appProperty.frontendUrl() + "/verify-email?token=mock-verify-token-12345");
+    vars.put("code", "482915");
     vars.put(
         "resetUrl", appProperty.frontendUrl() + "/reset-password?token=mock-reset-token-67890");
     return vars;

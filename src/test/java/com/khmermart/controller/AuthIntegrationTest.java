@@ -11,16 +11,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.AbstractIntegrationTest;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.AppUserToken;
-import com.khmermart.model.entity.EmailVerificationToken;
 import com.khmermart.model.entity.PasswordResetToken;
 import com.khmermart.model.request.AuthRequest;
 import com.khmermart.model.request.ForgotPasswordRequest;
 import com.khmermart.model.request.RegisterRequest;
 import com.khmermart.model.request.ResetPasswordRequest;
-import com.khmermart.model.request.VerifyEmailRequest;
 import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.AppUserTokenRepository;
-import com.khmermart.repository.EmailVerificationTokenRepository;
 import com.khmermart.repository.PasswordResetTokenRepository;
 import com.khmermart.security.JwtService;
 import com.khmermart.service.MailService;
@@ -55,8 +52,6 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private AppUserTokenRepository appUserTokenRepository;
 
-  @Autowired private EmailVerificationTokenRepository emailVerificationTokenRepository;
-
   @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
 
   @SpyBean private MailService mailService;
@@ -65,9 +60,8 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
   private String accessSecret;
 
   @Test
-  @DisplayName(
-      "POST /api/auth/register should create user and set km_rt cookie with correct attributes")
-  void testRegisterSuccessAndCookieAttributes() throws Exception {
+  @DisplayName("POST /api/auth/register creates an unverified user and returns no tokens/cookie")
+  void testRegisterSuccessReturnsNoTokens() throws Exception {
     String uniqueEmail = "reg_" + System.currentTimeMillis() + "@khmermart.local";
     RegisterRequest request =
         new RegisterRequest(uniqueEmail, "ValidPass123", "New Customer", "+85512888999");
@@ -78,18 +72,9 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     JsonNode json = objectMapper.readTree(response.getBody());
     assertThat(json.get("success").asBoolean()).isTrue();
-    assertThat(json.get("data").get("user").get("email").asText()).isEqualTo(uniqueEmail);
-    assertThat(json.get("data").has("accessToken")).isTrue();
-
-    // Verify Set-Cookie header
-    List<String> setCookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
-    assertThat(setCookies).isNotNull().isNotEmpty();
-    String cookieHeader = setCookies.get(0);
-    assertThat(cookieHeader).contains("km_rt=");
-    assertThat(cookieHeader).contains("HttpOnly");
-    assertThat(cookieHeader).contains("SameSite=Lax");
-    assertThat(cookieHeader).contains("Path=/api/auth");
-    assertThat(cookieHeader).contains("Max-Age=604800");
+    assertThat(json.get("data").has("accessToken")).isFalse();
+    assertThat(json.get("data").get("email").asText()).isEqualTo(uniqueEmail);
+    assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNull();
   }
 
   @Test
@@ -161,6 +146,19 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     assertThat(json.get("error").get("code").asText()).isEqualTo("RATE_LIMITED");
   }
 
+  /** register -> mark verified -> login; returns the km_rt Set-Cookie header. */
+  private String registerVerifyLoginCookie(RegisterRequest reg) {
+    ResponseEntity<String> regResp =
+        restTemplate.postForEntity("/api/auth/register", reg, String.class);
+    assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    markVerified(reg.email());
+    ResponseEntity<String> login =
+        restTemplate.postForEntity(
+            "/api/auth/login", new AuthRequest(reg.email(), reg.password()), String.class);
+    assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
+    return login.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+  }
+
   @Test
   @DisplayName("POST /api/auth/refresh token rotation and reuse detection revoking family")
   void testRefreshTokenRotationAndReuseDetection() throws Exception {
@@ -168,11 +166,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     RegisterRequest reg =
         new RegisterRequest(email, "Password123", "Rotation Test", "+85512333444");
 
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-    String cookieHeader = regResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+    String cookieHeader = registerVerifyLoginCookie(reg);
     assertThat(cookieHeader).isNotNull();
     String kmRtCookie = cookieHeader.split(";")[0]; // "km_rt=..."
 
@@ -227,6 +221,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     ResponseEntity<String> regResp =
         restTemplate.postForEntity("/api/auth/register", reg, String.class);
     assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    markVerified(email);
 
     AppUser user = appUserRepository.findByEmail(email).orElseThrow();
     Long userId = user.getId();
@@ -294,55 +289,11 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("Verify email flow: registration sends email, verify-email sets emailVerified=true")
-  void testVerifyEmailFlow() throws Exception {
-    String email = "verify_" + System.currentTimeMillis() + "@khmermart.local";
-    RegisterRequest reg =
-        new RegisterRequest(email, "Password123", "Verify Tester", "+85512777333");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    assertThat(regResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-    AppUser user = appUserRepository.findByEmail(email).orElseThrow();
-    Long userId = user.getId();
-
-    // Capture verification token
-    ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
-    verify(mailService, atLeastOnce())
-        .sendVerificationEmail(eq(email), any(), tokenCaptor.capture());
-    String rawVerifyToken = tokenCaptor.getValue();
-    assertThat(rawVerifyToken).isNotBlank();
-
-    // Verify token stored in DB is hashed with SHA-256
-    List<EmailVerificationToken> tokens = emailVerificationTokenRepository.findAll();
-    EmailVerificationToken dbToken =
-        tokens.stream().filter(t -> t.getUserId().equals(userId)).findFirst().orElseThrow();
-    assertThat(dbToken.getTokenHash()).hasSize(64);
-    assertThat(dbToken.getTokenHash()).isNotEqualTo(rawVerifyToken);
-
-    // Call verify-email
-    VerifyEmailRequest verifyReq = new VerifyEmailRequest(rawVerifyToken);
-    ResponseEntity<String> verifyResp =
-        restTemplate.postForEntity("/api/auth/verify-email", verifyReq, String.class);
-    assertThat(verifyResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-    JsonNode verifyJson = objectMapper.readTree(verifyResp.getBody());
-    assertThat(verifyJson.get("success").asBoolean()).isTrue();
-    assertThat(verifyJson.has("data")).isTrue();
-    assertThat(verifyJson.get("data").isObject()).isTrue();
-
-    // Confirm emailVerified is now true
-    AppUser verifiedUser = appUserRepository.findById(userId).orElseThrow();
-    assertThat(verifiedUser.isEmailVerified()).isTrue();
-  }
-
-  @Test
   @DisplayName("POST /api/auth/logout clears km_rt cookie and revokes refresh token")
   void testLogout() throws Exception {
     String email = "logout_" + System.currentTimeMillis() + "@khmermart.local";
     RegisterRequest reg = new RegisterRequest(email, "Password123", "Logout Test", "+85512777999");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    String cookieHeader = regResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+    String cookieHeader = registerVerifyLoginCookie(reg);
     assertThat(cookieHeader).isNotNull();
     String kmRtCookie = cookieHeader.split(";")[0];
 

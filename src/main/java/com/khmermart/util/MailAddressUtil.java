@@ -26,9 +26,11 @@ public final class MailAddressUtil {
         throw new IllegalArgumentException("MAIL_FROM is empty");
       }
       InternetAddress addr = parsed[0];
-      if (addr.getPersonal() != null) {
-        addr.setPersonal(addr.getPersonal(), "UTF-8");
-      }
+      String personal =
+          addr.getPersonal() == null || addr.getPersonal().isBlank()
+              ? "KhmerMart"
+              : addr.getPersonal();
+      addr.setPersonal(personal, "UTF-8");
       return addr;
     } catch (AddressException | UnsupportedEncodingException e) {
       throw new IllegalArgumentException("Invalid MAIL_FROM '" + value + "': " + e.getMessage(), e);

@@ -76,10 +76,9 @@ class OrderDiscountBreakdownIntegrationTest extends AbstractIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    String customerToken =
-        "Bearer " + objectMapper.readTree(registerRes).path("data").path("accessToken").asText();
-    long customerId =
-        objectMapper.readTree(registerRes).path("data").path("user").path("id").asLong();
+    markVerified(email);
+    String customerToken = login(email, "Breakdown@12345");
+    long customerId = userId(email);
     String adminToken = login("admin@khmermart.local", "Admin@12345");
 
     Address address =

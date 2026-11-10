@@ -35,6 +35,7 @@ CONTRACT = {
         ("POST", "/auth/register"), ("POST", "/auth/login"), ("POST", "/auth/refresh"),
         ("POST", "/auth/logout"), ("POST", "/auth/forgot-password"),
         ("POST", "/auth/reset-password"), ("POST", "/auth/verify-email"),
+        ("POST", "/auth/resend-verification"),
     ],
     "USER": [
         ("GET", "/users/me"), ("PATCH", "/users/me"), ("PATCH", "/users/me/password"),

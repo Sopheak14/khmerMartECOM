@@ -31,10 +31,7 @@ class AppUserControllerTest extends AbstractIntegrationTest {
     String email = prefix + "_" + System.currentTimeMillis() + "@khmermart.local";
     RegisterRequest reg =
         new RegisterRequest(email, "InitialPass123", "Tester " + prefix, "+85512666777");
-    ResponseEntity<String> regResp =
-        restTemplate.postForEntity("/api/auth/register", reg, String.class);
-    JsonNode regJson = objectMapper.readTree(regResp.getBody());
-    String accessToken = regJson.get("data").get("accessToken").asText();
+    String accessToken = registerVerifiedAndLogin(restTemplate, reg);
     return new UserAuth(email, accessToken);
   }
 
@@ -52,7 +49,7 @@ class AppUserControllerTest extends AbstractIntegrationTest {
     JsonNode getMeJson = objectMapper.readTree(getMeResp.getBody());
     assertThat(getMeJson.get("success").asBoolean()).isTrue();
     assertThat(getMeJson.get("data").get("fullName").asText()).isEqualTo("Tester me_get");
-    assertThat(getMeJson.get("data").get("emailVerified").asBoolean()).isFalse();
+    assertThat(getMeJson.get("data").get("emailVerified").asBoolean()).isTrue();
   }
 
   @Test

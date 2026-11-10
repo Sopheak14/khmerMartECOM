@@ -89,10 +89,22 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
+    markVerified(customerEmail);
+    String customerLoginRes =
+        mockMvc
+            .perform(
+                post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            Map.of("email", customerEmail, "password", "E2eFlow@12345"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
     String customerToken =
-        "Bearer " + objectMapper.readTree(registerRes).path("data").path("accessToken").asText();
-    long customerId =
-        objectMapper.readTree(registerRes).path("data").path("user").path("id").asLong();
+        "Bearer " + objectMapper.readTree(customerLoginRes).path("data").path("accessToken").asText();
+    long customerId = userId(customerEmail);
 
     String adminLoginRes =
         mockMvc

@@ -25,7 +25,8 @@ This document defines the Role-Based Access Control (RBAC) matrix for the KhmerM
 | `POST` | `/api/auth/logout` | Revoke session & clear cookie | ❌ | ✅ | ✅ | ✅ |
 | `POST` | `/api/auth/forgot-password` | Request password reset email | ✅ | ✅ | ✅ | ✅ |
 | `POST` | `/api/auth/reset-password` | Reset password with token | ✅ | ✅ | ✅ | ✅ |
-| `POST` | `/api/auth/verify-email` | Verify email address | ✅ | ✅ | ✅ | ✅ |
+| `POST` | `/api/auth/verify-email` | Verify email with 6-digit code (signs in) | ✅ | ✅ | ✅ | ✅ |
+| `POST` | `/api/auth/resend-verification` | Resend verification code | ✅ | ✅ | ✅ | ✅ |
 | **USER PROFILE** |
 | `GET` | `/api/users/me` | Fetch personal profile | ❌ | ✅ | ✅ | ✅ |
 | `PATCH`| `/api/users/me` | Update name and phone | ❌ | ✅ | ✅ | ✅ |
