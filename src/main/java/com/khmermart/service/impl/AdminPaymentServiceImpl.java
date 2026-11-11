@@ -4,30 +4,38 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
+import com.khmermart.event.RefundCompletedEvent;
+import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.Inventory;
 import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
+import com.khmermart.model.entity.OrderStatusHistory;
 import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Refund;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.request.CompleteRefundRequest;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
 import com.khmermart.model.response.PaymentCheckResultDto;
 import com.khmermart.model.response.ReconciliationReportDto;
 import com.khmermart.model.response.ReconciliationReportDto.ReconciliationMismatchDto;
+import com.khmermart.model.response.RefundDto;
+import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.InventoryMovementRepository;
 import com.khmermart.repository.InventoryRepository;
 import com.khmermart.repository.OrderItemRepository;
 import com.khmermart.repository.OrderRepository;
+import com.khmermart.repository.OrderStatusHistoryRepository;
 import com.khmermart.repository.PaymentRepository;
 import com.khmermart.repository.RefundRepository;
 import com.khmermart.service.AdminPaymentService;
 import com.khmermart.service.AuditLogService;
 import com.khmermart.service.KhqrPaymentChecker;
+import com.khmermart.service.RefundRules;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -55,6 +64,9 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
   private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
   private final KhqrPaymentChecker paymentChecker;
+  private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+  private final AppUserRepository appUserRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   public AdminPaymentServiceImpl(
       PaymentRepository paymentRepository,
@@ -65,7 +77,10 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
       RefundRepository refundRepository,
       AuditLogService auditLogService,
       ObjectMapper objectMapper,
-      KhqrPaymentChecker paymentChecker) {
+      KhqrPaymentChecker paymentChecker,
+      OrderStatusHistoryRepository orderStatusHistoryRepository,
+      AppUserRepository appUserRepository,
+      ApplicationEventPublisher eventPublisher) {
     this.paymentRepository = paymentRepository;
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
@@ -75,6 +90,100 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
     this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
     this.paymentChecker = paymentChecker;
+    this.orderStatusHistoryRepository = orderStatusHistoryRepository;
+    this.appUserRepository = appUserRepository;
+    this.eventPublisher = eventPublisher;
+  }
+
+  @Override
+  @Transactional
+  public AdminPaymentDto completeRefund(
+      Long id, CompleteRefundRequest request, Long adminId, String ip) {
+    final Payment found =
+        paymentRepository
+            .findById(id)
+            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Payment not found"));
+    Payment payment = found;
+    if (payment.getStatus() != PaymentStatus.REFUND_PENDING) {
+      throw new CustomException(
+          ErrorCode.INVALID_REFUND_STATE,
+          "Only REFUND_PENDING payments can be completed; current status: " + payment.getStatus());
+    }
+
+    Refund refund =
+        refundRepository.findByPaymentId(id).stream()
+            .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
+            .max(java.util.Comparator.comparing(Refund::getId))
+            .orElseGet(
+                () ->
+                    Refund.builder()
+                        .paymentId(id)
+                        .amountCents(found.getAmountCents())
+                        .payerAccount(found.getFromAccountId())
+                        .reason("Order cancelled")
+                        .status("PENDING")
+                        .requestedAt(Instant.now())
+                        .createdAt(Instant.now())
+                        .build());
+    Object before =
+        Map.of(
+            "paymentStatus", payment.getStatus(),
+            "refundStatus", refund.getStatus());
+
+    Instant now = Instant.now();
+    String ref = request.bankReference().trim();
+    refund.setStatus("COMPLETED");
+    refund.setCompletedAt(now);
+    refund.setCompletedBy(adminId);
+    refund.setActorId(adminId);
+    refund.setBankReference(ref);
+    refund.setReference(ref);
+    if (request.note() != null && !request.note().isBlank()) {
+      refund.setNote(request.note().trim());
+    }
+    refundRepository.save(refund);
+
+    payment.setStatus(PaymentStatus.REFUNDED);
+    payment = paymentRepository.save(payment);
+
+    Order order = orderRepository.findById(payment.getOrderId()).orElse(null);
+    if (order != null) {
+      order.setPaymentStatus(PaymentStatus.REFUNDED);
+      orderRepository.save(order);
+      orderStatusHistoryRepository.save(
+          OrderStatusHistory.builder()
+              .orderId(order.getId())
+              .fromStatus(order.getStatus().name())
+              .toStatus(order.getStatus().name())
+              .note("Refunded: " + RefundRules.usd(refund.getAmountCents()) + " · bank ref " + ref)
+              .actorId(adminId)
+              .createdAt(now)
+              .build());
+      AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
+      eventPublisher.publishEvent(
+          new RefundCompletedEvent(
+              order.getOrderNumber(),
+              order.getUserId(),
+              user != null ? user.getEmail() : null,
+              user != null ? user.getFullName() : null,
+              refund.getAmountCents(),
+              refund.getPayerAccount(),
+              ref));
+    }
+
+    auditLogService.log(
+        adminId,
+        "COMPLETE_REFUND",
+        "PAYMENT",
+        String.valueOf(id),
+        before,
+        Map.of(
+            "paymentStatus", payment.getStatus(),
+            "refundStatus", refund.getStatus(),
+            "bankReference", ref,
+            "amountCents", refund.getAmountCents()),
+        ip);
+    return toDto(payment);
   }
 
   @Override
@@ -364,6 +473,26 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
     return new ReconciliationReportDto(reportStatus, mismatches.size(), mismatches, Instant.now());
   }
 
+  private RefundDto latestRefund(Long paymentId) {
+    return refundRepository.findByPaymentId(paymentId).stream()
+        .max(java.util.Comparator.comparing(Refund::getId))
+        .map(
+            r ->
+                new RefundDto(
+                    r.getId(),
+                    r.getAmountCents(),
+                    r.getPayerAccount(),
+                    r.getReason(),
+                    r.getStatus(),
+                    r.getRequestedAt() != null ? r.getRequestedAt() : r.getCreatedAt(),
+                    r.getApprovedBy(),
+                    r.getCompletedAt(),
+                    r.getCompletedBy(),
+                    r.getBankReference(),
+                    r.getNote()))
+        .orElse(null);
+  }
+
   private AdminPaymentDto toDto(Payment p) {
     Order order = orderRepository.findById(p.getOrderId()).orElse(null);
     String orderNum = order != null ? order.getOrderNumber() : null;
@@ -400,6 +529,8 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
         p.getLastCheckedAt(),
         p.getQrExpiresAt(),
         orderNeedsAttention,
-        orderAttentionNote);
+        orderAttentionNote,
+        RefundRules.effectiveMode(p),
+        latestRefund(p.getId()));
   }
 }

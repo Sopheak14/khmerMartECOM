@@ -5,6 +5,7 @@ import com.khmermart.common.response.PaginationResponse;
 import com.khmermart.common.response.SuccessResponse;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.request.CompleteRefundRequest;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
 import com.khmermart.model.response.OrderDto;
@@ -93,6 +94,23 @@ public class AdminPaymentController {
     Long adminId = principal != null ? principal.id() : null;
     AdminPaymentDto dto = adminPaymentService.refundPayment(id, request, adminId, ip);
     return ApiResponseUtil.success(dto);
+  }
+
+  @PostMapping("/{id}/refund/complete")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(
+      summary = "Record that a pending refund was transferred manually (bank reference required)",
+      description =
+          "Only from REFUND_PENDING (409 INVALID_REFUND_STATE otherwise). Bakong has no refund API:"
+              + " a person sends the money from the shop's bank app, then records the reference here.")
+  public SuccessResponse<AdminPaymentDto> completeRefund(
+      @PathVariable Long id,
+      @Valid @RequestBody CompleteRefundRequest request,
+      @CurrentUser UserPrincipal principal,
+      HttpServletRequest servletRequest) {
+    return ApiResponseUtil.success(
+        adminPaymentService.completeRefund(
+            id, request, principal != null ? principal.id() : null, resolveIp(servletRequest)));
   }
 
   @PostMapping("/{id}/recheck")

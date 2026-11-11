@@ -44,6 +44,27 @@ public class Refund {
   @Column(name = "actor_id")
   private Long actorId;
 
+  @Column(name = "payer_account", length = 100)
+  private String payerAccount;
+
+  @Column(name = "requested_at")
+  private Instant requestedAt;
+
+  @Column(name = "approved_by")
+  private Long approvedBy;
+
+  @Column(name = "completed_at")
+  private Instant completedAt;
+
+  @Column(name = "completed_by")
+  private Long completedBy;
+
+  @Column(name = "bank_reference", length = 64)
+  private String bankReference;
+
+  @Column(length = 500)
+  private String note;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   @Builder.Default
   private Instant createdAt = Instant.now();

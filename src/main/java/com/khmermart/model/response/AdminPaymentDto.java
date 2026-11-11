@@ -2,6 +2,7 @@ package com.khmermart.model.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.khmermart.model.enumerate.PaidMode;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import java.time.Instant;
@@ -29,4 +30,6 @@ public record AdminPaymentDto(
     Instant lastCheckedAt,
     Instant qrExpiresAt,
     Boolean orderNeedsAttention,
-    String orderAttentionNote) {}
+    String orderAttentionNote,
+    PaidMode paidMode,
+    RefundDto refund) {}

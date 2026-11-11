@@ -6,6 +6,7 @@ import com.khmermart.common.response.SuccessResponse;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentStatus;
 import com.khmermart.model.request.AddTrackingEventRequest;
+import com.khmermart.model.request.CancelRequestRequest;
 import com.khmermart.model.request.ShipOrderRequest;
 import com.khmermart.model.request.UpdateOrderStatusRequest;
 import com.khmermart.model.response.OrderDto;
@@ -17,6 +18,7 @@ import com.khmermart.service.TrackingService;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +97,44 @@ public class AdminOrderController {
       @PathVariable String orderNumber, @Valid @RequestBody AddTrackingEventRequest request) {
     TrackingEventDto dto = trackingService.addTrackingEvent(orderNumber, request);
     return ApiResponseUtil.success(dto);
+  }
+
+  @PostMapping("/{orderNumber}/cancel")
+  @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+  @Operation(
+      summary = "Cancel an order (approve a cancellation request or cancel directly)",
+      description =
+          "Stock is RETURNed (paid) or RELEASEd (unpaid). Paid MOCK -> payment REFUNDED at once."
+              + " Paid LIVE/COD -> payment REFUND_PENDING until an ADMIN records the bank transfer"
+              + " via POST /admin/payments/{id}/refund/complete.")
+  public SuccessResponse<OrderDto> cancelOrder(
+      @CurrentUser UserPrincipal principal,
+      @PathVariable String orderNumber,
+      @Valid @RequestBody CancelRequestRequest request,
+      HttpServletRequest http) {
+    return ApiResponseUtil.success(
+        orderService.adminCancel(
+            orderNumber, request.reason().trim(), principal.id(), clientIp(http)));
+  }
+
+  @PostMapping("/{orderNumber}/cancel-request/reject")
+  @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+  @Operation(
+      summary = "Reject a customer's cancellation request",
+      description = "Clears the request and needs_attention; the customer is told the reason.")
+  public SuccessResponse<OrderDto> rejectCancelRequest(
+      @CurrentUser UserPrincipal principal,
+      @PathVariable String orderNumber,
+      @Valid @RequestBody CancelRequestRequest request,
+      HttpServletRequest http) {
+    return ApiResponseUtil.success(
+        orderService.rejectCancelRequest(
+            orderNumber, request.reason().trim(), principal.id(), clientIp(http)));
+  }
+
+  private static String clientIp(HttpServletRequest request) {
+    String xff = request.getHeader("X-Forwarded-For");
+    return xff != null && !xff.isBlank() ? xff.split(",")[0].trim() : request.getRemoteAddr();
   }
 
   @PatchMapping("/{orderNumber}/status")

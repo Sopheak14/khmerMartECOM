@@ -249,8 +249,13 @@ public class InvoiceServiceImpl implements InvoiceService {
       invoiceMetaCell.addElement(invoiceHeader);
 
       // Resolve latest payment status
+      boolean refundPending =
+          order.getPaymentStatus() == PaymentStatus.REFUND_PENDING
+              || (payment != null && payment.getStatus() == PaymentStatus.REFUND_PENDING);
       String paymentStatus;
-      if (order.getPaymentStatus() == PaymentStatus.REFUNDED
+      if (refundPending) {
+        paymentStatus = "REFUND_PENDING";
+      } else if (order.getPaymentStatus() == PaymentStatus.REFUNDED
           || (payment != null && payment.getStatus() == PaymentStatus.REFUNDED)
           || (latestRefund != null
               && ("COMPLETED".equalsIgnoreCase(latestRefund.getStatus())
@@ -266,7 +271,16 @@ public class InvoiceServiceImpl implements InvoiceService {
       }
 
       String refundLine = null;
-      if ("REFUNDED".equals(paymentStatus)
+      if (refundPending) {
+        long cents =
+            latestRefund != null
+                ? latestRefund.getAmountCents()
+                : (payment != null ? payment.getAmountCents() : 0L);
+        refundLine =
+            "Refund pending: "
+                + MONEY_FORMAT.format(cents / 100.0)
+                + " (manual bank transfer, not yet sent)";
+      } else if ("REFUNDED".equals(paymentStatus)
           || "PARTIALLY_REFUNDED".equals(paymentStatus)
           || latestRefund != null) {
         if (latestRefund != null) {
@@ -274,7 +288,10 @@ public class InvoiceServiceImpl implements InvoiceService {
               "Refunded: "
                   + MONEY_FORMAT.format(latestRefund.getAmountCents() / 100.0)
                   + " on "
-                  + DATE_FORMATTER.format(latestRefund.getCreatedAt());
+                  + DATE_FORMATTER.format(
+                      latestRefund.getCompletedAt() != null
+                          ? latestRefund.getCompletedAt()
+                          : latestRefund.getCreatedAt());
         } else if (payment != null && payment.getStatus() == PaymentStatus.REFUNDED) {
           Instant refDate = order.getCancelledAt() != null ? order.getCancelledAt() : Instant.now();
           refundLine =

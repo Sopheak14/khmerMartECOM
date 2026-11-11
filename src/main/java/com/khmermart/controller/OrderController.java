@@ -4,6 +4,7 @@ import com.khmermart.common.response.SuccessResponse;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.Roles;
 import com.khmermart.model.request.CancelOrderRequest;
+import com.khmermart.model.request.CancelRequestRequest;
 import com.khmermart.model.response.CartDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.security.CurrentUser;
@@ -13,6 +14,8 @@ import com.khmermart.service.OrderService;
 import com.khmermart.util.ApiResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -63,14 +66,40 @@ public class OrderController {
   }
 
   @PostMapping("/{orderNumber}/cancel")
-  @Operation(summary = "Cancel an order before shipping")
+  @Operation(
+      summary = "Cancel an UNPAID order",
+      description =
+          "Only for PENDING_PAYMENT / unpaid orders. Paid orders (CONFIRMED, PROCESSING) must use"
+              + " POST /orders/{orderNumber}/cancel-request (409 CANCEL_NOT_ALLOWED otherwise).")
   public SuccessResponse<OrderDto> cancelOrder(
       @CurrentUser UserPrincipal principal,
       @PathVariable String orderNumber,
-      @RequestBody(required = false) CancelOrderRequest request) {
+      @RequestBody(required = false) CancelOrderRequest request,
+      HttpServletRequest http) {
     String reason = request != null ? request.reason() : "Cancelled by customer";
-    OrderDto dto = orderService.cancelOrder(principal.id(), orderNumber, reason);
+    OrderDto dto = orderService.cancelOrder(principal.id(), orderNumber, reason, ip(http));
     return ApiResponseUtil.success(dto);
+  }
+
+  @PostMapping("/{orderNumber}/cancel-request")
+  @Operation(
+      summary = "Request cancellation of a PAID, not-yet-shipped order",
+      description =
+          "Order stays as-is, flagged needs_attention for staff. 409 CANCEL_ALREADY_REQUESTED on a"
+              + " repeat, 409 CANCEL_NOT_ALLOWED once shipped.")
+  public SuccessResponse<OrderDto> requestCancellation(
+      @CurrentUser UserPrincipal principal,
+      @PathVariable String orderNumber,
+      @Valid @RequestBody CancelRequestRequest request,
+      HttpServletRequest http) {
+    return ApiResponseUtil.success(
+        orderService.requestCancellation(
+            principal.id(), orderNumber, request.reason().trim(), ip(http)));
+  }
+
+  private static String ip(HttpServletRequest request) {
+    String xff = request.getHeader("X-Forwarded-For");
+    return xff != null && !xff.isBlank() ? xff.split(",")[0].trim() : request.getRemoteAddr();
   }
 
   @PostMapping("/{orderNumber}/reorder")

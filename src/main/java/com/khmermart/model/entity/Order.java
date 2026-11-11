@@ -119,6 +119,16 @@ public class Order {
   @Builder.Default
   private boolean needsAttention = false;
 
+  @Column(name = "cancel_requested", nullable = false)
+  @Builder.Default
+  private boolean cancelRequested = false;
+
+  @Column(name = "cancel_request_reason", length = 500)
+  private String cancelRequestReason;
+
+  @Column(name = "cancel_requested_at")
+  private Instant cancelRequestedAt;
+
   @Column(name = "attention_note", length = 500)
   private String attentionNote;
 

@@ -30,6 +30,7 @@ import com.khmermart.repository.ProductRepository;
 import com.khmermart.service.InvoiceService;
 import com.khmermart.service.OrderStateMachine;
 import com.khmermart.service.PaymentConfirmationService;
+import com.khmermart.service.RefundRules;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -139,6 +140,7 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
     Instant now = Instant.now();
     PaymentStatus previous = payment.getStatus();
     payment.setStatus(PaymentStatus.PAID);
+    payment.setPaidMode(RefundRules.modeForHash(txData.hash()));
     payment.setBakongHash(txData.hash());
     payment.setFromAccountId(txData.fromAccountId());
     payment.setToAccountId(txData.toAccountId());
@@ -222,6 +224,7 @@ public class PaymentConfirmationServiceImpl implements PaymentConfirmationServic
 
     // 1. Update Payment
     payment.setStatus(PaymentStatus.PAID);
+    payment.setPaidMode(RefundRules.modeForHash(hash));
     payment.setBakongHash(hash);
     payment.setFromAccountId(fromAccountId);
     payment.setToAccountId(toAccountId);

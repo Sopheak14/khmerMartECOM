@@ -63,7 +63,10 @@ This document details the complete REST API contract for KhmerMart, covering all
 ## 4. Orders & Public Payments
 - `GET /api/orders`: List customer purchase history.
 - `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline. `OrderDTO.discountBreakdown` = `{ "promotions": [{ "label", "amountCents" }], "coupon": { "code", "amountCents" } | null }`, read from the checkout snapshot (never recalculated); `discountCents` = sum(promotions) + coupon. Orders without a snapshot return `promotions: []`, `coupon: null`. Also returned by `POST /api/checkout` and the admin order endpoints.
-- `POST /api/orders/{orderNumber}/cancel`: Customer order cancellation.
+- `POST /api/orders/{orderNumber}/cancel` `{ reason? }`: Customer cancels an **unpaid** order (`PENDING_PAYMENT`, or COD not yet paid) → `CANCELLED`, stock `RELEASE`, no refund. A **paid** order → `409 CANCEL_NOT_ALLOWED` (use `cancel-request`). `SHIPPED`/`OUT_FOR_DELIVERY`/`DELIVERED` → `409 CANCEL_NOT_ALLOWED`. Already cancelled/expired → `422 INVALID_STATUS_TRANSITION`.
+- `POST /api/orders/{orderNumber}/cancel-request` `{ reason }` (required, ≤ 500): Customer asks to cancel a **paid, not-yet-shipped** order (`CONFIRMED`/`PROCESSING`). Order status is unchanged; `OrderDTO.cancelRequested=true` (+ `cancelRequestReason`, `cancelRequestedAt`) and `needsAttention=true` for staff. Repeat → `409 CANCEL_ALREADY_REQUESTED`; shipped/cancelled/unpaid → `409 CANCEL_NOT_ALLOWED`; missing/blank/too long reason → `400 VALIDATION_ERROR`.
+
+**Refunds are manual.** Bakong offers no refund API: a KHQR/COD refund is a person sending money from the shop's bank app. So `paymentStatus` tells the truth: `PAID → REFUND_PENDING → REFUNDED`. `REFUNDED` is only set when an admin records the bank reference (or for MOCK payments, where no real money ever moved).
 - `GET /api/orders/{orderNumber}/invoice.pdf`: Download PDF tax invoice.
 - `POST /api/payments/khqr/{orderNumber}`: Generate (or return the active) KHQR payment for a `PENDING_PAYMENT` order. Returns `paymentId`, `qrString`, `qrImageDataUrl`, `expiresAt`, `streamToken`. The order's `paymentDeadline` **equals** this `expiresAt`.
 - `POST /api/payments/khqr/{orderNumber}/regenerate`: Expire previous pending QR and issue a fresh one.
@@ -128,13 +131,16 @@ This document details the complete REST API contract for KhmerMart, covering all
 ### 7.6 Orders Management
 - `GET /api/admin/orders`: Filter by status, payment status, date range, search query.
 - `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, items and `discountBreakdown` (same shape as the customer endpoint).
-- `PATCH /api/admin/orders/{orderNumber}/status`: Update order status obeying state machine, recording reason `note` in timeline.
+- `PATCH /api/admin/orders/{orderNumber}/status`: Update order status obeying state machine, recording reason `note` in timeline. Setting `CANCELLED` here runs exactly the same flow as `cancel` below.
+- `POST /api/admin/orders/{orderNumber}/cancel` `{ reason }` (STAFF/ADMIN): Cancel an order (approve a customer request, or cancel directly). Allowed from `PENDING_PAYMENT`/`CONFIRMED`/`PROCESSING`, else `409 CANCEL_NOT_ALLOWED`. Clears `cancelRequested`/`needsAttention`. Stock: `RETURN` if paid, `RELEASE` if unpaid. If paid: `paidMode=MOCK` → payment `REFUNDED` + refund `COMPLETED` ("MOCK payment — no real money moved"); `paidMode=LIVE` or `COD` (cash collected) → payment **`REFUND_PENDING`** + refund `PENDING` (with `payerAccount`). Customer is notified (in-app + email, EN + KM); for a pending refund the message names the amount and `payerAccount` ("within 3 working days").
+- `POST /api/admin/orders/{orderNumber}/cancel-request/reject` `{ reason }` (STAFF/ADMIN): Refuse a request: clears `cancelRequested` + `needsAttention`, customer is told the reason. No pending request → `409 CANCEL_NOT_REQUESTED`.
 - `POST /api/admin/orders/{orderNumber}/ship`: Ship order with carrier and generate `KMTRK` tracking number.
 
 ### 7.7 Payments & Reconciliation
-- `GET /api/admin/payments`: Filter payments by method, status, date.
+- `GET /api/admin/payments`: Filter payments by method, status (incl. `REFUND_PENDING`), date. `AdminPaymentDTO` now has `paidMode` (`MOCK`|`LIVE`|`COD`) and `refund` `{ id, amountCents, payerAccount, reason, status: PENDING|COMPLETED, requestedAt, approvedBy, completedAt, completedBy, bankReference, note }`.
 - `GET /api/admin/payments/{id}`: Payment detail with gateway response and raw payload.
 - `POST /api/admin/payments/{id}/refund`: Issue full or partial refund (sets order to `PARTIALLY_REFUNDED` or `REFUNDED`).
+- `POST /api/admin/payments/{id}/refund/complete` `{ bankReference, note? }` (**ADMIN only**, STAFF → 403): Record that the manual transfer was sent. Only from `REFUND_PENDING` (else `409 INVALID_REFUND_STATE`); `bankReference` required, 3–64 chars (`400 VALIDATION_ERROR`). Payment + order → `REFUNDED`, refund → `COMPLETED` with `completedAt/completedBy/bankReference`; customer is notified with the reference.
 - `POST /api/admin/payments/{id}/recheck`: Run one Bakong check now (admin only). Returns `{paymentId, outcome, reason, bakongResponseCode, paymentStatus, checkCount}`; `outcome` is one of `PAID`, `LATE_PAID`, `ALREADY_PAID`, `NOT_FOUND`, `REJECTED`, `BAKONG_ERROR`, `SKIPPED`. A payment confirmed after expiry is recorded as PAID and its order gets `needsAttention=true`.
 - `GET /api/admin/payments/reconciliation`: Reconcile internal payments against Bakong transaction logs.
 - `GET /api/admin/payments/export.csv`: Export payment records to CSV.
@@ -166,3 +172,29 @@ This document details the complete REST API contract for KhmerMart, covering all
 - `GET /api/admin/settings`: Read global configurations (`khrRate`, `khqrMode`, merchant tags).
 - `PUT /api/admin/settings`: Update settings (enforces `BAKONG_TOKEN` when switching to `LIVE`). `shippingMethods[]` entries are matched by `code` and update `feeCents` (must be >= 0, e.g. EXPRESS `5` = $0.05) and `freeOverCents` (optional/null = no free-shipping threshold, otherwise >= 0); unknown code -> 404, negative -> 422 `VALIDATION_ERROR`. New fees apply immediately to `GET /api/shipping/methods` and `POST /api/checkout/preview`.
 - `GET /api/admin/audit-logs`: Audit trail listing backoffice writes with actor, action, entity, before/after JSON, and IP.
+
+
+---
+
+## 8. Cancellation & Refund Reference
+
+Payment status flow (`PaymentStatus`): `PENDING → PAID → REFUND_PENDING → REFUNDED` (also `FAILED`, `EXPIRED`, `PARTIALLY_REFUNDED`).
+
+```
+customer, unpaid ──cancel──────────────► CANCELLED (stock RELEASE, no refund)
+customer, paid   ──cancel-request──────► cancelRequested + needsAttention (order unchanged)
+                                            │ staff/admin
+                    reject ◄────────────────┤──────► cancel
+ flags cleared, customer told why           ▼
+                         paidMode MOCK ► REFUNDED (no real money moved)
+                         paidMode LIVE/COD ► REFUND_PENDING
+                                                │ ADMIN: refund/complete {bankReference}
+                                                ▼
+                                             REFUNDED
+```
+
+Error codes: `CANCEL_NOT_ALLOWED` (409), `CANCEL_ALREADY_REQUESTED` (409), `CANCEL_NOT_REQUESTED` (409), `INVALID_REFUND_STATE` (409).
+
+Timeline wording: "Cancellation requested by customer: <reason>", "Cancellation rejected by admin: <reason>", "Cancelled by admin: <reason>", "Refund pending: $0.15 to <payerAccount> (manual bank transfer)", "Refunded: $0.15 · bank ref <ref>", "Refunded (MOCK — no real money moved)".
+
+Audit log actions (with before/after): `CUSTOMER_CANCEL_ORDER`, `CUSTOMER_CANCEL_REQUEST`, `ADMIN_CANCEL_ORDER`, `ADMIN_REJECT_CANCEL_REQUEST`, `COMPLETE_REFUND`.

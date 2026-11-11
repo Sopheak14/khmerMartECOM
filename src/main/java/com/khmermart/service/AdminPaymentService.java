@@ -2,6 +2,7 @@ package com.khmermart.service;
 
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
+import com.khmermart.model.request.CompleteRefundRequest;
 import com.khmermart.model.request.RefundRequest;
 import com.khmermart.model.response.AdminPaymentDto;
 import com.khmermart.model.response.PaymentCheckResultDto;
@@ -18,6 +19,12 @@ public interface AdminPaymentService {
   AdminPaymentDto getPaymentDetail(Long id);
 
   AdminPaymentDto refundPayment(Long id, RefundRequest request, Long adminId, String ip);
+
+  /**
+   * ADMIN records that the manual refund transfer was made. Only from REFUND_PENDING; the bank
+   * reference is mandatory.
+   */
+  AdminPaymentDto completeRefund(Long id, CompleteRefundRequest request, Long adminId, String ip);
 
   /** Runs one Bakong check for this payment right now (same logic as the poller). */
   PaymentCheckResultDto recheckPayment(Long id, Long adminId, String ip);

@@ -278,11 +278,15 @@ public class InvoiceKhmerIntegrationTest extends AbstractIntegrationTest {
             .createdAt(Instant.now())
             .build());
 
-    // Cancel order via API (paid -> cancel flow triggers refund & status REFUNDED)
+    // Admin cancels the paid MOCK order (refund completes at once; LIVE would stay pending)
     mockMvc
         .perform(
-            post("/api/orders/{orderNumber}/cancel", order.getOrderNumber())
-                .header("Authorization", customerToken)
+            post("/api/admin/orders/{orderNumber}/cancel", order.getOrderNumber())
+                .header(
+                    "Authorization",
+                    "Bearer "
+                        + jwtService.generateAccessToken(
+                            1L, "admin@khmermart.local", com.khmermart.model.enumerate.Roles.ADMIN))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Damaged product\"}"))
         .andExpect(status().isOk());

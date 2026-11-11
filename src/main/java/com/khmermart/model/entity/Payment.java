@@ -1,5 +1,6 @@
 package com.khmermart.model.entity;
 
+import com.khmermart.model.enumerate.PaidMode;
 import com.khmermart.model.enumerate.PaymentMethod;
 import com.khmermart.model.enumerate.PaymentStatus;
 import jakarta.persistence.Column;
@@ -73,6 +74,11 @@ public class Payment {
   @Column(name = "bakong_hash", unique = true)
   private String bakongHash;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "paid_mode", length = 10)
+  private PaidMode paidMode;
+
+  /** Bakong payer account (the account a refund must be sent back to). */
   @Column(name = "from_account_id", length = 100)
   private String fromAccountId;
 

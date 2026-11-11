@@ -374,7 +374,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName(
-      "Order cancellation: customer can cancel CONFIRMED order; cannot cancel SHIPPED order (422)")
+      "Order cancellation: customer can cancel CONFIRMED order; cannot cancel SHIPPED order (409)")
   void testOrderCancellation() throws Exception {
     Order order =
         orderRepository.save(
@@ -424,13 +424,13 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .header("Authorization", customer1Token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Too late to cancel\"}"))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.error.code").value("INVALID_STATUS_TRANSITION"));
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CANCEL_NOT_ALLOWED"));
   }
 
   @Test
   @DisplayName(
-      "Cancelling a PAID order: returns stock via movement RETURN (quantity_on_hand + 1), creates COMPLETED Refund, marks payment and order REFUNDED, and logs timeline note")
+      "Cancelling a PAID MOCK order (admin approves): returns stock via movement RETURN (quantity_on_hand + 1), creates COMPLETED Refund, marks payment and order REFUNDED, and logs timeline note")
   void testCancelPaidOrderFlow() throws Exception {
     Product product =
         productRepository.save(
@@ -492,11 +492,21 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
                 .createdAt(Instant.now())
                 .build());
 
-    // Cancel the PAID order
+    // A customer can no longer cancel a PAID order directly...
     mockMvc
         .perform(
             post("/api/orders/{orderNumber}/cancel", order.getOrderNumber())
                 .header("Authorization", customer1Token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Customer changed mind\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CANCEL_NOT_ALLOWED"));
+
+    // ...an admin cancels it (MOCK-… hash => simulated payment => refund completes at once)
+    mockMvc
+        .perform(
+            post("/api/admin/orders/{orderNumber}/cancel", order.getOrderNumber())
+                .header("Authorization", adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Customer changed mind\"}"))
         .andExpect(status().isOk())
@@ -532,7 +542,7 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
     List<OrderStatusHistory> histories =
         orderStatusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
     assertThat(histories)
-        .anyMatch(h -> h.getNote() != null && h.getNote().contains("Payment refunded"));
+        .anyMatch(h -> h.getNote() != null && h.getNote().contains("Refunded (MOCK"));
   }
 
   @Test

@@ -21,15 +21,20 @@ public interface OrderService {
 
   OrderDto getOrderByNumber(Long userId, String orderNumber, boolean isStaffOrAdmin);
 
-  OrderDto cancelOrder(Long userId, String orderNumber, String reason);
+  /** Customer cancels an UNPAID order. Paid orders must use {@link #requestCancellation}. */
+  OrderDto cancelOrder(Long userId, String orderNumber, String reason, String ip);
+
+  OrderDto requestCancellation(Long userId, String orderNumber, String reason, String ip);
+
+  OrderDto adminCancel(String orderNumber, String reason, Long actorId, String ip);
+
+  OrderDto rejectCancelRequest(String orderNumber, String reason, Long actorId, String ip);
 
   CartDto reorder(Long userId, String orderNumber);
 
   OrderDto shipOrder(String orderNumber, String carrier);
 
   OrderDto updateStatus(String orderNumber, OrderStatus newStatus, String note, Long actorId);
-
-  OrderDto processRefund(Long adminId, Long paymentId, String reference);
 
   OrderDto toDto(Order order);
 }

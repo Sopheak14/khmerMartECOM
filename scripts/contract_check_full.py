@@ -63,6 +63,7 @@ CONTRACT = {
     "CHECKOUT & ORDERS": [
         ("POST", "/checkout/preview"), ("POST", "/checkout"), ("GET", "/orders"),
         ("GET", "/orders/{orderNumber}"), ("POST", "/orders/{orderNumber}/cancel"),
+        ("POST", "/orders/{orderNumber}/cancel-request"),
         ("GET", "/orders/{orderNumber}/invoice.pdf"), ("POST", "/orders/{orderNumber}/reorder"),
     ],
     "PAYMENTS (KHQR)": [
@@ -91,7 +92,9 @@ CONTRACT = {
         ("PATCH", "/admin/orders/{orderNumber}/status"), ("POST", "/admin/orders/{orderNumber}/ship"),
         ("POST", "/admin/orders/{orderNumber}/tracking-events"),
         ("GET", "/admin/payments"), ("GET", "/admin/payments/{id}"),
-        ("POST", "/admin/payments/{id}/refund"), ("POST", "/admin/payments/{id}/recheck"), ("POST", "/admin/payments/{id}/approve-bank-transfer"),
+        ("POST", "/admin/payments/{id}/refund"), ("POST", "/admin/payments/{id}/refund/complete"),
+        ("POST", "/admin/orders/{orderNumber}/cancel"),
+        ("POST", "/admin/orders/{orderNumber}/cancel-request/reject"), ("POST", "/admin/payments/{id}/recheck"), ("POST", "/admin/payments/{id}/approve-bank-transfer"),
         ("GET", "/admin/payments/export.csv"), ("GET", "/admin/payments/reconciliation"),
         ("GET", "/admin/coupons"), ("POST", "/admin/coupons"),
         ("PUT", "/admin/coupons/{id}"), ("DELETE", "/admin/coupons/{id}"),

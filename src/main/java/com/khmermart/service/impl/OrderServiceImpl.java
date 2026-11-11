@@ -5,7 +5,6 @@ import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
 import com.khmermart.common.response.PaginationResponse;
 import com.khmermart.common.response.SuccessResponse;
-import com.khmermart.event.OrderCancelledEvent;
 import com.khmermart.event.OrderShippedEvent;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.Cart;
@@ -14,14 +13,11 @@ import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
 import com.khmermart.model.entity.OrderStatusHistory;
-import com.khmermart.model.entity.Payment;
 import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.ProductImage;
-import com.khmermart.model.entity.Refund;
 import com.khmermart.model.entity.Shipment;
 import com.khmermart.model.entity.ShippingMethod;
 import com.khmermart.model.entity.TrackingEvent;
-import com.khmermart.model.enumerate.CouponRedemptionStatus;
 import com.khmermart.model.enumerate.InventoryMovementType;
 import com.khmermart.model.enumerate.OrderStatus;
 import com.khmermart.model.enumerate.PaymentMethod;
@@ -54,6 +50,7 @@ import com.khmermart.repository.ShipmentRepository;
 import com.khmermart.repository.ShippingMethodRepository;
 import com.khmermart.repository.TrackingEventRepository;
 import com.khmermart.service.CartService;
+import com.khmermart.service.OrderCancellationService;
 import com.khmermart.service.OrderService;
 import com.khmermart.service.OrderStateMachine;
 import com.khmermart.service.ShippingService;
@@ -62,7 +59,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
@@ -97,6 +93,7 @@ public class OrderServiceImpl implements OrderService {
   private final OrderStateMachine orderStateMachine;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final OrderCancellationService cancellationService;
 
   public OrderServiceImpl(
       OrderRepository orderRepository,
@@ -120,7 +117,8 @@ public class OrderServiceImpl implements OrderService {
       CartService cartService,
       OrderStateMachine orderStateMachine,
       ObjectMapper objectMapper,
-      ApplicationEventPublisher eventPublisher) {
+      ApplicationEventPublisher eventPublisher,
+      OrderCancellationService cancellationService) {
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -143,6 +141,7 @@ public class OrderServiceImpl implements OrderService {
     this.orderStateMachine = orderStateMachine;
     this.objectMapper = objectMapper;
     this.eventPublisher = eventPublisher;
+    this.cancellationService = cancellationService;
   }
 
   @Override
@@ -180,117 +179,26 @@ public class OrderServiceImpl implements OrderService {
 
   @Override
   @Transactional
-  public OrderDto cancelOrder(Long userId, String orderNumber, String reason) {
-    Order order =
-        orderRepository
-            .findByOrderNumber(orderNumber)
-            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
-
-    if (userId != null && !order.getUserId().equals(userId)) {
-      throw new CustomException(ErrorCode.FORBIDDEN, "Access denied");
-    }
-
-    if (order.getStatus() == OrderStatus.SHIPPED
-        || order.getStatus() == OrderStatus.OUT_FOR_DELIVERY
-        || order.getStatus() == OrderStatus.DELIVERED) {
-      throw new CustomException(
-          ErrorCode.INVALID_STATUS_TRANSITION,
-          "Cannot cancel order that has already shipped or completed: " + order.getStatus());
-    }
-
-    if (order.getStatus() == OrderStatus.CANCELLED
-        || order.getStatus() == OrderStatus.PAYMENT_EXPIRED) {
-      throw new CustomException(
-          ErrorCode.INVALID_STATUS_TRANSITION,
-          "Order is already cancelled or expired: " + order.getStatus());
-    }
-
-    OrderStatus fromStatus = order.getStatus();
-    Instant now = Instant.now();
-
-    order.setStatus(OrderStatus.CANCELLED);
-    order.setCancelledAt(now);
-    order.setCancelReason(reason != null ? reason : "Cancelled by customer");
-
-    OrderStatusHistory history =
-        OrderStatusHistory.builder()
-            .orderId(order.getId())
-            .fromStatus(fromStatus.name())
-            .toStatus(OrderStatus.CANCELLED.name())
-            .note(reason != null ? reason : "Order cancelled")
-            .actorId(userId)
-            .createdAt(now)
-            .build();
-    orderStatusHistoryRepository.save(history);
-
-    handleOrderCancellation(order, fromStatus, reason, userId, now);
-    order = orderRepository.save(order);
-
-    AppUser user = appUserRepository.findById(order.getUserId()).orElse(null);
-    eventPublisher.publishEvent(
-        new OrderCancelledEvent(
-            order.getId(),
-            order.getOrderNumber(),
-            order.getUserId(),
-            user != null ? user.getEmail() : null,
-            user != null ? user.getFullName() : null,
-            user != null ? user.getPhone() : null,
-            reason != null ? reason : "Order cancelled"));
-
-    return toDto(order);
+  public OrderDto cancelOrder(Long userId, String orderNumber, String reason, String ip) {
+    return toDto(cancellationService.cancelByCustomer(userId, orderNumber, reason, ip));
   }
 
   @Override
   @Transactional
-  public OrderDto processRefund(Long adminId, Long paymentId, String reference) {
-    Payment payment =
-        paymentRepository
-            .findById(paymentId)
-            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Payment not found"));
+  public OrderDto requestCancellation(Long userId, String orderNumber, String reason, String ip) {
+    return toDto(cancellationService.requestCancellation(userId, orderNumber, reason, ip));
+  }
 
-    Order order =
-        orderRepository
-            .findById(payment.getOrderId())
-            .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
+  @Override
+  @Transactional
+  public OrderDto adminCancel(String orderNumber, String reason, Long actorId, String ip) {
+    return toDto(cancellationService.adminCancel(orderNumber, reason, actorId, ip));
+  }
 
-    payment.setStatus(PaymentStatus.REFUNDED);
-    paymentRepository.save(payment);
-
-    order.setPaymentStatus(PaymentStatus.REFUNDED);
-    orderRepository.save(order);
-
-    List<Refund> refunds = refundRepository.findByPaymentId(payment.getId());
-    if (refunds.isEmpty()) {
-      Refund refund =
-          Refund.builder()
-              .paymentId(payment.getId())
-              .amountCents(payment.getAmountCents())
-              .reason("Manual refund")
-              .status("COMPLETED")
-              .reference(
-                  reference != null
-                      ? reference
-                      : "REFUND-" + UUID.randomUUID().toString().substring(0, 8))
-              .actorId(adminId)
-              .createdAt(Instant.now())
-              .build();
-      refundRepository.save(refund);
-    } else {
-      for (Refund r : refunds) {
-        if ("PENDING".equalsIgnoreCase(r.getStatus())) {
-          r.setStatus("COMPLETED");
-          r.setActorId(adminId);
-          if (reference != null) {
-            r.setReference(reference);
-          } else if (r.getReference() == null) {
-            r.setReference("REFUND-" + UUID.randomUUID().toString().substring(0, 8));
-          }
-          refundRepository.save(r);
-        }
-      }
-    }
-
-    return toDto(order);
+  @Override
+  @Transactional
+  public OrderDto rejectCancelRequest(String orderNumber, String reason, Long actorId, String ip) {
+    return toDto(cancellationService.rejectCancelRequest(orderNumber, reason, actorId, ip));
   }
 
   @Override
@@ -453,6 +361,11 @@ public class OrderServiceImpl implements OrderService {
           "Cannot transition order from " + fromStatus + " to " + newStatus);
     }
 
+    if (newStatus == OrderStatus.CANCELLED) {
+      // One honest cancel path: stock, refund bookkeeping, audit and notifications all live there.
+      return adminCancel(orderNumber, note, actorId, null);
+    }
+
     Instant now = Instant.now();
     order.setStatus(newStatus);
     if (newStatus == OrderStatus.DELIVERED) {
@@ -464,14 +377,11 @@ public class OrderServiceImpl implements OrderService {
             .ifPresent(
                 p -> {
                   p.setStatus(PaymentStatus.PAID);
+                  p.setPaidMode(com.khmermart.model.enumerate.PaidMode.COD);
                   p.setPaidAt(now);
                   paymentRepository.save(p);
                 });
       }
-    } else if (newStatus == OrderStatus.CANCELLED) {
-      order.setCancelledAt(now);
-      order.setCancelReason(note);
-      handleOrderCancellation(order, fromStatus, note, actorId, now);
     }
     order = orderRepository.save(order);
 
@@ -487,102 +397,6 @@ public class OrderServiceImpl implements OrderService {
     orderStatusHistoryRepository.save(history);
 
     return toDto(order);
-  }
-
-  private void handleOrderCancellation(
-      Order order, OrderStatus fromStatus, String reason, Long actorId, Instant now) {
-    // Release stock
-    List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
-    for (OrderItem item : items) {
-      Inventory inv =
-          item.getVariantId() != null
-              ? inventoryRepository
-                  .findByProductIdAndVariantId(item.getProductId(), item.getVariantId())
-                  .orElse(null)
-              : inventoryRepository
-                  .findByProductIdAndVariantIdIsNull(item.getProductId())
-                  .orElse(null);
-
-      if (inv != null) {
-        InventoryMovementType movementType;
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-          inventoryRepository.addOnHand(inv.getId(), item.getQuantity());
-          movementType = InventoryMovementType.RETURN;
-        } else {
-          inventoryRepository.releaseReserved(inv.getId(), item.getQuantity());
-          movementType = InventoryMovementType.RELEASE;
-        }
-
-        InventoryMovement movement =
-            InventoryMovement.builder()
-                .inventoryId(inv.getId())
-                .type(movementType)
-                .quantity(item.getQuantity())
-                .reason("Order cancelled: " + order.getOrderNumber())
-                .actorId(actorId)
-                .refOrderId(order.getId())
-                .createdAt(now)
-                .build();
-        movementRepository.save(movement);
-      }
-    }
-
-    // Release coupon
-    if (order.getCouponCode() != null) {
-      couponRedemptionRepository
-          .findByOrderId(order.getId())
-          .ifPresent(
-              r -> {
-                r.setStatus(CouponRedemptionStatus.RELEASED);
-                couponRedemptionRepository.save(r);
-              });
-
-      couponRepository
-          .findByCode(order.getCouponCode())
-          .ifPresent(
-              c -> {
-                c.setUsedCount(Math.max(0, c.getUsedCount() - 1));
-                couponRepository.save(c);
-              });
-    }
-
-    // If paid, create completed refund record and update payment & order status to REFUNDED
-    if (order.getPaymentStatus() == PaymentStatus.PAID) {
-      Payment payment =
-          paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
-      if (payment != null) {
-        Refund refund =
-            Refund.builder()
-                .paymentId(payment.getId())
-                .amountCents(payment.getAmountCents())
-                .reason(reason != null ? reason : "Order cancelled")
-                .status("COMPLETED")
-                .reference("REFUND-" + UUID.randomUUID().toString().substring(0, 8))
-                .actorId(actorId)
-                .createdAt(now)
-                .build();
-        refundRepository.save(refund);
-
-        payment.setStatus(PaymentStatus.REFUNDED);
-        paymentRepository.save(payment);
-
-        order.setPaymentStatus(PaymentStatus.REFUNDED);
-
-        OrderStatusHistory refundHistory =
-            OrderStatusHistory.builder()
-                .orderId(order.getId())
-                .fromStatus(OrderStatus.CANCELLED.name())
-                .toStatus(OrderStatus.CANCELLED.name())
-                .note(
-                    "Payment refunded: $"
-                        + String.format(Locale.US, "%.2f", payment.getAmountCents() / 100.0)
-                        + (reason != null ? " (" + reason + ")" : ""))
-                .actorId(actorId)
-                .createdAt(now)
-                .build();
-        orderStatusHistoryRepository.save(refundHistory);
-      }
-    }
   }
 
   @Override
@@ -713,7 +527,10 @@ public class OrderServiceImpl implements OrderService {
         canReview,
         "/api/orders/" + order.getOrderNumber() + "/invoice.pdf",
         customer,
-        DiscountBreakdownDto.fromSnapshot(order.getDiscountBreakdown(), objectMapper));
+        DiscountBreakdownDto.fromSnapshot(order.getDiscountBreakdown(), objectMapper),
+        order.isCancelRequested(),
+        order.getCancelRequestReason(),
+        order.getCancelRequestedAt());
   }
 
   @Override

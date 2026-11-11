@@ -165,6 +165,7 @@ public class TrackingServiceImpl implements TrackingService {
             paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
         if (payment != null) {
           payment.setStatus(PaymentStatus.PAID);
+          payment.setPaidMode(com.khmermart.model.enumerate.PaidMode.COD);
           payment.setPaidAt(now);
           paymentRepository.save(payment);
         }

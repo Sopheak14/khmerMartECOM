@@ -16,7 +16,11 @@
             <p>Your order <strong th:text="${orderNumber}">KM-20261023-000001</strong> has been cancelled.</p>
             <div style="background-color: #fff5f5; border-left: 4px solid #e53e3e; padding: 15px; margin: 20px 0;">
                 <p style="margin: 0 0 8px 0;"><strong>Reason / មូលហេតុ:</strong> <span th:text="${reason}">Cancelled by customer</span></p>
-                <p style="margin: 0;">If you had already paid for this order, our accounting team has initiated your refund.</p>
+                <p style="margin: 0;" th:unless="${refundPending}">If you had already paid for this order, our team will contact you about your refund.</p>
+                <div th:if="${refundPending}">
+                    <p style="margin: 0 0 8px 0;">Your order was cancelled. We will send <strong th:text="${refundAmount}">$0.15</strong> back to your account <strong th:text="${payerAccount}">account</strong> within 3 working days.</p>
+                    <p style="margin: 0;">ការបញ្ជាទិញរបស់អ្នកត្រូវបានលុប។ យើងនឹងផ្ទេរប្រាក់ <strong th:text="${refundAmount}">$0.15</strong> ត្រឡប់ទៅគណនី <strong th:text="${payerAccount}">account</strong> ក្នុងរយៈពេល ៣ ថ្ងៃធ្វើការ។</p>
+                </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
                 <a th:href="${frontendUrl + '/account/orders'}" style="background-color: #718096; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">View My Orders / មើលការបញ្ជាទិញរបស់ខ្ញុំ</a>

@@ -36,7 +36,10 @@ public record OrderDto(
     boolean canReview,
     String invoiceUrl,
     AppUserDto customer,
-    DiscountBreakdownDto discountBreakdown) {
+    DiscountBreakdownDto discountBreakdown,
+    boolean cancelRequested,
+    String cancelRequestReason,
+    Instant cancelRequestedAt) {
 
   public OrderDto(
       Long id,
@@ -94,6 +97,9 @@ public record OrderDto(
         canReview,
         invoiceUrl,
         null,
-        discountBreakdown);
+        discountBreakdown,
+        false,
+        null,
+        null);
   }
 }

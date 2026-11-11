@@ -59,7 +59,8 @@ This document defines the Role-Based Access Control (RBAC) matrix for the KhmerM
 | `POST` | `/api/checkout` | Submit order (idempotent) | ❌ | ✅ | ✅ | ✅ |
 | `GET` | `/api/orders` | Customer order history | ❌ | ✅ | ✅ | ✅ |
 | `GET` | `/api/orders/{orderNumber}` | View order details | ❌ | ✅ | ✅ | ✅ |
-| `POST` | `/api/orders/{orderNumber}/cancel` | Cancel eligible order | ❌ | ✅ | ✅ | ✅ |
+| `POST` | `/api/orders/{orderNumber}/cancel` | Cancel an unpaid order (paid → 409) | ❌ | ✅ | ✅ | ✅ |
+| `POST` | `/api/orders/{orderNumber}/cancel-request` | Request cancellation of a paid order | ❌ | ✅ | ✅ | ✅ |
 | `GET` | `/api/orders/{orderNumber}/invoice.pdf` | Download PDF invoice | ❌ | ✅ | ✅ | ✅ |
 | **PAYMENTS (KHQR)** |
 | `POST` | `/api/payments/khqr/{orderNumber}` | Generate KHQR QR | ❌ | ✅ | ✅ | ✅ |
@@ -97,6 +98,9 @@ This document defines the Role-Based Access Control (RBAC) matrix for the KhmerM
 | `GET` | `/api/admin/payments` | Payment transaction registry | ❌ | ❌ (403) | ❌ (403) | ✅ |
 | `GET` | `/api/admin/payments/{id}` | Transaction detail with raw gateway payload | ❌ | ❌ (403) | ❌ (403) | ✅ |
 | `POST` | `/api/admin/payments/{id}/refund` | Process full / partial refund | ❌ | ❌ (403) | ❌ (403) | ✅ |
+| `POST` | `/api/admin/payments/{id}/refund/complete` | Record the manual refund transfer (bank ref) | ❌ | ❌ (403) | ❌ (403) | ✅ |
+| `POST` | `/api/admin/orders/{orderNumber}/cancel` | Cancel / approve cancellation | ❌ | ❌ (403) | ✅ | ✅ |
+| `POST` | `/api/admin/orders/{orderNumber}/cancel-request/reject` | Reject a cancellation request | ❌ | ❌ (403) | ✅ | ✅ |
 | `GET` | `/api/admin/payments/reconciliation` | Payment reconciliation report | ❌ | ❌ (403) | ❌ (403) | ✅ |
 | `GET` | `/api/admin/payments/export.csv` | Export payments transaction CSV | ❌ | ❌ (403) | ❌ (403) | ✅ |
 | `GET` | `/api/admin/reports/sales` | Sales report (day, month, cat, prod, method) | ❌ | ❌ (403) | ❌ (403) | ✅ |

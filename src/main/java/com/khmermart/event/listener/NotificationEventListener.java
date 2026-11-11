@@ -1,5 +1,6 @@
 package com.khmermart.event.listener;
 
+import com.khmermart.event.CancelRequestRejectedEvent;
 import com.khmermart.event.InventoryLowEvent;
 import com.khmermart.event.OrderCancelledEvent;
 import com.khmermart.event.OrderDeliveredEvent;
@@ -8,6 +9,7 @@ import com.khmermart.event.OrderPlacedEvent;
 import com.khmermart.event.OrderShippedEvent;
 import com.khmermart.event.PasswordChangedEvent;
 import com.khmermart.event.PaymentPaidEvent;
+import com.khmermart.event.RefundCompletedEvent;
 import com.khmermart.event.ReviewRepliedEvent;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.enumerate.NotificationChannel;
@@ -16,6 +18,7 @@ import com.khmermart.repository.AppUserRepository;
 import com.khmermart.service.EmailSender;
 import com.khmermart.service.NotificationService;
 import com.khmermart.service.PushSender;
+import com.khmermart.service.RefundRules;
 import com.khmermart.service.SmsSender;
 import java.util.HashMap;
 import java.util.List;
@@ -368,7 +371,7 @@ public class NotificationEventListener {
         NotificationChannel.IN_APP,
         "ORDER_CANCELLED",
         "Order Cancelled",
-        "Order " + event.orderNumber() + " was cancelled. Reason: " + event.reason(),
+        cancelledBody(event),
         "/account/orders/" + event.orderNumber(),
         null);
 
@@ -378,6 +381,11 @@ public class NotificationEventListener {
       vars.put("fullName", event.fullName() != null ? event.fullName() : "Customer");
       vars.put("orderNumber", event.orderNumber());
       vars.put("reason", event.reason());
+      vars.put("refundPending", event.refundPending());
+      if (event.refundPending()) {
+        vars.put("refundAmount", RefundRules.usd(event.refundAmountCents()));
+        vars.put("payerAccount", event.payerAccount());
+      }
 
       emailSender.sendEmail(
           event.email(), "Order Cancelled - " + event.orderNumber(), "email/order-cancelled", vars);
@@ -390,6 +398,98 @@ public class NotificationEventListener {
           "Cancellation email sent to " + event.email(),
           "/account/orders/" + event.orderNumber(),
           null);
+    }
+  }
+
+  private static String cancelledBody(OrderCancelledEvent e) {
+    String base = "Order " + e.orderNumber() + " was cancelled. Reason: " + e.reason();
+    if (!e.refundPending()) {
+      return base;
+    }
+    String amount = RefundRules.usd(e.refundAmountCents());
+    String account = e.payerAccount() != null ? e.payerAccount() : "your account";
+    return base
+        + "\nYour order was cancelled. We will send "
+        + amount
+        + " back to your account "
+        + account
+        + " within 3 working days."
+        + "\nការបញ្ជាទិញរបស់អ្នកត្រូវបានលុប។ យើងនឹងផ្ទេរប្រាក់ "
+        + amount
+        + " ត្រឡប់ទៅគណនី "
+        + account
+        + " ក្នុងរយៈពេល ៣ ថ្ងៃធ្វើការ។";
+  }
+
+  @Async("notificationExecutor")
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2.0))
+  public void handleCancelRequestRejected(CancelRequestRejectedEvent event) {
+    String body =
+        "Your cancellation request for order "
+            + event.orderNumber()
+            + " was not approved. Reason: "
+            + event.reason()
+            + "\nសំណើលុបការបញ្ជាទិញ "
+            + event.orderNumber()
+            + " របស់អ្នកមិនត្រូវបានអនុម័តទេ។ មូលហេតុ៖ "
+            + event.reason();
+    notificationService.createNotification(
+        event.userId(),
+        NotificationChannel.IN_APP,
+        "CANCEL_REQUEST_REJECTED",
+        "Cancellation request declined",
+        body,
+        "/account/orders/" + event.orderNumber(),
+        null);
+    if (event.email() != null && !event.email().isBlank()) {
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("fullName", event.fullName() != null ? event.fullName() : "Customer");
+      vars.put("orderNumber", event.orderNumber());
+      vars.put("reason", event.reason());
+      emailSender.sendEmail(
+          event.email(),
+          "Cancellation request declined - " + event.orderNumber(),
+          "email/cancel-request-rejected",
+          vars);
+    }
+  }
+
+  @Async("notificationExecutor")
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2.0))
+  public void handleRefundCompleted(RefundCompletedEvent event) {
+    String amount = RefundRules.usd(event.amountCents());
+    String body =
+        "Your refund of "
+            + amount
+            + " for order "
+            + event.orderNumber()
+            + " has been sent. Bank reference: "
+            + event.bankReference()
+            + "\nប្រាក់សង "
+            + amount
+            + " សម្រាប់ការបញ្ជាទិញ "
+            + event.orderNumber()
+            + " ត្រូវបានផ្ទេរហើយ។ លេខយោងធនាគារ៖ "
+            + event.bankReference();
+    notificationService.createNotification(
+        event.userId(),
+        NotificationChannel.IN_APP,
+        "REFUND_COMPLETED",
+        "Refund sent",
+        body,
+        "/account/orders/" + event.orderNumber(),
+        null);
+    if (event.email() != null && !event.email().isBlank()) {
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("fullName", event.fullName() != null ? event.fullName() : "Customer");
+      vars.put("orderNumber", event.orderNumber());
+      vars.put("amount", amount);
+      vars.put("payerAccount", event.payerAccount());
+      vars.put("bankReference", event.bankReference());
+      emailSender.sendEmail(
+          event.email(), "Refund sent - " + event.orderNumber(), "email/refund-completed", vars);
     }
   }
 
