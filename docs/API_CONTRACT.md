@@ -61,8 +61,9 @@ This document details the complete REST API contract for KhmerMart, covering all
 ---
 
 ## 4. Orders & Public Payments
-- `GET /api/orders`: List customer purchase history.
+- `GET /api/orders`: List customer purchase history. Each item has the same `refund` / `cancelRequested*` fields as the detail below.
 - `GET /api/orders/{orderNumber}`: Customer order detail and tracking timeline. `OrderDTO.discountBreakdown` = `{ "promotions": [{ "label", "amountCents" }], "coupon": { "code", "amountCents" } | null }`, read from the checkout snapshot (never recalculated); `discountCents` = sum(promotions) + coupon. Orders without a snapshot return `promotions: []`, `coupon: null`. Also returned by `POST /api/checkout` and the admin order endpoints.
+  **Refund data (structured, do not parse the timeline):** `OrderDTO.refund` = `{ status: "PENDING"|"COMPLETED", amountCents, payerAccount, bankReference, completedAt }`; the key is **absent** when the order has no refund. `bankReference`/`completedAt` are `null` until an ADMIN completes the refund. For the customer `payerAccount` is **masked** to `"****"` + its last 4 chars (e.g. `payer@bkrt` → `****bkrt`). Also `cancelRequested` (bool), `cancelRequestReason`, `cancelRequestedAt`. Someone else's order number → `404 NOT_FOUND` (not 403).
 - `POST /api/orders/{orderNumber}/cancel` `{ reason? }`: Customer cancels an **unpaid** order (`PENDING_PAYMENT`, or COD not yet paid) → `CANCELLED`, stock `RELEASE`, no refund. A **paid** order → `409 CANCEL_NOT_ALLOWED` (use `cancel-request`). `SHIPPED`/`OUT_FOR_DELIVERY`/`DELIVERED` → `409 CANCEL_NOT_ALLOWED`. Already cancelled/expired → `422 INVALID_STATUS_TRANSITION`.
 - `POST /api/orders/{orderNumber}/cancel-request` `{ reason }` (required, ≤ 500): Customer asks to cancel a **paid, not-yet-shipped** order (`CONFIRMED`/`PROCESSING`). Order status is unchanged; `OrderDTO.cancelRequested=true` (+ `cancelRequestReason`, `cancelRequestedAt`) and `needsAttention=true` for staff. Repeat → `409 CANCEL_ALREADY_REQUESTED`; shipped/cancelled/unpaid → `409 CANCEL_NOT_ALLOWED`; missing/blank/too long reason → `400 VALIDATION_ERROR`.
 
@@ -130,14 +131,14 @@ This document details the complete REST API contract for KhmerMart, covering all
 
 ### 7.6 Orders Management
 - `GET /api/admin/orders`: Filter by status, payment status, date range, search query.
-- `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, items and `discountBreakdown` (same shape as the customer endpoint).
+- `GET /api/admin/orders/{orderNumber}`: Complete order detail with customer, timeline, items and `discountBreakdown` (same shape as the customer endpoint). Adds `paymentId` (latest payment, so no scan of `/admin/payments` is needed) and the same `refund` object with the payer account **unmasked**. All admin order endpoints (list, ship, cancel, reject, status) return this admin view.
 - `PATCH /api/admin/orders/{orderNumber}/status`: Update order status obeying state machine, recording reason `note` in timeline. Setting `CANCELLED` here runs exactly the same flow as `cancel` below.
 - `POST /api/admin/orders/{orderNumber}/cancel` `{ reason }` (STAFF/ADMIN): Cancel an order (approve a customer request, or cancel directly). Allowed from `PENDING_PAYMENT`/`CONFIRMED`/`PROCESSING`, else `409 CANCEL_NOT_ALLOWED`. Clears `cancelRequested`/`needsAttention`. Stock: `RETURN` if paid, `RELEASE` if unpaid. If paid: `paidMode=MOCK` → payment `REFUNDED` + refund `COMPLETED` ("MOCK payment — no real money moved"); `paidMode=LIVE` or `COD` (cash collected) → payment **`REFUND_PENDING`** + refund `PENDING` (with `payerAccount`). Customer is notified (in-app + email, EN + KM); for a pending refund the message names the amount and `payerAccount` ("within 3 working days").
 - `POST /api/admin/orders/{orderNumber}/cancel-request/reject` `{ reason }` (STAFF/ADMIN): Refuse a request: clears `cancelRequested` + `needsAttention`, customer is told the reason. No pending request → `409 CANCEL_NOT_REQUESTED`.
 - `POST /api/admin/orders/{orderNumber}/ship`: Ship order with carrier and generate `KMTRK` tracking number.
 
 ### 7.7 Payments & Reconciliation
-- `GET /api/admin/payments`: Filter payments by method, status (incl. `REFUND_PENDING`), date. `AdminPaymentDTO` now has `paidMode` (`MOCK`|`LIVE`|`COD`) and `refund` `{ id, amountCents, payerAccount, reason, status: PENDING|COMPLETED, requestedAt, approvedBy, completedAt, completedBy, bankReference, note }`.
+- `GET /api/admin/payments`: Filter payments by method, status (incl. `REFUND_PENDING`), `orderNumber` (exact match; unknown → empty list), date. `AdminPaymentDTO` now has `paidMode` (`MOCK`|`LIVE`|`COD`) and `refund` `{ id, amountCents, payerAccount, reason, status: PENDING|COMPLETED, requestedAt, approvedBy, completedAt, completedBy, bankReference, note }`.
 - `GET /api/admin/payments/{id}`: Payment detail with gateway response and raw payload.
 - `POST /api/admin/payments/{id}/refund`: Issue full or partial refund (sets order to `PARTIALLY_REFUNDED` or `REFUNDED`).
 - `POST /api/admin/payments/{id}/refund/complete` `{ bankReference, note? }` (**ADMIN only**, STAFF → 403): Record that the manual transfer was sent. Only from `REFUND_PENDING` (else `409 INVALID_REFUND_STATE`); `bankReference` required, 3–64 chars (`400 VALIDATION_ERROR`). Payment + order → `REFUNDED`, refund → `COMPLETED` with `completedAt/completedBy/bankReference`; customer is notified with the reference.

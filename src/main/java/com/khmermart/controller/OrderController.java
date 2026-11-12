@@ -56,7 +56,12 @@ public class OrderController {
   }
 
   @GetMapping("/{orderNumber}")
-  @Operation(summary = "Get order details by order number")
+  @Operation(
+      summary = "Get order details by order number",
+      description =
+          "Includes refund {status PENDING|COMPLETED, amountCents, payerAccount (masked to the last"
+              + " 4 chars), bankReference, completedAt} when a refund exists, and cancelRequested*."
+              + " Another customer's order number -> 404.")
   public SuccessResponse<OrderDto> getOrderByNumber(
       @CurrentUser UserPrincipal principal, @PathVariable String orderNumber) {
     boolean isStaffOrAdmin =

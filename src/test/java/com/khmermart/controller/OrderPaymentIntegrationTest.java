@@ -567,8 +567,8 @@ class OrderPaymentIntegrationTest extends AbstractIntegrationTest {
         .perform(
             get("/api/orders/{orderNumber}", order.getOrderNumber())
                 .header("Authorization", customer2Token))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
   }
 
   @Test

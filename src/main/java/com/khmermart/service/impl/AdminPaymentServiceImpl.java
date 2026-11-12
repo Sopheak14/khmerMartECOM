@@ -197,8 +197,20 @@ public class AdminPaymentServiceImpl implements AdminPaymentService {
   @Override
   @Transactional(readOnly = true)
   public Page<AdminPaymentDto> getPayments(
-      PaymentStatus status, PaymentMethod method, Instant from, Instant to, Pageable pageable) {
+      PaymentStatus status,
+      PaymentMethod method,
+      String orderNumber,
+      Instant from,
+      Instant to,
+      Pageable pageable) {
     Specification<Payment> spec = Specification.where(null);
+
+    if (orderNumber != null && !orderNumber.isBlank()) {
+      // exact match; an unknown order number yields an empty page, not an error
+      Long orderId =
+          orderRepository.findByOrderNumber(orderNumber.trim()).map(Order::getId).orElse(-1L);
+      spec = spec.and((root, q, cb) -> cb.equal(root.get("orderId"), orderId));
+    }
 
     if (status != null) {
       spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));

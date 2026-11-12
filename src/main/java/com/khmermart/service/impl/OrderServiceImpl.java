@@ -13,6 +13,8 @@ import com.khmermart.model.entity.InventoryMovement;
 import com.khmermart.model.entity.Order;
 import com.khmermart.model.entity.OrderItem;
 import com.khmermart.model.entity.OrderStatusHistory;
+import com.khmermart.model.entity.Payment;
+import com.khmermart.model.entity.Refund;
 import com.khmermart.model.entity.Product;
 import com.khmermart.model.entity.ProductImage;
 import com.khmermart.model.entity.Shipment;
@@ -31,6 +33,7 @@ import com.khmermart.model.response.DiscountBreakdownDto;
 import com.khmermart.model.response.OrderDto;
 import com.khmermart.model.response.OrderItemDto;
 import com.khmermart.model.response.OrderTimelineDto;
+import com.khmermart.model.response.RefundInfoDto;
 import com.khmermart.model.response.ShippingMethodDto;
 import com.khmermart.repository.AppUserRepository;
 import com.khmermart.repository.CouponRedemptionRepository;
@@ -171,10 +174,11 @@ public class OrderServiceImpl implements OrderService {
             .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
 
     if (userId != null && !order.getUserId().equals(userId) && !isStaffOrAdmin) {
-      throw new CustomException(ErrorCode.FORBIDDEN, "Access denied");
+      // 404, not 403: do not reveal that someone else's order number exists
+      throw new CustomException(ErrorCode.NOT_FOUND, "Order not found");
     }
 
-    return toDto(order);
+    return isStaffOrAdmin ? toAdminDto(order) : toDto(order);
   }
 
   @Override
@@ -192,13 +196,13 @@ public class OrderServiceImpl implements OrderService {
   @Override
   @Transactional
   public OrderDto adminCancel(String orderNumber, String reason, Long actorId, String ip) {
-    return toDto(cancellationService.adminCancel(orderNumber, reason, actorId, ip));
+    return toAdminDto(cancellationService.adminCancel(orderNumber, reason, actorId, ip));
   }
 
   @Override
   @Transactional
   public OrderDto rejectCancelRequest(String orderNumber, String reason, Long actorId, String ip) {
-    return toDto(cancellationService.rejectCancelRequest(orderNumber, reason, actorId, ip));
+    return toAdminDto(cancellationService.rejectCancelRequest(orderNumber, reason, actorId, ip));
   }
 
   @Override
@@ -342,7 +346,7 @@ public class OrderServiceImpl implements OrderService {
             order.getCarrier(),
             order.getTrackingNumber()));
 
-    return toDto(order);
+    return toAdminDto(order);
   }
 
   @Override
@@ -396,12 +400,50 @@ public class OrderServiceImpl implements OrderService {
             .build();
     orderStatusHistoryRepository.save(history);
 
-    return toDto(order);
+    return toAdminDto(order);
   }
 
   @Override
   @Transactional(readOnly = true)
   public OrderDto toDto(Order order) {
+    return buildDto(order, false);
+  }
+
+  /** Admin view: payer account unmasked, plus the payment id. */
+  private OrderDto toAdminDto(Order order) {
+    return buildDto(order, true);
+  }
+
+  private static String maskAccount(String account) {
+    if (account == null || account.isBlank()) {
+      return account;
+    }
+    String a = account.trim();
+    return a.length() <= 4 ? "****" : "****" + a.substring(a.length() - 4);
+  }
+
+  private OrderDto buildDto(Order order, boolean admin) {
+    Payment payment = paymentRepository.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+    RefundInfoDto refundInfo = null;
+    if (payment != null) {
+      refundInfo =
+          refundRepository.findByPaymentId(payment.getId()).stream()
+              .max(java.util.Comparator.comparing(Refund::getId))
+              .map(
+                  r -> {
+                    String payer =
+                        r.getPayerAccount() != null
+                            ? r.getPayerAccount()
+                            : payment.getFromAccountId();
+                    return new RefundInfoDto(
+                        r.getStatus(),
+                        r.getAmountCents(),
+                        admin ? payer : maskAccount(payer),
+                        r.getBankReference(),
+                        r.getCompletedAt());
+                  })
+              .orElse(null);
+    }
     List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
     List<OrderItemDto> itemDtos = new ArrayList<>();
 
@@ -530,7 +572,9 @@ public class OrderServiceImpl implements OrderService {
         DiscountBreakdownDto.fromSnapshot(order.getDiscountBreakdown(), objectMapper),
         order.isCancelRequested(),
         order.getCancelRequestReason(),
-        order.getCancelRequestedAt());
+        order.getCancelRequestedAt(),
+        admin && payment != null ? payment.getId() : null,
+        refundInfo);
   }
 
   @Override
@@ -566,6 +610,6 @@ public class OrderServiceImpl implements OrderService {
                       cb.like(cb.lower(root.get("trackingNumber")), term)));
     }
 
-    return orderRepository.findAll(spec, pageable).map(this::toDto);
+    return orderRepository.findAll(spec, pageable).map(this::toAdminDto);
   }
 }

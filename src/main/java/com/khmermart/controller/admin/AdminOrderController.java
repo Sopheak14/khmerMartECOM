@@ -72,7 +72,11 @@ public class AdminOrderController {
 
   @GetMapping("/{orderNumber}")
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-  @Operation(summary = "Get order detail with customer and timeline")
+  @Operation(
+      summary = "Get order detail with customer and timeline",
+      description =
+          "Includes paymentId and the refund object {status, amountCents, payerAccount (unmasked),"
+              + " bankReference, completedAt}.")
   public SuccessResponse<OrderDto> getOrderDetail(@PathVariable String orderNumber) {
     OrderDto dto = orderService.getOrderByNumber(null, orderNumber, true);
     return ApiResponseUtil.success(dto);

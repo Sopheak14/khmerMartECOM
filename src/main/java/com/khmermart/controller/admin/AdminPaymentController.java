@@ -55,10 +55,13 @@ public class AdminPaymentController {
 
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
-  @Operation(summary = "Search and list payments with filters and pagination")
+  @Operation(
+      summary = "Search and list payments with filters and pagination",
+      description = "Filters: status (e.g. REFUND_PENDING), method, orderNumber (exact match), from/to.")
   public SuccessResponse<List<AdminPaymentDto>> getPayments(
       @RequestParam(required = false) PaymentStatus status,
       @RequestParam(required = false) PaymentMethod method,
+      @RequestParam(required = false) String orderNumber,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           Instant from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -66,7 +69,7 @@ public class AdminPaymentController {
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     Page<AdminPaymentDto> page =
-        adminPaymentService.getPayments(status, method, from, to, pageable);
+        adminPaymentService.getPayments(status, method, orderNumber, from, to, pageable);
     PaginationResponse meta =
         new PaginationResponse(
             page.getNumber() + 1, page.getSize(), page.getTotalElements(), page.getTotalPages());

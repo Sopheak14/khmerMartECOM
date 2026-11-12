@@ -39,7 +39,9 @@ public record OrderDto(
     DiscountBreakdownDto discountBreakdown,
     boolean cancelRequested,
     String cancelRequestReason,
-    Instant cancelRequestedAt) {
+    Instant cancelRequestedAt,
+    Long paymentId,
+    RefundInfoDto refund) {
 
   public OrderDto(
       Long id,
@@ -99,6 +101,8 @@ public record OrderDto(
         null,
         discountBreakdown,
         false,
+        null,
+        null,
         null,
         null);
   }

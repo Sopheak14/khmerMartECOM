@@ -286,7 +286,7 @@ public class OrderCancellationService {
             .findByOrderNumber(orderNumber)
             .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "Order not found"));
     if (userId != null && !order.getUserId().equals(userId)) {
-      throw new CustomException(ErrorCode.FORBIDDEN, "Access denied");
+      throw new CustomException(ErrorCode.NOT_FOUND, "Order not found");
     }
     return order;
   }

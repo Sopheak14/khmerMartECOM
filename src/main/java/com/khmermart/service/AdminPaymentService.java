@@ -14,7 +14,12 @@ import org.springframework.data.domain.Pageable;
 public interface AdminPaymentService {
 
   Page<AdminPaymentDto> getPayments(
-      PaymentStatus status, PaymentMethod method, Instant from, Instant to, Pageable pageable);
+      PaymentStatus status,
+      PaymentMethod method,
+      String orderNumber,
+      Instant from,
+      Instant to,
+      Pageable pageable);
 
   AdminPaymentDto getPaymentDetail(Long id);
 
