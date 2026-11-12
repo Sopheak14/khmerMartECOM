@@ -20,6 +20,7 @@ export type PaymentStatus =
   | 'PAID'
   | 'FAILED'
   | 'EXPIRED'
+  | 'REFUND_PENDING'
   | 'REFUNDED'
   | 'PARTIALLY_REFUNDED';
 
@@ -261,6 +262,22 @@ export interface DiscountBreakdownDTO {
   coupon: { code: string; amountCents: number } | null;
 }
 
+export interface RefundDTO {
+  id: number;
+  /** Admin/staff view only. */
+  paymentId?: number;
+  amountCents: number;
+  payerAccount?: string | null;
+  reason?: string | null;
+  status: 'PENDING' | 'COMPLETED';
+  requestedAt?: string;
+  approvedBy?: number | null;
+  completedAt?: string | null;
+  completedBy?: number | null;
+  bankReference?: string | null;
+  note?: string | null;
+}
+
 export interface OrderDTO {
   id: number;
   orderNumber: string;
@@ -287,6 +304,11 @@ export interface OrderDTO {
   cancelReason?: string | null;
   timeline: OrderTimelineEvent[];
   canCancel: boolean;
+  cancelRequested?: boolean;
+  cancelRequestReason?: string | null;
+  cancelRequestedAt?: string | null;
+  /** Key is absent (not null) when there is no refund. Customers get the payer masked ("****bkrt"). */
+  refund?: RefundDTO;
   canReview?: boolean;
   invoiceUrl?: string;
   customer?: UserDTO;
@@ -496,6 +518,8 @@ export interface AdminPaymentDTO {
   qrExpiresAt?: string;
   orderNeedsAttention?: boolean;
   orderAttentionNote?: string;
+  paidMode?: 'MOCK' | 'LIVE' | 'COD';
+  refund?: RefundDTO | null;
 }
 
 export interface ReconciliationMismatchDTO {

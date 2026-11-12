@@ -2,7 +2,7 @@ import { test, expect, request as pwRequest, Browser } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { createThrowawayUser, loginViaUI, ThrowawayUser } from './helpers/auth';
 import { HERO } from './fixtures/catalog';
-import { cancelOrder, createAddress, findShippedTrackingNumber, placeKhqrOrder } from './helpers/orders';
+import { cancelOrder, createAddress, findShippedTrackingNumber, placeKhqrOrder, placePaidLiveOrder, seedRefundPending } from './helpers/orders';
 
 type Role = 'guest' | 'customer' | 'admin';
 interface PageSpec {
@@ -13,6 +13,8 @@ interface PageSpec {
 interface Data {
   pending: string;
   tracking: string;
+  refund: string;
+  request: string;
 }
 
 const PAGES: PageSpec[] = [
@@ -24,6 +26,10 @@ const PAGES: PageSpec[] = [
   { name: 'Order detail', role: 'customer', path: (d) => `/orders/${d.pending}` },
   { name: 'Track', role: 'guest', path: (d) => `/track/${d.tracking}` },
   { name: 'Admin dashboard', role: 'admin', path: () => '/admin' },
+  { name: 'Order detail (refund pending)', role: 'customer', path: (d) => `/orders/${d.refund}` },
+  { name: 'Admin order (refund card)', role: 'admin', path: (d) => `/admin/orders/${d.refund}` },
+  { name: 'Admin order (cancel request banner)', role: 'admin', path: (d) => `/admin/orders/${d.request}` },
+  { name: 'Admin payments (refund pending)', role: 'admin', path: () => '/admin/payments?status=REFUND_PENDING' },
 ];
 
 let data: Data;
@@ -51,7 +57,13 @@ test.describe('Phase 8 — Accessibility (axe) & responsive (360px)', () => {
     const addressId = await createAddress(api, customer);
     // High-stock hero variant (Ruby Red / Standard); the order is cancelled in afterAll so no stock stays reserved
     const pending = await placeKhqrOrder(api, customer, addressId, { productId: HERO.id, variantId: HERO.variants.redStandard });
-    data = { pending: pending.orderNumber, tracking: await findShippedTrackingNumber(api) };
+    const refund = await seedRefundPending(api, customer, addressId);
+    const request = await placePaidLiveOrder(api, customer, addressId);
+    await api.post('http://localhost:4000/api/orders/' + request.orderNumber + '/cancel-request', {
+      headers: { Authorization: `Bearer ${customer.token}` },
+      data: { reason: 'Ordered by mistake' },
+    });
+    data = { pending: pending.orderNumber, tracking: await findShippedTrackingNumber(api), refund: refund.orderNumber, request: request.orderNumber };
     // A cart line so /cart and /checkout render their populated states
     await api.post('http://localhost:4000/api/cart/items', {
       headers: { Authorization: `Bearer ${customer.token}` },

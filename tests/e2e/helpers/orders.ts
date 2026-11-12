@@ -99,3 +99,57 @@ export async function findShippedTrackingNumber(request: APIRequestContext): Pro
 export async function cancelOrder(request: APIRequestContext, user: ThrowawayUser, orderNumber: string) {
   await request.post(`${API}/orders/${orderNumber}/cancel`, { headers: { Authorization: `Bearer ${user.token}` } });
 }
+
+/** 1x1 PNG used as a bank-transfer deposit slip. */
+const SLIP_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/**
+ * Seeds a PAID order whose money really moved (paidMode LIVE), so cancelling it creates a REFUND_PENDING payment.
+ * KHQR is in MOCK mode in dev and must stay that way, so a bank transfer is used: the throwaway customer checks out,
+ * uploads a slip, and the admin API approves it. No demo account data is changed.
+ */
+export async function placePaidLiveOrder(request: APIRequestContext, user: ThrowawayUser, addressId: number) {
+  const auth = { Authorization: `Bearer ${user.token}` };
+  await request.post(`${API}/cart/items`, { headers: auth, data: { productId: COCONUT_OIL.id, quantity: 1 } });
+  const checkout = await request.post(`${API}/checkout`, {
+    headers: { ...auth, 'Idempotency-Key': `idem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` },
+    data: { addressId, shippingMethodCode: 'STANDARD', paymentMethod: 'BANK_TRANSFER' },
+  });
+  const json = await checkout.json();
+  if (!json.data?.order) throw new Error(`Checkout failed: ${JSON.stringify(json)}`);
+  const orderNumber: string = json.data.order.orderNumber;
+
+  const slip = await request.post(`${API}/payments/bank-transfer/${orderNumber}/slip`, {
+    headers: auth,
+    multipart: { file: { name: 'slip.png', mimeType: 'image/png', buffer: SLIP_PNG } },
+  });
+  if (!slip.ok()) throw new Error(`Slip upload failed: ${slip.status()} ${await slip.text()}`);
+
+  const admin = { Authorization: `Bearer ${await adminToken(request)}` };
+  const list = await request.get(`${API}/admin/payments`, { headers: admin, params: { method: 'BANK_TRANSFER', size: 100 } });
+  const payment = ((await list.json()).data as any[]).find((p) => p.orderNumber === orderNumber);
+  if (!payment) throw new Error(`No bank-transfer payment found for ${orderNumber}`);
+  const approve = await request.post(`${API}/admin/payments/${payment.id}/approve-bank-transfer`, { headers: admin });
+  if (!approve.ok()) throw new Error(`Approve failed: ${approve.status()} ${await approve.text()}`);
+  return { orderNumber, paymentId: payment.id as number };
+}
+
+/** Customer asks to cancel (API), then the admin approves via the API → payment REFUND_PENDING. */
+export async function seedRefundPending(request: APIRequestContext, user: ThrowawayUser, addressId: number) {
+  const seeded = await placePaidLiveOrder(request, user, addressId);
+  const admin = { Authorization: `Bearer ${await adminToken(request)}` };
+  const reqRes = await request.post(`${API}/orders/${seeded.orderNumber}/cancel-request`, {
+    headers: { Authorization: `Bearer ${user.token}` },
+    data: { reason: 'Ordered by mistake' },
+  });
+  if (!reqRes.ok()) throw new Error(`cancel-request failed: ${reqRes.status()} ${await reqRes.text()}`);
+  const cancel = await request.post(`${API}/admin/orders/${seeded.orderNumber}/cancel`, {
+    headers: admin,
+    data: { reason: 'Approved: customer request' },
+  });
+  if (!cancel.ok()) throw new Error(`admin cancel failed: ${cancel.status()} ${await cancel.text()}`);
+  return seeded;
+}

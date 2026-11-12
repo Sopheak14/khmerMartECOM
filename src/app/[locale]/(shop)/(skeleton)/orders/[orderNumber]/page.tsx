@@ -8,6 +8,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
 import { apiClient } from '@/lib/apiClient';
+import { FormDialog } from '@/components/common/FormDialog';
+import {
+  customerCancelAction,
+  errorMessageKey,
+  extractRefundInfo,
+  paymentStatusTone,
+  timelineRows,
+  TONE_CLASSES,
+  REASON_RULE,
+} from '@/lib/refund';
 import { OrderDTO, OrderStatus, CartDTO } from '@/types/api';
 import { getDiscountLines } from '@/lib/orderDiscounts';
 import { formatUsd, formatKhr } from '@/lib/money';
@@ -39,6 +49,8 @@ export default function OrderDetailPage() {
   const t = useTranslations('orders');
   const common = useTranslations('common');
   const reviewsT = useTranslations('reviews');
+  const rt = useTranslations('refunds');
+  const errT = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const params = useParams();
@@ -48,7 +60,8 @@ export default function OrderDetailPage() {
   const orderNumber = params?.orderNumber as string;
 
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [reviewItem, setReviewItem] = useState<{ productId: number; productName: string } | null>(null);
   const [reviewedProductIds, setReviewedProductIds] = useState<Set<number>>(new Set());
@@ -66,7 +79,12 @@ export default function OrderDetailPage() {
     enabled: Boolean(orderNumber),
   });
 
-  // Cancel order mutation
+  const apiErrorText = (err: any, fallback: string) => {
+    const key = errorMessageKey(err);
+    return key ? errT(key) : err?.message || fallback;
+  };
+
+  // Cancel an unpaid order directly (no refund involved)
   const cancelOrderMutation = useMutation({
     mutationFn: async (reason: string) => {
       const res = await apiClient<OrderDTO>(`/orders/${orderNumber}/cancel`, {
@@ -79,10 +97,32 @@ export default function OrderDetailPage() {
       queryClient.setQueryData(['order', orderNumber], data);
       queryClient.invalidateQueries({ queryKey: ['account-orders'] });
       setIsCancelDialogOpen(false);
-      toast.success(common('orderCancelled') || 'Order cancelled successfully');
+      toast.success(rt('orderCancelled'));
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to cancel order');
+      setDialogError(apiErrorText(err, 'Failed to cancel order'));
+      refetch();
+    },
+  });
+
+  // Ask to cancel a paid, not-yet-shipped order (staff decides)
+  const requestCancelMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const res = await apiClient<OrderDTO>(`/orders/${orderNumber}/cancel-request`, {
+        method: 'POST',
+        body: { reason },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      setIsRequestDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['order', orderNumber] });
+      queryClient.invalidateQueries({ queryKey: ['account-orders'] });
+      toast.success(rt('requestSent'));
+    },
+    onError: (err: any) => {
+      setDialogError(apiErrorText(err, 'Failed to send request'));
+      refetch();
     },
   });
 
@@ -197,6 +237,8 @@ export default function OrderDetailPage() {
     );
   }
 
+  const cancelAction = customerCancelAction(order);
+  const refundInfo = extractRefundInfo(order);
   const statusInfo = getStatusBadge(order.status);
   const StatusIcon = statusInfo.icon;
   const placedDate = new Date(order.placedAt).toLocaleString(
@@ -247,8 +289,56 @@ export default function OrderDetailPage() {
               <StatusIcon className="w-3.5 h-3.5" />
               <span>{statusInfo.label}</span>
             </span>
+            {order.cancelRequested && (
+              <span
+                data-testid="order-cancel-requested-badge"
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${TONE_CLASSES.orange}`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{rt('cancelRequestedBadge')}</span>
+              </span>
+            )}
+            {order.paymentStatus === 'REFUND_PENDING' && (
+              <span
+                data-testid="order-refund-pending-badge"
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${TONE_CLASSES.orange}`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{rt('refundPendingBadge')}</span>
+              </span>
+            )}
+            {order.paymentStatus === 'REFUNDED' && (
+              <span
+                data-testid="order-refunded-badge"
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${TONE_CLASSES.green}`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{rt('refundedBadge')}</span>
+              </span>
+            )}
           </div>
         </div>
+
+        {order.cancelRequested && (
+          <p data-testid="order-cancel-requested-text" className="text-xs text-muted -mt-4">
+            {rt('cancelRequestedText', { reason: order.cancelRequestReason || '—' })}
+          </p>
+        )}
+        {order.paymentStatus === 'REFUND_PENDING' && (
+          <p data-testid="order-refund-pending-text" className="text-xs text-foreground -mt-4">
+            {refundInfo.payerAccount
+              ? rt('refundPendingText', {
+                  amount: formatUsd(refundInfo.amountCents ?? order.totalCents),
+                  account: refundInfo.payerAccount,
+                })
+              : rt('refundPendingNoAccount', { amount: formatUsd(refundInfo.amountCents ?? order.totalCents) })}
+          </p>
+        )}
+        {order.paymentStatus === 'REFUNDED' && refundInfo.bankReference && (
+          <p data-testid="order-refunded-text" className="text-xs text-foreground -mt-4">
+            {rt('bankRef', { ref: refundInfo.bankReference })}
+          </p>
+        )}
 
         {/* Timeline from OrderDTO.timeline */}
         {order.timeline && order.timeline.length > 0 && (
@@ -258,7 +348,7 @@ export default function OrderDetailPage() {
             </h3>
 
             <div className="relative pl-6 space-y-6 border-l-2 border-primary/20 ml-3">
-              {order.timeline.map((event, idx) => {
+              {timelineRows(order.timeline).map(({ event, showStatus }, idx) => {
                 const eventDate = new Date(event.at).toLocaleString(
                   locale === 'km' ? 'km-KH' : 'en-US',
                   { dateStyle: 'short', timeStyle: 'short' }
@@ -272,9 +362,11 @@ export default function OrderDetailPage() {
 
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-foreground">
-                          {eventStatusInfo.label}
-                        </span>
+                        {showStatus && (
+                          <span className="font-bold text-xs text-foreground">
+                            {eventStatusInfo.label}
+                          </span>
+                        )}
                         <span className="text-[11px] text-muted">({eventDate})</span>
                       </div>
                       {event.note && (
@@ -407,15 +499,10 @@ export default function OrderDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-muted">{t('paymentStatus')}:</span>
                   <span
-                    className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                      order.paymentStatus === 'PAID'
-                        ? 'bg-green-500/10 text-green-800'
-                        : order.paymentStatus === 'PENDING'
-                        ? 'bg-amber-500/10 text-amber-800'
-                        : 'bg-muted/15 text-muted'
-                    }`}
+                    data-testid="order-payment-status"
+                    className={`font-bold px-2 py-0.5 rounded text-[11px] border ${TONE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}
                   >
-                    {order.paymentStatus}
+                    {order.paymentStatus === 'REFUND_PENDING' ? rt('refundPendingBadge') : order.paymentStatus}
                   </span>
                 </div>
               </div>
@@ -489,17 +576,39 @@ export default function OrderDetailPage() {
               </Link>
             )}
 
-            {/* Cancel Order Button (if canCancel) */}
-            {order.canCancel && (
+            {/* Cancel (unpaid) / request cancellation (paid, not shipped) / locked note */}
+            {cancelAction === 'cancel' && (
               <button
                 type="button"
                 data-testid="cancel-order-btn"
-                onClick={() => setIsCancelDialogOpen(true)}
+                onClick={() => {
+                  setDialogError(null);
+                  setIsCancelDialogOpen(true);
+                }}
                 className="px-4 py-2.5 rounded-btn border border-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors flex items-center gap-1.5"
               >
                 <XCircle className="w-3.5 h-3.5" />
-                <span>{t('cancel')}</span>
+                <span>{rt('cancelOrder')}</span>
               </button>
+            )}
+            {cancelAction === 'request' && (
+              <button
+                type="button"
+                data-testid="request-cancel-btn"
+                onClick={() => {
+                  setDialogError(null);
+                  setIsRequestDialogOpen(true);
+                }}
+                className="px-4 py-2.5 rounded-btn border border-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors flex items-center gap-1.5"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>{rt('requestCancel')}</span>
+              </button>
+            )}
+            {cancelAction === 'locked' && (
+              <p data-testid="order-not-cancellable" className="text-xs text-muted">
+                {rt('noLongerCancellable')}
+              </p>
             )}
 
             {/* Buy Again Button */}
@@ -551,69 +660,43 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Cancel Order Confirm Dialog */}
-      {isCancelDialogOpen && (
-        <div
-          data-testid="cancel-order-dialog"
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-        >
-          <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-700 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-base text-foreground leading-snug">
-                {t('cancelConfirmTitle')}
-              </h3>
-            </div>
+      {/* Cancel an unpaid order (in-page confirm, reason optional) */}
+      <FormDialog
+        open={isCancelDialogOpen}
+        onOpenChange={setIsCancelDialogOpen}
+        title={t('cancelConfirmTitle')}
+        description={t('cancelConfirmDesc')}
+        fields={[
+          { name: 'reason', label: rt('reasonLabel'), multiline: true, placeholder: t('reasonPlaceholder'), testId: 'cancel-reason-input', maxLength: 500 },
+        ]}
+        submitLabel={t('confirmCancel')}
+        cancelLabel={t('keepOrder')}
+        destructive
+        pending={cancelOrderMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => cancelOrderMutation.mutate(v.reason)}
+        dialogTestId="cancel-order-dialog"
+        submitTestId="confirm-cancel-btn"
+      />
 
-            <p className="text-xs text-muted leading-relaxed">
-              {t('cancelConfirmDesc')}
-            </p>
-
-            <div className="space-y-1.5">
-              <label htmlFor="cancel-reason" className="text-xs font-semibold text-foreground">
-                Reason (optional)
-              </label>
-              <textarea
-                id="cancel-reason"
-                data-testid="cancel-reason-input"
-                rows={2}
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder={t('reasonPlaceholder')}
-                className="w-full text-xs p-2.5 rounded-btn border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-foreground"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsCancelDialogOpen(false)}
-                disabled={cancelOrderMutation.isPending}
-                className="h-9 rounded-btn border border-border bg-surface hover:bg-muted/10 text-xs font-bold text-foreground transition-colors"
-              >
-                {t('keepOrder')}
-              </button>
-              <button
-                type="button"
-                data-testid="confirm-cancel-btn"
-                onClick={() => cancelOrderMutation.mutate(cancelReason)}
-                disabled={cancelOrderMutation.isPending}
-                className="h-9 rounded-btn bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                {cancelOrderMutation.isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <span>{t('confirmCancel')}</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Ask to cancel a paid order (reason required) */}
+      <FormDialog
+        open={isRequestDialogOpen}
+        onOpenChange={setIsRequestDialogOpen}
+        title={rt('requestDialogTitle')}
+        description={rt('requestDialogDesc')}
+        fields={[
+          { name: 'reason', label: rt('reasonLabel'), multiline: true, placeholder: rt('reasonPlaceholder'), testId: 'request-cancel-reason-input', ...REASON_RULE },
+        ]}
+        submitLabel={rt('sendRequest')}
+        cancelLabel={rt('keep')}
+        destructive
+        pending={requestCancelMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => requestCancelMutation.mutate(v.reason)}
+        dialogTestId="request-cancel-dialog"
+        submitTestId="confirm-request-cancel-btn"
+      />
       {/* Review Dialog */}
       {reviewItem && (
         <ReviewDialog

@@ -7,7 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter, usePathname, Link } from '@/navigation';
 import { apiClient } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
-import { DashboardDTO } from '@/types/api';
+import { AdminPaymentDTO, DashboardDTO } from '@/types/api';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { formatUsd, formatKhr } from '@/lib/money';
 import { EmptyStoreCta } from '@/components/admin/EmptyStoreCta';
 import { DashboardCharts } from '@/components/admin/DashboardCharts';
@@ -31,6 +32,9 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const rt = useTranslations('refunds');
+  const isAdmin = useAuthStore((st) => st.user?.role === 'ADMIN');
+
   const range = (searchParams.get('range') || '30d') as 'today' | '7d' | '30d';
 
   const setRange = (newRange: 'today' | '7d' | '30d') => {
@@ -47,6 +51,18 @@ export default function AdminDashboardPage() {
       });
       return res.data;
     },
+  });
+
+  // Refunds waiting for a manual bank transfer (the payments API is ADMIN-only)
+  const { data: refundsToSend } = useQuery({
+    queryKey: ['admin', 'payments', 'refund-pending-count'],
+    queryFn: async () => {
+      const res = await apiClient<AdminPaymentDTO[]>('/admin/payments', {
+        query: { status: 'REFUND_PENDING', size: 1 },
+      });
+      return res.meta?.totalElements ?? res.meta?.total ?? res.data?.length ?? 0;
+    },
+    enabled: isAdmin,
   });
 
   // Calculate revenue based on selected range
@@ -237,6 +253,23 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </div>
+
+      {isAdmin && refundsToSend !== undefined && (
+        <Link
+          href="/admin/payments?status=REFUND_PENDING"
+          data-testid="dashboard-refunds-to-send"
+          className={cn(
+            'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-colors',
+            refundsToSend > 0
+              ? 'border-orange-500/40 bg-orange-500/10 text-orange-900 dark:text-orange-300 hover:bg-orange-500/20'
+              : 'border-border bg-surface text-muted hover:text-foreground',
+          )}
+        >
+          <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+          <span data-testid="dashboard-refunds-to-send-text">{rt('dashboard.toSend', { count: refundsToSend })}</span>
+          <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+        </Link>
+      )}
 
       {/* Visual Analytics Charts */}
       <DashboardCharts

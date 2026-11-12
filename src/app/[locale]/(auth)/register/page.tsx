@@ -3,21 +3,14 @@
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiClient, ApiError } from '@/lib/apiClient';
-import { useAuthStore } from '@/lib/store/useAuthStore';
-import { queryKeys } from '@/lib/queryKeys';
-import { UserDTO } from '@/types/api';
-import { toast } from 'sonner';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
   const errT = useTranslations('errors');
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { setAuth } = useAuthStore();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,7 +35,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const res = await apiClient<{ accessToken: string; user: UserDTO }>('/auth/register', {
+      await apiClient('/auth/register', {
         method: 'POST',
         body: {
           fullName: fullName.trim(),
@@ -53,17 +46,7 @@ export default function RegisterPage() {
         auth: false,
       });
 
-      if (res.data?.accessToken) {
-        setAuth(res.data.accessToken, res.data.user);
-        toast.success(t('createAccount'));
-        try {
-          await apiClient('/cart/merge', { method: 'POST' });
-        } catch {
-          // ignore
-        }
-        queryClient.invalidateQueries({ queryKey: queryKeys.cart.current });
-        router.push('/');
-      }
+      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
     } catch (err: any) {
       if (err instanceof ApiError) {
         if (err.details && Object.keys(err.details).length > 0) {

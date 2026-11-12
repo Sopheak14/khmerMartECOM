@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/uploads/:path*", "destination": "https://api.chheangsopheak.store/uploads/:path*" }
+  ]
+}

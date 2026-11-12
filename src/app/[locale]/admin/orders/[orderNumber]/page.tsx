@@ -7,7 +7,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter } from '@/navigation';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { queryKeys } from '@/lib/queryKeys';
-import { OrderDTO, OrderStatus, ShipmentStatus, TrackingDTO } from '@/types/api';
+import { AdminPaymentDTO, OrderDTO, OrderStatus, ShipmentStatus, TrackingDTO } from '@/types/api';
+import { FormDialog } from '@/components/common/FormDialog';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { errorMessageKey, extractRefundInfo, BANK_REFERENCE_RULE, REASON_RULE, TONE_CLASSES, paymentStatusTone } from '@/lib/refund';
 import { formatUsd, formatKhr } from '@/lib/money';
 import { osmUrl } from '@/lib/geo';
 import { SafeImage } from '@/components/common/SafeImage';
@@ -29,6 +32,8 @@ import {
   Loader2,
   CheckCircle2,
   X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -50,6 +55,9 @@ export default function AdminOrderDetailPage() {
   const tAddr = useTranslations('address');
   const commonT = useTranslations('admin.common');
   const orderStatusLabel = useOrderStatusLabel();
+  const rt = useTranslations('refunds');
+  const errT = useTranslations('errors');
+  const isAdmin = useAuthStore((st) => st.user?.role === 'ADMIN');
   const locale = useLocale();
   const params = useParams();
   const router = useRouter();
@@ -67,7 +75,11 @@ export default function AdminOrderDetailPage() {
   const [eventNote, setEventNote] = useState('');
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [markSentOpen, setMarkSentOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [copiedAccount, setCopiedAccount] = useState(false);
 
   const [selectedNextStatus, setSelectedNextStatus] = useState<string>('');
   const [transitionError, setTransitionError] = useState<string | null>(null);
@@ -169,25 +181,87 @@ export default function AdminOrderDetailPage() {
     },
   });
 
-  // Cancel order mutation
+  const errorText = (err: any, fallback: string) => {
+    const key = errorMessageKey(err);
+    return key ? errT(key) : err?.message || fallback;
+  };
+
+  const afterOrderChange = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.orderDetail(orderNumber) });
+    queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+    queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+  };
+
+  // Cancel the order (also approves a customer's request): reason required
   const cancelMutation = useMutation({
-    mutationFn: async () => {
-      await apiClient(`/admin/orders/${orderNumber}/status`, {
-        method: 'PATCH',
-        body: {
-          status: 'CANCELLED',
-          note: cancelReason,
-        },
+    mutationFn: async (reason: string) => {
+      const res = await apiClient<OrderDTO>(`/admin/orders/${orderNumber}/cancel`, {
+        method: 'POST',
+        body: { reason },
       });
+      return res.data;
     },
     onSuccess: () => {
       setCancelDialogOpen(false);
-      setCancelReason('');
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.orderDetail(orderNumber) });
+      setApproveDialogOpen(false);
+      afterOrderChange();
       toast.success(t('cancelSuccess'));
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to cancel order');
+      setDialogError(errorText(err, 'Failed to cancel order'));
+      afterOrderChange();
+    },
+  });
+
+  // Refuse a customer's cancellation request: reason required, shown to the customer
+  const rejectMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const res = await apiClient<OrderDTO>(`/admin/orders/${orderNumber}/cancel-request/reject`, {
+        method: 'POST',
+        body: { reason },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      setRejectDialogOpen(false);
+      afterOrderChange();
+      toast.success(rt('banner.rejected'));
+    },
+    onError: (err: any) => {
+      setDialogError(errorText(err, 'Failed to reject request'));
+      afterOrderChange();
+    },
+  });
+
+  // The admin order view carries the refund (with paymentId). Fall back to an exact orderNumber lookup if it is missing.
+  const refundPending = order?.paymentStatus === 'REFUND_PENDING';
+  const { data: lookedUpPayment } = useQuery({
+    queryKey: ['admin', 'payments', 'refund-pending', orderNumber],
+    queryFn: async () => {
+      const res = await apiClient<AdminPaymentDTO[]>('/admin/payments', { query: { orderNumber } });
+      return (res.data || []).find((p) => p.orderNumber === orderNumber) ?? null;
+    },
+    enabled: refundPending && isAdmin && !order?.refund?.paymentId,
+  });
+  const refundPaymentId = order?.refund?.paymentId ?? lookedUpPayment?.id;
+  const refundPayment = refundPaymentId ? { id: refundPaymentId, refund: order?.refund ?? lookedUpPayment?.refund } : null;
+
+  const markSentMutation = useMutation({
+    mutationFn: async ({ bankReference, note }: { bankReference: string; note: string }) => {
+      const res = await apiClient(`/admin/payments/${refundPayment!.id}/refund/complete`, {
+        method: 'POST',
+        body: { bankReference, note: note || undefined },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      setMarkSentOpen(false);
+      afterOrderChange();
+      toast.success(rt('markSent.success'));
+    },
+    onError: (err: any) => {
+      setDialogError(errorText(err, 'Failed to mark refund as sent'));
+      afterOrderChange();
     },
   });
 
@@ -216,6 +290,7 @@ export default function AdminOrderDetailPage() {
     );
   }
 
+  const refundInfo = extractRefundInfo({ refund: refundPayment?.refund ?? undefined, timeline: order.timeline });
   const placedDate = new Date(order.placedAt).toLocaleString(
     locale === 'km' ? 'km-KH' : 'en-US',
     { dateStyle: 'full', timeStyle: 'short' }
@@ -290,11 +365,14 @@ export default function AdminOrderDetailPage() {
           )}
 
           {/* Cancel Order Button */}
-          {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.status !== 'REFUNDED' && (
+          {(order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED' || order.status === 'PROCESSING') && (
             <button
               type="button"
               data-testid="open-cancel-dialog-btn"
-              onClick={() => setCancelDialogOpen(true)}
+              onClick={() => {
+                setDialogError(null);
+                setCancelDialogOpen(true);
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-semibold transition-colors cursor-pointer"
             >
               <XCircle className="w-3.5 h-3.5" />
@@ -303,6 +381,50 @@ export default function AdminOrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Customer asked to cancel */}
+      {order.cancelRequested && (
+        <div
+          role="region"
+          aria-label={rt('banner.title')}
+          data-testid="cancel-request-banner"
+          className="rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="space-y-1 min-w-0">
+            <p className="text-sm font-bold text-orange-900 dark:text-orange-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>{rt('banner.title')}</span>
+            </p>
+            <p className="text-xs text-foreground break-words" data-testid="cancel-request-reason">
+              {rt('banner.reason', { reason: order.cancelRequestReason || '—' })}
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              data-testid="approve-cancel-btn"
+              onClick={() => {
+                setDialogError(null);
+                setApproveDialogOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold cursor-pointer"
+            >
+              {rt('banner.approve')}
+            </button>
+            <button
+              type="button"
+              data-testid="reject-cancel-btn"
+              onClick={() => {
+                setDialogError(null);
+                setRejectDialogOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl border border-border bg-surface hover:bg-muted/10 text-xs font-bold text-foreground cursor-pointer"
+            >
+              {rt('banner.reject')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Order Details & Sidebar Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -575,6 +697,80 @@ export default function AdminOrderDetailPage() {
             )}
           </div>
 
+          {/* Refund to send (manual bank transfer) */}
+          {refundPending && (
+            <div
+              data-testid="refund-card"
+              className="bg-orange-500/5 border border-orange-500/40 rounded-2xl p-5 shadow-2xs space-y-3"
+            >
+              <h3 className="font-bold text-xs uppercase tracking-wider text-orange-900 dark:text-orange-300 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>{rt('card.title')}</span>
+              </h3>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted">{rt('card.amount')}:</span>
+                  <span className="font-mono font-bold text-foreground" data-testid="refund-card-amount">
+                    {formatUsd(refundInfo.amountCents ?? order.totalCents)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-muted shrink-0">{rt('card.payer')}:</span>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono font-bold text-foreground truncate" data-testid="refund-card-account">
+                      {refundInfo.payerAccount || rt('card.noAccount')}
+                    </span>
+                    {refundInfo.payerAccount && (
+                      <button
+                        type="button"
+                        data-testid="refund-card-copy-btn"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(refundInfo.payerAccount!).catch(() => {});
+                          setCopiedAccount(true);
+                          setTimeout(() => setCopiedAccount(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted/10 text-[11px] font-semibold text-foreground cursor-pointer"
+                      >
+                        {copiedAccount ? (
+                          <Check className="w-3 h-3 text-emerald-600" aria-hidden="true" />
+                        ) : (
+                          <Copy className="w-3 h-3" aria-hidden="true" />
+                        )}
+                        <span>{copiedAccount ? rt('card.copied') : rt('card.copy')}</span>
+                      </button>
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="text-xs text-foreground space-y-1">
+                <p className="font-semibold">{rt('card.stepsTitle')}</p>
+                <ol className="list-decimal pl-5 space-y-0.5 text-muted">
+                  <li>{rt('card.step1')}</li>
+                  <li>{rt('card.step2')}</li>
+                  <li>{rt('card.step3')}</li>
+                </ol>
+              </div>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  data-testid="mark-refund-sent-btn"
+                  disabled={!refundPayment}
+                  onClick={() => {
+                    setDialogError(null);
+                    setMarkSentOpen(true);
+                  }}
+                  className="w-full h-9 rounded-btn bg-orange-700 hover:bg-orange-800 text-white text-xs font-bold disabled:opacity-50 cursor-pointer"
+                >
+                  {rt('card.markSent')}
+                </button>
+              ) : (
+                <p className="text-[11px] text-muted" data-testid="refund-admin-only-note">
+                  {rt('card.adminOnly')}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Payment Details Card */}
           <div className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3">
             <h3 className="font-bold text-xs uppercase tracking-wider text-muted flex items-center gap-1.5">
@@ -590,7 +786,10 @@ export default function AdminOrderDetailPage() {
                 <span className="text-muted">Status:</span>
                 <span
                   data-testid="admin-payment-status"
-                  className="font-bold px-2 py-0.5 rounded text-[11px] bg-primary/10 text-primary"
+                  className={cn(
+                    'font-bold px-2 py-0.5 rounded text-[11px] border',
+                    TONE_CLASSES[paymentStatusTone(order.paymentStatus)],
+                  )}
                 >
                   {order.paymentStatus}
                 </span>
@@ -800,77 +999,78 @@ export default function AdminOrderDetailPage() {
         </div>
       )}
 
-      {/* Cancel Order Dialog */}
-      {cancelDialogOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          data-testid="cancel-order-dialog"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-        >
-          <div className="bg-surface border border-border rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative text-left">
-            <button
-              type="button"
-              onClick={() => setCancelDialogOpen(false)}
-              aria-label="Close dialog"
-              className="absolute top-4 right-4 text-muted hover:text-foreground"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {/* Cancel order (reason required) */}
+      <FormDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        title={rt('adminCancel.title')}
+        description={rt('adminCancel.desc')}
+        fields={[{ name: 'reason', label: t('cancelReason'), multiline: true, placeholder: t('cancelReasonPlaceholder'), testId: 'cancel-reason-input', ...REASON_RULE }]}
+        submitLabel={rt('adminCancel.confirm')}
+        cancelLabel={commonT('cancel')}
+        destructive
+        pending={cancelMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => cancelMutation.mutate(v.reason)}
+        dialogTestId="cancel-order-dialog"
+        submitTestId="confirm-cancel-order-btn"
+      />
 
-            <h3 className="text-base font-bold text-destructive flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-destructive" />
-              <span>{t('cancelOrder')}</span>
-            </h3>
+      {/* Approve the customer's request */}
+      <FormDialog
+        open={approveDialogOpen}
+        onOpenChange={setApproveDialogOpen}
+        title={rt('banner.approveTitle')}
+        description={rt('banner.approveDesc')}
+        fields={[{ name: 'reason', label: rt('banner.approveReasonLabel'), multiline: true, testId: 'approve-reason-input', ...REASON_RULE }]}
+        submitLabel={rt('banner.approve')}
+        cancelLabel={commonT('cancel')}
+        destructive
+        pending={cancelMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => cancelMutation.mutate(v.reason)}
+        dialogTestId="approve-cancel-dialog"
+        submitTestId="confirm-approve-cancel-btn"
+      />
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                cancelMutation.mutate();
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label htmlFor="cancel-reason-input" className="block text-xs font-semibold text-foreground mb-1">
-                  {t('cancelReason')}
-                </label>
-                <textarea
-                  id="cancel-reason-input"
-                  data-testid="cancel-reason-input"
-                  rows={3}
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder={t('cancelReasonPlaceholder')}
-                  className="w-full text-xs p-2.5 rounded-btn border border-border bg-background text-foreground resize-none"
-                  required
-                />
-              </div>
+      {/* Reject the customer's request */}
+      <FormDialog
+        open={rejectDialogOpen}
+        onOpenChange={setRejectDialogOpen}
+        title={rt('banner.rejectTitle')}
+        description={rt('banner.rejectDesc')}
+        fields={[{ name: 'reason', label: rt('banner.rejectReasonLabel'), multiline: true, testId: 'reject-reason-input', ...REASON_RULE }]}
+        submitLabel={rt('banner.reject')}
+        cancelLabel={commonT('cancel')}
+        pending={rejectMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => rejectMutation.mutate(v.reason)}
+        dialogTestId="reject-cancel-dialog"
+        submitTestId="confirm-reject-cancel-btn"
+      />
 
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCancelDialogOpen(false)}
-                  className="h-9 rounded-btn border border-border hover:bg-muted/10 text-xs font-bold text-foreground"
-                >
-                  {commonT('cancel')}
-                </button>
-                <button
-                  type="submit"
-                  data-testid="confirm-cancel-order-btn"
-                  disabled={cancelMutation.isPending}
-                  className="h-9 rounded-btn bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
-                >
-                  {cancelMutation.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <span>Confirm Cancel</span>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Mark the manual refund as sent (ADMIN only) */}
+      <FormDialog
+        open={markSentOpen}
+        onOpenChange={setMarkSentOpen}
+        title={rt('markSent.title')}
+        description={rt('markSent.desc', {
+          order: order.orderNumber,
+          amount: formatUsd(refundInfo.amountCents ?? order.totalCents),
+          account: refundInfo.payerAccount || rt('card.noAccount'),
+        })}
+        fields={[
+          { name: 'bankReference', label: rt('markSent.bankReferenceLabel'), placeholder: rt('markSent.bankReferencePlaceholder'), testId: 'bank-reference-input', ...BANK_REFERENCE_RULE },
+          { name: 'note', label: rt('markSent.noteLabel'), multiline: true, testId: 'refund-note-input', maxLength: 500 },
+        ]}
+        submitLabel={rt('markSent.submit')}
+        cancelLabel={commonT('cancel')}
+        pending={markSentMutation.isPending}
+        error={dialogError}
+        onSubmit={(v) => markSentMutation.mutate({ bankReference: v.bankReference, note: v.note })}
+        dialogTestId="mark-refund-sent-dialog"
+        submitTestId="confirm-mark-refund-sent-btn"
+      />
     </div>
   );
 }

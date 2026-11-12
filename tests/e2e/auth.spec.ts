@@ -350,9 +350,9 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
     await page.fill('#register-confirm-password', 'Customer@123');
     await page.click('button[type="submit"]');
 
-    await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/verify-email\?email=/, { timeout: 10000 });
 
-    // Poll Mailpit API until verification email arrives
+    // Poll Mailpit API until the OTP email arrives
     let verifyMsgDetail: any;
     await expect.poll(async () => {
       const res = await request.get('http://localhost:8025/api/v1/messages');
@@ -366,14 +366,11 @@ test.describe('Phase 2 — Auth & Account E2E against Real Backend', () => {
       return null;
     }, { timeout: 10000 }).not.toBeNull();
 
-    const verifyUrlMatch = verifyMsgDetail.HTML.match(/http:\/\/localhost:3000\/verify-email\?token=([a-zA-Z0-9_-]+)/);
-    expect(verifyUrlMatch).not.toBeNull();
-    const verifyUrl = verifyUrlMatch![0];
-    console.log('RAW EXTRACTED VERIFY URL:', verifyUrl);
-
-    // Navigate to verify URL
-    await page.goto(verifyUrl);
-    await expect(page.locator('text=Your email address has been verified successfully').first()).toBeVisible({ timeout: 10000 });
+    const otpMatch = (verifyMsgDetail.Text || verifyMsgDetail.HTML).match(/\b(\d{6})\b/);
+    expect(otpMatch).not.toBeNull();
+    await page.fill('#verify-code', otpMatch![1]);
+    await page.click('button[type="submit"]');
+    await expect(page.locator('[data-testid="header-user-name"]').first()).toBeVisible({ timeout: 10000 });
   });
 
 });

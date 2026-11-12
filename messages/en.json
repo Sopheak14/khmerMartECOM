@@ -147,6 +147,14 @@
     "passwordResetSuccess": "Your password has been reset successfully! You can now sign in with your new password.",
     "passwordsDoNotMatch": "Passwords do not match.",
     "verifyEmailTitle": "Email Verification",
+    "otpSubtitle": "We sent a 6-digit code to {email}. Enter it below to activate your account.",
+    "otpLabel": "Verification code",
+    "otpVerify": "Verify & Continue",
+    "otpResend": "Resend code",
+    "otpResendIn": "Resend code in {seconds}s",
+    "otpResent": "A new code has been sent.",
+    "otpInvalidFormat": "Enter the 6-digit code.",
+    "otpMissingEmail": "Missing email address. Please register first.",
     "verifyingEmail": "Verifying your email address...",
     "emailVerifiedSuccess": "Your email address has been verified successfully! You can now sign in.",
     "emailVerificationFailed": "Email verification link is invalid or has expired.",
@@ -363,7 +371,8 @@
       "noMismatches": "All payments and order records are fully reconciled.",
       "mismatchType": "Type",
       "description": "Description",
-      "noPaymentsYet": "No payments yet. Transactions will appear here once customers pay."
+      "noPaymentsYet": "No payments yet. Transactions will appear here once customers pay.",
+      "refundPending": "Refund pending"
     },
     "inventory": {
       "title": "Inventory Management",
@@ -688,7 +697,11 @@
     "KHQR_GENERATION_FAILED": "Failed to generate KHQR code.",
     "BAKONG_UNAVAILABLE": "Bakong KHQR network is temporarily unavailable.",
     "RATE_LIMITED": "Too many login attempts. Please try again later.",
-    "INTERNAL_ERROR": "Internal server error. Please try again later."
+    "INTERNAL_ERROR": "Internal server error. Please try again later.",
+    "CANCEL_NOT_ALLOWED": "This order can no longer be cancelled. If it is already shipped, please wait for delivery.",
+    "CANCEL_ALREADY_REQUESTED": "A cancellation request has already been sent for this order. We will reply soon.",
+    "CANCEL_NOT_REQUESTED": "There is no pending cancellation request on this order.",
+    "INVALID_REFUND_STATE": "This refund is not waiting to be sent (it may already be marked as sent). Refresh the page."
   },
   "catalog": {
     "title": "All Products",
@@ -1050,5 +1063,85 @@
     "unsupported": "Web push notifications are not supported in your browser.",
     "permissionDenied": "Notification permission was denied. Please allow notifications in your browser settings.",
     "subscribeSuccess": "Web push notifications enabled successfully!"
+  },
+  "refunds": {
+    "cancelOrder": "Cancel order",
+    "requestCancel": "Request cancellation",
+    "requestDialogTitle": "Request cancellation",
+    "requestDialogDesc": "This order is already paid. Tell us why you want to cancel. We will review it and reply soon.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "Why do you want to cancel this order?",
+    "sendRequest": "Send request",
+    "keep": "Keep order",
+    "requestSent": "Request sent. We will reply soon",
+    "noLongerCancellable": "This order can no longer be cancelled",
+    "cancelRequestedBadge": "Cancellation requested",
+    "cancelRequestedText": "Waiting for approval. Your reason: {reason}",
+    "refundPendingBadge": "Refund pending",
+    "refundedBadge": "Refunded",
+    "refundPendingText": "We will send {amount} back to {account}",
+    "refundPendingNoAccount": "We will send {amount} back to the account you paid from",
+    "bankRef": "Bank ref: {ref}",
+    "orderCancelled": "Order cancelled",
+    "banner": {
+      "title": "Customer requested cancellation",
+      "reason": "Reason: {reason}",
+      "approve": "Approve & cancel",
+      "reject": "Reject",
+      "approveTitle": "Approve & cancel this order",
+      "approveDesc": "The order will be cancelled and stock returned. If the customer already paid, a refund to send will be created.",
+      "rejectTitle": "Reject cancellation request",
+      "rejectDesc": "The order stays as it is. The customer will see your reason.",
+      "approveReasonLabel": "Reason (recorded on the order)",
+      "rejectReasonLabel": "Reason (shown to the customer)",
+      "approved": "Order cancelled",
+      "rejected": "Request rejected"
+    },
+    "adminCancel": {
+      "title": "Cancel order",
+      "desc": "The customer will be told why. If the order is paid, a refund to send will be created.",
+      "confirm": "Confirm cancel",
+      "reasonLabel": "Reason"
+    },
+    "card": {
+      "title": "Refund to send",
+      "amount": "Amount",
+      "payer": "Send to account",
+      "copy": "Copy",
+      "copied": "Copied",
+      "stepsTitle": "How to send the refund",
+      "step1": "Open the shop's bank app",
+      "step2": "Transfer to this account",
+      "step3": "Enter the bank reference here",
+      "markSent": "Mark refund as sent",
+      "adminOnly": "Only an admin can mark the refund as sent.",
+      "noAccount": "Not shown"
+    },
+    "markSent": {
+      "title": "Mark refund as sent",
+      "desc": "Order {order} · {amount} to {account}. Enter the reference of the bank transfer you made.",
+      "bankReferenceLabel": "Bank reference",
+      "bankReferencePlaceholder": "e.g. FT24123456789",
+      "noteLabel": "Note (optional)",
+      "submit": "Mark as sent",
+      "success": "Refund marked as sent. The customer has been told."
+    },
+    "payments": {
+      "refundPending": "Refund pending",
+      "payerAccount": "Payer account",
+      "bankRef": "Ref: {ref}",
+      "copyAccount": "Copy account",
+      "copied": "Account copied"
+    },
+    "dashboard": {
+      "toSend": "Refunds to send: {count}",
+      "view": "View list"
+    },
+    "validation": {
+      "required": "This field is required.",
+      "tooShort": "Enter at least {min} characters.",
+      "tooLong": "Enter at most {max} characters.",
+      "close": "Close"
+    }
   }
 }

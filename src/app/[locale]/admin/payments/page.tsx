@@ -16,6 +16,8 @@ import {
   ReconciliationReportDTO,
 } from '@/types/api';
 import { formatUsd, formatKhr } from '@/lib/money';
+import { FormDialog } from '@/components/common/FormDialog';
+import { errorMessageKey, paymentStatusTone, TONE_CLASSES, BANK_REFERENCE_RULE } from '@/lib/refund';
 import {
   CreditCard,
   Download,
@@ -38,6 +40,9 @@ import { cn } from '@/lib/utils';
 export default function AdminPaymentsPage() {
   const t = useTranslations('admin.payments');
   const commonT = useTranslations('admin.common');
+  const rt = useTranslations('refunds');
+  const errT = useTranslations('errors');
+  const isAdmin = useAuthStore((st) => st.user?.role === 'ADMIN');
   const locale = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -59,6 +64,11 @@ export default function AdminPaymentsPage() {
   const [refundPayment, setRefundPayment] = useState<AdminPaymentDTO | null>(null);
   const [refundAmountCents, setRefundAmountCents] = useState<number>(0);
   const [refundReason, setRefundReason] = useState<string>('');
+
+  // Mark-refund-as-sent dialog state
+  const [markSentPayment, setMarkSentPayment] = useState<AdminPaymentDTO | null>(null);
+  const [markSentError, setMarkSentError] = useState<string | null>(null);
+  const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
 
   const updateFilters = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -129,6 +139,35 @@ export default function AdminPaymentsPage() {
       toast.error(err.message || 'Failed to process refund');
     },
   });
+
+  // Record that the manual refund transfer was sent (ADMIN only)
+  const completeRefundMutation = useMutation({
+    mutationFn: async ({ id, bankReference, note }: { id: number; bankReference: string; note: string }) => {
+      const res = await apiClient(`/admin/payments/${id}/refund/complete`, {
+        method: 'POST',
+        body: { bankReference, note: note || undefined },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      setMarkSentPayment(null);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      toast.success(rt('markSent.success'));
+    },
+    onError: (err: any) => {
+      const key = errorMessageKey(err);
+      setMarkSentError(key ? errT(key) : err?.message || 'Failed to mark refund as sent');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+    },
+  });
+
+  const handleCopyAccount = (account: string) => {
+    navigator.clipboard?.writeText(account).catch(() => {});
+    setCopiedAccount(account);
+    toast.success(rt('payments.copied'));
+    setTimeout(() => setCopiedAccount(null), 2000);
+  };
 
   // Re-check KHQR payment against Bakong now (same single check the poller runs)
   const recheckMutation = useMutation({
@@ -222,21 +261,7 @@ export default function AdminPaymentsPage() {
     return `${h.slice(0, 8)}...${h.slice(-6)}`;
   };
 
-  const getStatusBadge = (s: PaymentStatus) => {
-    switch (s) {
-      case 'PAID':
-        return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
-      case 'PENDING':
-        return 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20';
-      case 'FAILED':
-      case 'EXPIRED':
-        return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20';
-      case 'REFUNDED':
-        return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20';
-      default:
-        return 'bg-muted/15 text-muted border-border';
-    }
-  };
+  const getStatusBadge = (s: PaymentStatus) => TONE_CLASSES[paymentStatusTone(s)];
 
   return (
     <div className="space-y-6" data-testid="admin-payments-page">
@@ -329,6 +354,7 @@ export default function AdminPaymentsPage() {
               <option value="PENDING">PENDING</option>
               <option value="FAILED">FAILED</option>
               <option value="EXPIRED">EXPIRED</option>
+              <option value="REFUND_PENDING">{rt('payments.refundPending')}</option>
               <option value="REFUNDED">REFUNDED</option>
             </select>
 
@@ -414,8 +440,16 @@ export default function AdminPaymentsPage() {
                                 getStatusBadge(p.status)
                               )}
                             >
-                              {p.status}
+                              {p.status === 'REFUND_PENDING' ? rt('payments.refundPending') : p.status}
                             </span>
+                            {p.status === 'REFUNDED' && p.refund?.bankReference && (
+                              <span
+                                data-testid={`refund-bank-ref-${p.id}`}
+                                className="block mt-1 font-mono text-[10px] text-muted"
+                              >
+                                {rt('payments.bankRef', { ref: p.refund.bankReference })}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className="font-mono font-bold text-foreground block">
@@ -449,8 +483,32 @@ export default function AdminPaymentsPage() {
                               <span className="text-muted">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-mono text-xs text-muted max-w-[120px] truncate">
-                            {p.fromAccountId || '—'}
+                          <td className="py-3 px-4 font-mono text-xs text-muted whitespace-nowrap">
+                            {(() => {
+                              const account = p.refund?.payerAccount || p.fromAccountId;
+                              if (!account) return '—';
+                              return (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="max-w-[120px] truncate" title={account} data-testid={`payer-account-${p.id}`}>
+                                    {account}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    data-testid={`copy-account-btn-${p.id}`}
+                                    onClick={() => handleCopyAccount(account)}
+                                    aria-label={rt('payments.copyAccount')}
+                                    title={rt('payments.copyAccount')}
+                                    className="p-1 rounded-md hover:bg-muted/15 text-muted hover:text-foreground transition-colors cursor-pointer"
+                                  >
+                                    {copiedAccount === account ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="py-3 px-4 text-muted whitespace-nowrap">{paidDate}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -497,6 +555,21 @@ export default function AdminPaymentsPage() {
                                   className="px-2 py-1 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 hover:bg-purple-500/20 text-[11px] font-semibold transition-colors cursor-pointer"
                                 >
                                   {t('refund')}
+                                </button>
+                              )}
+
+                              {/* Mark manual refund as sent (ADMIN only; this whole page is ADMIN-only on the API) */}
+                              {p.status === 'REFUND_PENDING' && isAdmin && (
+                                <button
+                                  type="button"
+                                  data-testid={`mark-refund-sent-btn-${p.id}`}
+                                  onClick={() => {
+                                    setMarkSentError(null);
+                                    setMarkSentPayment(p);
+                                  }}
+                                  className="px-2 py-1 rounded-md bg-orange-600 text-white hover:bg-orange-700 text-[11px] font-bold transition-colors cursor-pointer"
+                                >
+                                  {rt('card.markSent')}
                                 </button>
                               )}
 
@@ -770,6 +843,36 @@ export default function AdminPaymentsPage() {
           </div>
         </div>
       )}
+
+      {/* Mark refund as sent */}
+      <FormDialog
+        open={markSentPayment !== null}
+        onOpenChange={(o) => !o && setMarkSentPayment(null)}
+        title={rt('markSent.title')}
+        description={
+          markSentPayment
+            ? rt('markSent.desc', {
+                order: markSentPayment.orderNumber,
+                amount: formatUsd(markSentPayment.refund?.amountCents ?? markSentPayment.amountCents),
+                account: markSentPayment.refund?.payerAccount || markSentPayment.fromAccountId || rt('card.noAccount'),
+              })
+            : undefined
+        }
+        fields={[
+          { name: 'bankReference', label: rt('markSent.bankReferenceLabel'), placeholder: rt('markSent.bankReferencePlaceholder'), testId: 'bank-reference-input', ...BANK_REFERENCE_RULE },
+          { name: 'note', label: rt('markSent.noteLabel'), multiline: true, testId: 'refund-note-input', maxLength: 500 },
+        ]}
+        submitLabel={rt('markSent.submit')}
+        cancelLabel={commonT('cancel')}
+        pending={completeRefundMutation.isPending}
+        error={markSentError}
+        onSubmit={(v) =>
+          markSentPayment &&
+          completeRefundMutation.mutate({ id: markSentPayment.id, bankReference: v.bankReference, note: v.note })
+        }
+        dialogTestId="mark-refund-sent-dialog"
+        submitTestId="confirm-mark-refund-sent-btn"
+      />
     </div>
   );
 }
