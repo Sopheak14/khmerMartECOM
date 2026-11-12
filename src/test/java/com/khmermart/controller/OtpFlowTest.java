@@ -39,7 +39,15 @@ class OtpFlowTest extends AbstractIntegrationTest {
   private ResponseEntity<String> register(String email) {
     return rt.postForEntity(
         "/api/auth/register",
-        Map.of("email", email, "password", PASSWORD, "fullName", "Otp Tester", "phone", "+85512345678"),
+        Map.of(
+            "email",
+            email,
+            "password",
+            PASSWORD,
+            "fullName",
+            "Otp Tester",
+            "phone",
+            "+85512345678"),
         String.class);
   }
 
@@ -83,7 +91,8 @@ class OtpFlowTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("register: user is unverified, mail with a 6-digit code is sent, no tokens, hash only")
+  @DisplayName(
+      "register: user is unverified, mail with a 6-digit code is sent, no tokens, hash only")
   void registerCreatesUnverifiedUserAndSendsMail() throws Exception {
     String email = newEmail();
     ResponseEntity<String> r = register(email);
@@ -98,7 +107,8 @@ class OtpFlowTest extends AbstractIntegrationTest {
     assertThat(r.getHeaders().get(HttpHeaders.SET_COOKIE)).isNull();
 
     Boolean verified =
-        jdbc.queryForObject("SELECT email_verified FROM users WHERE email = ?", Boolean.class, email);
+        jdbc.queryForObject(
+            "SELECT email_verified FROM users WHERE email = ?", Boolean.class, email);
     assertThat(verified).isFalse();
 
     String code = codeSentTo(email, 1);
@@ -123,7 +133,8 @@ class OtpFlowTest extends AbstractIntegrationTest {
     assertThat(r.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).contains("km_rt=");
 
     Boolean verified =
-        jdbc.queryForObject("SELECT email_verified FROM users WHERE email = ?", Boolean.class, email);
+        jdbc.queryForObject(
+            "SELECT email_verified FROM users WHERE email = ?", Boolean.class, email);
     assertThat(verified).isTrue();
     Boolean consumed =
         jdbc.queryForObject(

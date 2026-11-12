@@ -103,7 +103,8 @@ class PurchaseFlowE2ETest extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
     String customerToken =
-        "Bearer " + objectMapper.readTree(customerLoginRes).path("data").path("accessToken").asText();
+        "Bearer "
+            + objectMapper.readTree(customerLoginRes).path("data").path("accessToken").asText();
     long customerId = userId(customerEmail);
 
     String adminLoginRes =

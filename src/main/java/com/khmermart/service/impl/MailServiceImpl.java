@@ -111,7 +111,11 @@ public class MailServiceImpl implements MailService {
       mailSender.get().send(message);
       log.info("Sent password reset email to {}", toEmail);
     } catch (Exception e) {
-      log.warn("Failed to send password reset email to {}: {}: {}", toEmail, e.getClass().getSimpleName(), e.getMessage());
+      log.warn(
+          "Failed to send password reset email to {}: {}: {}",
+          toEmail,
+          e.getClass().getSimpleName(),
+          e.getMessage());
     }
   }
 }

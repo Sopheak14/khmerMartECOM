@@ -5,10 +5,10 @@ import com.khmermart.common.exception.CustomException;
 import com.khmermart.common.exception.ErrorCode;
 import com.khmermart.common.response.TokenResponse;
 import com.khmermart.config.AppProperty;
+import com.khmermart.event.EmailOtpRequestedEvent;
 import com.khmermart.mapper.AppUserMapper;
 import com.khmermart.model.entity.AppUser;
 import com.khmermart.model.entity.AppUserToken;
-import com.khmermart.event.EmailOtpRequestedEvent;
 import com.khmermart.model.entity.EmailOtp;
 import com.khmermart.model.entity.PasswordResetToken;
 import com.khmermart.model.enumerate.Roles;
@@ -32,8 +32,8 @@ import com.khmermart.service.MailService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -379,7 +379,8 @@ public class AuthServiceImpl implements AuthService {
       issueOtp(user);
     }
     // Identical answer for unknown / already verified emails: no user enumeration.
-    return new ResendResult(MessageConstant.OTP_RESEND_GENERIC, OTP_TTL_SECONDS, RESEND_COOLDOWN_SECONDS);
+    return new ResendResult(
+        MessageConstant.OTP_RESEND_GENERIC, OTP_TTL_SECONDS, RESEND_COOLDOWN_SECONDS);
   }
 
   private CustomException tooManyAttempts() {
