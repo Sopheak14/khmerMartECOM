@@ -35,7 +35,7 @@ public class WebConfig implements WebMvcConfigurer {
   public void addCorsMappings(CorsRegistry registry) {
     registry
         .addMapping("/**")
-        .allowedOrigins(appProperties.frontendUrl())
+        .allowedOrigins(appProperties.frontendUrl(), "https://khmermart.vercel.app")
         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         .allowedHeaders("Authorization", "Content-Type", "Idempotency-Key")
         .exposedHeaders("Content-Disposition", "X-Request-Id")
