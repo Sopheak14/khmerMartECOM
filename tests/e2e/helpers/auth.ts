@@ -35,15 +35,31 @@ export async function createThrowawayUser(
     throw new Error(`Failed to create throwaway user: ${res.status()} - ${errorBody}`);
   }
 
-  const json = await res.json();
-  return {
-    email,
-    password,
-    fullName,
-    phone,
-    token: json.data?.accessToken,
-    user: json.data?.user,
-  };
+  const registered = (await res.json()).data;
+  let token: string | undefined = registered?.accessToken;
+  let user: any = registered?.user;
+
+  // Registration now needs the emailed 6-digit code: read it from Mailpit and verify.
+  if (registered?.verificationRequired) {
+    let code: string | null = null;
+    for (let i = 0; i < 40 && !code; i++) {
+      const list = await (await request.get('http://localhost:8025/api/v1/messages')).json();
+      const msg = list.messages?.find((m: any) => m.To?.[0]?.Address?.toLowerCase() === email.toLowerCase());
+      if (msg) {
+        const detail = await (await request.get(`http://localhost:8025/api/v1/message/${msg.ID}`)).json();
+        code = (detail.Text || detail.HTML || '').match(/\b(\d{6})\b/)?.[1] ?? null;
+      }
+      if (!code) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!code) throw new Error(`No verification email arrived for ${email}`);
+    const verify = await request.post('http://localhost:4000/api/auth/verify-email', { data: { email, code } });
+    if (!verify.ok()) throw new Error(`verify-email failed: ${verify.status()} ${await verify.text()}`);
+    const verified = (await verify.json()).data;
+    token = verified?.accessToken;
+    user = verified?.user;
+  }
+
+  return { email, password, fullName, phone, token, user };
 }
 
 export async function loginViaUI(page: Page, email: string, password: string, locale: 'en' | 'km' = 'en') {
